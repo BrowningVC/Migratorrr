@@ -15,6 +15,7 @@ import { StatsCards } from '@/components/dashboard/stats-cards';
 import { ActivityLog } from '@/components/dashboard/activity-log';
 import { PositionCard } from '@/components/dashboard/position-card';
 import { SniperCard } from '@/components/dashboard/sniper-card';
+import { WalletBalanceCard } from '@/components/dashboard/wallet-balance-card';
 import { CreateSniperModal } from '@/components/sniper/create-sniper-modal';
 import { DashboardSkeleton } from '@/components/dashboard/loading-skeletons';
 import { Button } from '@/components/ui/button';
@@ -313,8 +314,9 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Activity Log */}
-          <div className="lg:col-span-1">
+          {/* Sidebar: Wallet + Activity Log */}
+          <div className="lg:col-span-1 space-y-4">
+            <WalletBalanceCard />
             <ActivityLog />
           </div>
         </div>

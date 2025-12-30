@@ -1,12 +1,16 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { Keypair } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { prisma } from '../db/client.js';
 import { authenticate } from '../middleware/auth.js';
 import { SecureWalletService } from '../services/secure-wallet.js';
 
 const walletService = new SecureWalletService();
+
+// Solana connection for balance checks
+const RPC_URL = process.env.HELIUS_RPC_URL || process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const connection = new Connection(RPC_URL, 'confirmed');
 
 const connectWalletSchema = z.object({
   publicKey: z.string().min(32).max(44),
@@ -41,6 +45,101 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
       success: true,
       data: wallets,
     };
+  });
+
+  // Get wallet balance(s)
+  fastify.get('/balances', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+
+    const wallets = await prisma.wallet.findMany({
+      where: { userId, isActive: true },
+      select: {
+        id: true,
+        publicKey: true,
+        label: true,
+        walletType: true,
+      },
+    });
+
+    // Fetch balances in parallel
+    const balancePromises = wallets.map(async (wallet) => {
+      try {
+        const pubkey = new PublicKey(wallet.publicKey);
+        const balance = await connection.getBalance(pubkey);
+        return {
+          walletId: wallet.id,
+          publicKey: wallet.publicKey,
+          label: wallet.label,
+          walletType: wallet.walletType,
+          balanceLamports: balance,
+          balanceSol: balance / LAMPORTS_PER_SOL,
+        };
+      } catch (error) {
+        fastify.log.error(`Failed to fetch balance for ${wallet.publicKey}:`, error);
+        return {
+          walletId: wallet.id,
+          publicKey: wallet.publicKey,
+          label: wallet.label,
+          walletType: wallet.walletType,
+          balanceLamports: 0,
+          balanceSol: 0,
+          error: 'Failed to fetch balance',
+        };
+      }
+    });
+
+    const balances = await Promise.all(balancePromises);
+
+    return {
+      success: true,
+      data: balances,
+    };
+  });
+
+  // Get single wallet balance
+  fastify.get('/:walletId/balance', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const { walletId } = request.params as { walletId: string };
+
+    const wallet = await prisma.wallet.findFirst({
+      where: { id: walletId, userId, isActive: true },
+      select: {
+        id: true,
+        publicKey: true,
+        label: true,
+        walletType: true,
+      },
+    });
+
+    if (!wallet) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Wallet not found',
+      });
+    }
+
+    try {
+      const pubkey = new PublicKey(wallet.publicKey);
+      const balance = await connection.getBalance(pubkey);
+
+      return {
+        success: true,
+        data: {
+          walletId: wallet.id,
+          publicKey: wallet.publicKey,
+          label: wallet.label,
+          walletType: wallet.walletType,
+          balanceLamports: balance,
+          balanceSol: balance / LAMPORTS_PER_SOL,
+        },
+      };
+    } catch (error) {
+      fastify.log.error(`Failed to fetch balance for ${wallet.publicKey}:`, error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to fetch balance from Solana network',
+      });
+    }
   });
 
   // Connect external wallet

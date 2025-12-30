@@ -106,3 +106,102 @@
 .glow-primary {
   box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
 }
+
+/* Solana Wallet Adapter - Green Theme Override */
+.wallet-adapter-button {
+  background-color: #22c55e !important;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif !important;
+  border-radius: 0.5rem !important;
+  height: 40px !important;
+  padding: 0 16px !important;
+  font-weight: 500 !important;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background-color: #16a34a !important;
+}
+
+.wallet-adapter-button-trigger {
+  background-color: #22c55e !important;
+}
+
+.wallet-adapter-button[disabled] {
+  background-color: #27272a !important;
+  color: #71717a !important;
+}
+
+/* Wallet Modal Styling */
+.wallet-adapter-modal-wrapper {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+.wallet-adapter-modal-container {
+  background-color: #0a0f14 !important;
+  border: 1px solid #27272a !important;
+  border-radius: 1rem !important;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif !important;
+}
+
+.wallet-adapter-modal-title {
+  color: #f4f4f5 !important;
+  font-weight: 600 !important;
+}
+
+.wallet-adapter-modal-list {
+  margin: 0 !important;
+}
+
+.wallet-adapter-modal-list li {
+  margin-bottom: 8px !important;
+}
+
+.wallet-adapter-modal-list-more {
+  color: #22c55e !important;
+}
+
+.wallet-adapter-modal-list-more:hover {
+  color: #16a34a !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background-color: #18181b !important;
+  border: 1px solid #27272a !important;
+  border-radius: 0.75rem !important;
+  padding: 12px 16px !important;
+  height: auto !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background-color: #27272a !important;
+  border-color: #22c55e !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background-color: #27272a !important;
+}
+
+.wallet-adapter-modal-button-close:hover {
+  background-color: #3f3f46 !important;
+}
+
+.wallet-adapter-modal-button-close svg {
+  fill: #a1a1aa !important;
+}
+
+/* Dropdown menu styling */
+.wallet-adapter-dropdown-list {
+  background-color: #0a0f14 !important;
+  border: 1px solid #27272a !important;
+  border-radius: 0.75rem !important;
+  padding: 8px !important;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif !important;
+}
+
+.wallet-adapter-dropdown-list-item {
+  border-radius: 0.5rem !important;
+  padding: 10px 16px !important;
+}
+
+.wallet-adapter-dropdown-list-item:hover {
+  background-color: #27272a !important;
+}

@@ -122,6 +122,29 @@ export const walletApi = {
       { method: 'POST' },
       token
     ),
+
+  // Get all wallet balances
+  getBalances: (token: string) =>
+    fetchApi<Array<{
+      walletId: string;
+      publicKey: string;
+      label: string | null;
+      walletType: string;
+      balanceLamports: number;
+      balanceSol: number;
+      error?: string;
+    }>>('/api/wallet/balances', {}, token),
+
+  // Get single wallet balance
+  getBalance: (token: string, walletId: string) =>
+    fetchApi<{
+      walletId: string;
+      publicKey: string;
+      label: string | null;
+      walletType: string;
+      balanceLamports: number;
+      balanceSol: number;
+    }>(`/api/wallet/${walletId}/balance`, {}, token),
 };
 
 // Sniper API
