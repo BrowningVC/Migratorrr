@@ -19,7 +19,7 @@ interface CreateSniperModalProps {
   onCreated?: (sniper: Sniper) => void;
 }
 
-type Step = 'basics' | 'amounts' | 'automation' | 'filters' | 'review';
+type Step = 'basics' | 'selling' | 'buying' | 'filters' | 'review';
 
 const DEFAULT_CONFIG: SniperConfig = {
   snipeAmountSol: 0.1,
@@ -52,13 +52,13 @@ export function CreateSniperModal({
   const [namePatterns, setNamePatterns] = useState('');
   const [excludedPatterns, setExcludedPatterns] = useState('');
 
-  const steps: Step[] = ['basics', 'amounts', 'automation', 'filters', 'review'];
+  const steps: Step[] = ['basics', 'selling', 'buying', 'filters', 'review'];
   const stepIndex = steps.indexOf(step);
 
   const stepLabels = {
     basics: 'Basics',
-    amounts: 'Amounts',
-    automation: 'Automation',
+    selling: 'Exit Strategy',
+    buying: 'Buy Settings',
     filters: 'Filters',
     review: 'Review',
   };
@@ -243,70 +243,8 @@ export function CreateSniperModal({
             </div>
           )}
 
-          {/* Step 2: Amounts */}
-          {step === 'amounts' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="snipeAmount">Snipe Amount (SOL)</Label>
-                <Input
-                  id="snipeAmount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max="100"
-                  value={config.snipeAmountSol}
-                  onChange={(e) =>
-                    updateConfig({ snipeAmountSol: parseFloat(e.target.value) || 0 })
-                  }
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Amount of SOL to spend per snipe (excluding fees)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
-                <Input
-                  id="slippage"
-                  type="number"
-                  step="0.5"
-                  min="1"
-                  max="50"
-                  value={config.slippageBps / 100}
-                  onChange={(e) =>
-                    updateConfig({ slippageBps: Math.round(parseFloat(e.target.value) * 100) || 100 })
-                  }
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Maximum price slippage allowed (recommended: 10-20%)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="priorityFee">Priority Fee (SOL)</Label>
-                <Input
-                  id="priorityFee"
-                  type="number"
-                  step="0.0001"
-                  min="0.0001"
-                  max="0.1"
-                  value={config.priorityFeeSol}
-                  onChange={(e) =>
-                    updateConfig({ priorityFeeSol: parseFloat(e.target.value) || 0.001 })
-                  }
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Jito tip for faster execution (recommended: 0.001-0.005 SOL)
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Automation */}
-          {step === 'automation' && (
+          {/* Step 2: Selling/Exit Strategy */}
+          {step === 'selling' && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="takeProfit">Take Profit (%)</Label>
@@ -371,6 +309,68 @@ export function CreateSniperModal({
                 />
                 <p className="text-xs text-zinc-500">
                   Sell when price drops this % from highest point (leave empty to disable)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Buying/Entry Settings */}
+          {step === 'buying' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="snipeAmount">Snipe Amount (SOL)</Label>
+                <Input
+                  id="snipeAmount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max="100"
+                  value={config.snipeAmountSol}
+                  onChange={(e) =>
+                    updateConfig({ snipeAmountSol: parseFloat(e.target.value) || 0 })
+                  }
+                  className="bg-zinc-800 border-zinc-700"
+                />
+                <p className="text-xs text-zinc-500">
+                  Amount of SOL to spend per snipe (excluding fees)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
+                <Input
+                  id="slippage"
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="50"
+                  value={config.slippageBps / 100}
+                  onChange={(e) =>
+                    updateConfig({ slippageBps: Math.round(parseFloat(e.target.value) * 100) || 100 })
+                  }
+                  className="bg-zinc-800 border-zinc-700"
+                />
+                <p className="text-xs text-zinc-500">
+                  Maximum price slippage allowed (recommended: 10-20%)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="priorityFee">Priority Fee (SOL)</Label>
+                <Input
+                  id="priorityFee"
+                  type="number"
+                  step="0.0001"
+                  min="0.0001"
+                  max="0.1"
+                  value={config.priorityFeeSol}
+                  onChange={(e) =>
+                    updateConfig({ priorityFeeSol: parseFloat(e.target.value) || 0.001 })
+                  }
+                  className="bg-zinc-800 border-zinc-700"
+                />
+                <p className="text-xs text-zinc-500">
+                  Jito tip for faster execution (recommended: 0.001-0.005 SOL)
                 </p>
               </div>
             </div>
