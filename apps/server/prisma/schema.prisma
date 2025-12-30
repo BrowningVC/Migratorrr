@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User Management
+// ============================================
+
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique @map("wallet_address")
+  createdAt     DateTime @default(now()) @map("created_at")
+  lastLogin     DateTime? @map("last_login")
+
+  // Relations
+  wallets       Wallet[]
+  sniperConfigs SniperConfig[]
+  positions     Position[]
+  transactions  Transaction[]
+  activityLogs  ActivityLog[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// ============================================
+// Wallet Management
+// ============================================
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  publicKey String   @unique @map("public_key")
+  walletType String  @map("wallet_type") // 'connected' | 'generated'
+  label     String?
+  isPrimary Boolean  @default(false) @map("is_primary")
+  isActive  Boolean  @default(true) @map("is_active")
+
+  // Encrypted private key (for generated wallets only)
+  encryptedPrivateKey String? @map("encrypted_private_key")
+  iv                  String?
+  authTag             String? @map("auth_tag")
+  keyVersion          Int?    @default(1) @map("key_version")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sniperConfigs SniperConfig[]
+  positions     Position[]
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+// ============================================
+// Sniper Configuration
+// ============================================
+
+model SniperConfig {
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  walletId String  @map("wallet_id")
+  name     String
+  isActive Boolean @default(false) @map("is_active")
+
+  // Flexible JSON configuration for sniper parameters
+  // Allows easy addition of new parameters without schema changes
+  config Json
+
+  // Stats
+  totalSnipes      Int   @default(0) @map("total_snipes")
+  successfulSnipes Int   @default(0) @map("successful_snipes")
+  failedSnipes     Int   @default(0) @map("failed_snipes")
+  totalSolSpent    Float @default(0) @map("total_sol_spent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet    Wallet     @relation(fields: [walletId], references: [id])
+  positions Position[]
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("sniper_configs")
+}
+
+// ============================================
+// Trading Positions
+// ============================================
+
+model Position {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  walletId    String   @map("wallet_id")
+  sniperId    String?  @map("sniper_id")
+
+  // Token information
+  tokenMint   String   @map("token_mint")
+  tokenSymbol String?  @map("token_symbol")
+  tokenName   String?  @map("token_name")
+
+  // Entry details
+  entryPrice       Float    @map("entry_price")
+  entryTokenAmount Float    @map("entry_token_amount") // Token amount
+  entrySol         Float    @map("entry_sol")    // SOL spent
+
+  // Current state
+  currentTokenAmount Float  @map("current_token_amount")
+  status        String @default("open") // 'open' | 'closed' | 'liquidated'
+
+  // Automation targets (snapshot from sniper config at entry)
+  takeProfitPrice  Float?  @map("take_profit_price")
+  stopLossPrice    Float?  @map("stop_loss_price")
+  trailingStopPct  Float?  @map("trailing_stop_pct")
+  highestPrice     Float?  @map("highest_price") // For trailing stop
+
+  // Exit details
+  exitPrice    Float?  @map("exit_price")
+  exitSol      Float?  @map("exit_sol")
+
+  createdAt    DateTime  @default(now()) @map("created_at")
+  closedAt     DateTime? @map("closed_at")
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet       Wallet        @relation(fields: [walletId], references: [id])
+  sniper       SniperConfig? @relation(fields: [sniperId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@index([userId, status])
+  @@index([tokenMint])
+  @@index([sniperId])
+  @@map("positions")
+}
+
+// ============================================
+// Transactions
+// ============================================
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  positionId  String?  @map("position_id")
+
+  // Transaction details
+  signature   String   @unique
+  txType      String   @map("tx_type") // 'buy' | 'sell' | 'take_profit' | 'stop_loss'
+  tokenMint   String?  @map("token_mint")
+
+  // Amounts
+  solAmount   Float    @map("sol_amount")
+  tokenAmount Float    @map("token_amount")
+  pricePerToken Float? @map("price_per_token")
+
+  // Fees
+  platformFee Float    @map("platform_fee")
+  jitoTip     Float?   @map("jito_tip")
+  networkFee  Float?   @map("network_fee")
+
+  // Execution details
+  slippageBps   Int?    @map("slippage_bps")
+  bundleId      String? @map("bundle_id")
+  executionTime Int?    @map("execution_time_ms")
+
+  // Status
+  status       String   @default("pending") // 'pending' | 'confirmed' | 'failed'
+  errorMessage String?  @map("error_message")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  confirmedAt DateTime? @map("confirmed_at")
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  feeLedger FeeLedger?
+
+  @@index([userId])
+  @@index([status])
+  @@map("transactions")
+}
+
+// ============================================
+// Fee Tracking
+// ============================================
+
+model FeeLedger {
+  id            String   @id @default(uuid())
+  transactionId String?  @unique @map("transaction_id")
+  userId        String   @map("user_id")
+
+  feeType       String?  @map("fee_type") // 'trade_fee' | 'withdrawal_fee'
+  feeAmount     Float    @map("fee_amount")
+  feeSol        Float?   @map("fee_sol")
+
+  // Settlement tracking
+  settled          Boolean   @default(false)
+  settledSignature String?   @map("settled_signature")
+  settledAt        DateTime? @map("settled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([settled])
+  @@map("fee_ledger")
+}
+
+// ============================================
+// Activity & Audit Logging
+// ============================================
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  sniperId  String?  @map("sniper_id")
+
+  eventType String   @map("event_type")
+  eventData Json     @map("event_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("activity_log")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  action       String   // e.g., 'PRIVATE_KEY_EXPORTED', 'LOGIN', 'SNIPER_CREATED'
+  resourceType String?  @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  metadata     Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([action])
+  @@map("audit_log")
+}
+
+// ============================================
+// Migration Events (for analytics/debugging)
+// ============================================
+
+model MigrationEvent {
+  id        String   @id @default(uuid())
+
+  // Token info
+  tokenMint   String  @map("token_mint")
+  tokenName   String? @map("token_name")
+  tokenSymbol String? @map("token_symbol")
+
+  // Migration details
+  bondingCurveAddress String? @map("bonding_curve_address")
+  poolAddress         String? @map("pool_address")
+  initialLiquiditySol Float?  @map("initial_liquidity_sol")
+  initialPriceSol     Float?  @map("initial_price_sol")
+
+  // Detection metadata
+  detectedAt     DateTime @default(now()) @map("detected_at")
+  source         String   // 'pumpportal' | 'helius' | 'raydium'
+  detectionLatencyMs Int? @map("detection_latency_ms")
+
+  // Snipe results
+  totalSnipesAttempted  Int @default(0) @map("total_snipes_attempted")
+  totalSnipesSuccessful Int @default(0) @map("total_snipes_successful")
+
+  @@index([tokenMint])
+  @@index([detectedAt])
+  @@map("migration_events")
+}

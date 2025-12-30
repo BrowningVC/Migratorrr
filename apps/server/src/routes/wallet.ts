@@ -1,0 +1,342 @@
+import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { Keypair } from '@solana/web3.js';
+import bs58 from 'bs58';
+import { prisma } from '../db/client.js';
+import { authenticate } from '../middleware/auth.js';
+import { SecureWalletService } from '../services/secure-wallet.js';
+
+const walletService = new SecureWalletService();
+
+const connectWalletSchema = z.object({
+  publicKey: z.string().min(32).max(44),
+  label: z.string().max(100).optional(),
+  isPrimary: z.boolean().optional(),
+});
+
+const generateWalletSchema = z.object({
+  label: z.string().max(100).optional(),
+  isPrimary: z.boolean().optional(),
+});
+
+export const walletRoutes: FastifyPluginAsync = async (fastify) => {
+  // Get all wallets for user
+  fastify.get('/', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+
+    const wallets = await prisma.wallet.findMany({
+      where: { userId, isActive: true },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        publicKey: true,
+        walletType: true,
+        label: true,
+        isPrimary: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      data: wallets,
+    };
+  });
+
+  // Connect external wallet
+  fastify.post('/connect', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const body = connectWalletSchema.parse(request.body);
+
+    // Check if wallet already connected
+    const existing = await prisma.wallet.findFirst({
+      where: { publicKey: body.publicKey },
+    });
+
+    if (existing) {
+      if (existing.userId === userId) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Wallet already connected to your account',
+        });
+      }
+      return reply.status(400).send({
+        success: false,
+        error: 'Wallet already connected to another account',
+      });
+    }
+
+    // If setting as primary, unset other primary wallets
+    if (body.isPrimary) {
+      await prisma.wallet.updateMany({
+        where: { userId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    const wallet = await prisma.wallet.create({
+      data: {
+        userId,
+        publicKey: body.publicKey,
+        walletType: 'connected',
+        label: body.label,
+        isPrimary: body.isPrimary ?? false,
+      },
+      select: {
+        id: true,
+        publicKey: true,
+        walletType: true,
+        label: true,
+        isPrimary: true,
+        createdAt: true,
+      },
+    });
+
+    fastify.log.info(`Wallet connected: ${body.publicKey} for user ${userId}`);
+
+    return {
+      success: true,
+      data: wallet,
+    };
+  });
+
+  // Generate new wallet
+  fastify.post('/generate', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const body = generateWalletSchema.parse(request.body);
+
+    // Generate keypair
+    const keypair = Keypair.generate();
+    const publicKey = keypair.publicKey.toBase58();
+
+    // Encrypt and store private key
+    const encrypted = await walletService.encryptPrivateKey(
+      keypair.secretKey,
+      userId
+    );
+
+    // If setting as primary, unset other primary wallets
+    if (body.isPrimary) {
+      await prisma.wallet.updateMany({
+        where: { userId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    const wallet = await prisma.wallet.create({
+      data: {
+        userId,
+        publicKey,
+        walletType: 'generated',
+        label: body.label || 'Generated Wallet',
+        isPrimary: body.isPrimary ?? false,
+        encryptedPrivateKey: encrypted.ciphertext,
+        iv: encrypted.iv,
+        authTag: encrypted.authTag,
+        keyVersion: encrypted.version,
+      },
+      select: {
+        id: true,
+        publicKey: true,
+        walletType: true,
+        label: true,
+        isPrimary: true,
+        createdAt: true,
+      },
+    });
+
+    fastify.log.info(`Wallet generated: ${publicKey} for user ${userId}`);
+
+    return {
+      success: true,
+      data: wallet,
+    };
+  });
+
+  // Export private key (generated wallets only)
+  fastify.post('/:walletId/export', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const { walletId } = request.params as { walletId: string };
+
+    const wallet = await prisma.wallet.findFirst({
+      where: { id: walletId, userId },
+    });
+
+    if (!wallet) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Wallet not found',
+      });
+    }
+
+    if (wallet.walletType !== 'generated') {
+      return reply.status(400).send({
+        success: false,
+        error: 'Can only export generated wallets. Connected wallets are managed by your external wallet.',
+      });
+    }
+
+    if (!wallet.encryptedPrivateKey || !wallet.iv || !wallet.authTag) {
+      return reply.status(500).send({
+        success: false,
+        error: 'Wallet encryption data not found',
+      });
+    }
+
+    // Decrypt private key
+    const privateKey = await walletService.decryptPrivateKey(
+      {
+        ciphertext: wallet.encryptedPrivateKey,
+        iv: wallet.iv,
+        authTag: wallet.authTag,
+        version: wallet.keyVersion || 1,
+      },
+      userId
+    );
+
+    const privateKeyBase58 = bs58.encode(privateKey);
+
+    // Zero out the decrypted key
+    privateKey.fill(0);
+
+    // Log audit event
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'PRIVATE_KEY_EXPORTED',
+        resourceType: 'wallet',
+        resourceId: walletId,
+        ipAddress: request.ip,
+      },
+    });
+
+    fastify.log.warn(`Private key exported for wallet ${walletId} by user ${userId}`);
+
+    return {
+      success: true,
+      data: {
+        privateKey: privateKeyBase58,
+        warning: 'Store this securely. Anyone with this key has full control of the wallet.',
+      },
+    };
+  });
+
+  // Set wallet as primary
+  fastify.patch('/:walletId/primary', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const { walletId } = request.params as { walletId: string };
+
+    const wallet = await prisma.wallet.findFirst({
+      where: { id: walletId, userId },
+    });
+
+    if (!wallet) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Wallet not found',
+      });
+    }
+
+    // Unset other primary wallets
+    await prisma.wallet.updateMany({
+      where: { userId, isPrimary: true },
+      data: { isPrimary: false },
+    });
+
+    // Set this wallet as primary
+    const updated = await prisma.wallet.update({
+      where: { id: walletId },
+      data: { isPrimary: true },
+      select: {
+        id: true,
+        publicKey: true,
+        walletType: true,
+        label: true,
+        isPrimary: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      data: updated,
+    };
+  });
+
+  // Update wallet label
+  fastify.patch('/:walletId', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const { walletId } = request.params as { walletId: string };
+    const body = z.object({ label: z.string().max(100) }).parse(request.body);
+
+    const wallet = await prisma.wallet.findFirst({
+      where: { id: walletId, userId },
+    });
+
+    if (!wallet) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Wallet not found',
+      });
+    }
+
+    const updated = await prisma.wallet.update({
+      where: { id: walletId },
+      data: { label: body.label },
+      select: {
+        id: true,
+        publicKey: true,
+        walletType: true,
+        label: true,
+        isPrimary: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      data: updated,
+    };
+  });
+
+  // Deactivate wallet (soft delete)
+  fastify.delete('/:walletId', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const { walletId } = request.params as { walletId: string };
+
+    const wallet = await prisma.wallet.findFirst({
+      where: { id: walletId, userId },
+    });
+
+    if (!wallet) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Wallet not found',
+      });
+    }
+
+    // Check if wallet has active snipers
+    const activeSnipers = await prisma.sniperConfig.count({
+      where: { walletId, isActive: true },
+    });
+
+    if (activeSnipers > 0) {
+      return reply.status(400).send({
+        success: false,
+        error: `Cannot delete wallet with ${activeSnipers} active sniper(s). Deactivate them first.`,
+      });
+    }
+
+    await prisma.wallet.update({
+      where: { id: walletId },
+      data: { isActive: false },
+    });
+
+    fastify.log.info(`Wallet deactivated: ${walletId} by user ${userId}`);
+
+    return {
+      success: true,
+      data: { message: 'Wallet deactivated successfully' },
+    };
+  });
+};
