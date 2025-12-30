@@ -7,8 +7,6 @@ import { SniperConfig } from './snipers';
 export interface PendingSniperConfig {
   name: string;
   config: SniperConfig;
-  namePatterns?: string;
-  excludedPatterns?: string;
   createdAt: number; // timestamp to expire old configs
 }
 

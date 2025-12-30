@@ -36,8 +36,6 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   // Form state
   const [name, setName] = useState('My First Sniper');
   const [config, setConfig] = useState<SniperConfig>(DEFAULT_CONFIG);
-  const [namePatterns, setNamePatterns] = useState('');
-  const [excludedPatterns, setExcludedPatterns] = useState('');
 
   const steps: Step[] = ['basics', 'selling', 'buying', 'filters', 'review'];
   const stepIndex = steps.indexOf(step);
@@ -73,8 +71,6 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
     setPendingSniper({
       name,
       config,
-      namePatterns: namePatterns || undefined,
-      excludedPatterns: excludedPatterns || undefined,
       createdAt: Date.now(),
     });
 
@@ -87,8 +83,6 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
     setStep('basics');
     setName('My First Sniper');
     setConfig(DEFAULT_CONFIG);
-    setNamePatterns('');
-    setExcludedPatterns('');
     onClose();
   };
 
@@ -290,54 +284,126 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
 
           {/* Step 4: Filters */}
           {step === 'filters' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              {/* Token Type - Always enabled */}
               <div className="space-y-2">
-                <Label htmlFor="minLiquidity">Minimum Liquidity (SOL)</Label>
-                <Input
-                  id="minLiquidity"
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={config.minLiquiditySol || ''}
-                  onChange={(e) =>
-                    updateConfig({
-                      minLiquiditySol: e.target.value ? parseFloat(e.target.value) : undefined,
-                    })
-                  }
-                  placeholder="e.g., 5"
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Only snipe tokens with at least this much liquidity
-                </p>
+                <Label className="text-sm font-medium">Token Type</Label>
+                <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={true}
+                    disabled={true}
+                    className="w-4 h-4 rounded bg-green-600 border-green-600 text-green-600 cursor-not-allowed"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Newly Migrated Tokens</span>
+                    <p className="text-xs text-zinc-500">Only tokens that just migrated from PumpFun to Raydium</p>
+                  </div>
+                </div>
               </div>
 
+              {/* Migration Time Filter */}
               <div className="space-y-2">
-                <Label htmlFor="namePatterns">Name Patterns (comma-separated)</Label>
-                <Input
-                  id="namePatterns"
-                  value={namePatterns}
-                  onChange={(e) => setNamePatterns(e.target.value)}
-                  placeholder="e.g., pepe, doge, shib"
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Only snipe tokens whose name/symbol contains these (leave empty for all)
+                <Label className="text-sm font-medium">Migration Speed</Label>
+                <p className="text-xs text-zinc-500 mb-2">
+                  Time from token creation to migration (select one)
                 </p>
+                <div className="space-y-2">
+                  {[
+                    { value: 5, label: 'Migrated in less than 5 minutes' },
+                    { value: 15, label: 'Migrated in less than 15 minutes' },
+                    { value: 60, label: 'Migrated in less than 1 hour' },
+                    { value: 360, label: 'Migrated in less than 6 hours' },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={cn(
+                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        config.maxMigrationTimeMinutes === option.value
+                          ? 'bg-green-900/20 border-green-700'
+                          : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="migrationTime"
+                        checked={config.maxMigrationTimeMinutes === option.value}
+                        onChange={() => updateConfig({ maxMigrationTimeMinutes: option.value })}
+                        className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
+                      />
+                      <span className="text-sm">{option.label}</span>
+                    </label>
+                  ))}
+                  <label
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                      !config.maxMigrationTimeMinutes
+                        ? 'bg-green-900/20 border-green-700'
+                        : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="migrationTime"
+                      checked={!config.maxMigrationTimeMinutes}
+                      onChange={() => updateConfig({ maxMigrationTimeMinutes: undefined })}
+                      className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
+                    />
+                    <span className="text-sm text-zinc-400">No time restriction</span>
+                  </label>
+                </div>
               </div>
 
+              {/* Volume Filter */}
               <div className="space-y-2">
-                <Label htmlFor="excludedPatterns">Excluded Patterns (comma-separated)</Label>
-                <Input
-                  id="excludedPatterns"
-                  value={excludedPatterns}
-                  onChange={(e) => setExcludedPatterns(e.target.value)}
-                  placeholder="e.g., scam, rug, honeypot"
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Skip tokens whose name/symbol contains these
+                <Label className="text-sm font-medium">Minimum Volume</Label>
+                <p className="text-xs text-zinc-500 mb-2">
+                  Total trading volume since token deployment (select one)
                 </p>
+                <div className="space-y-2">
+                  {[
+                    { value: 10000, label: 'Over $10k in Volume' },
+                    { value: 25000, label: 'Over $25k in Volume' },
+                    { value: 50000, label: 'Over $50k in Volume' },
+                    { value: 100000, label: 'Over $100k in Volume' },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={cn(
+                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        config.minVolumeUsd === option.value
+                          ? 'bg-green-900/20 border-green-700'
+                          : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="volumeFilter"
+                        checked={config.minVolumeUsd === option.value}
+                        onChange={() => updateConfig({ minVolumeUsd: option.value })}
+                        className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
+                      />
+                      <span className="text-sm">{option.label}</span>
+                    </label>
+                  ))}
+                  <label
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                      !config.minVolumeUsd
+                        ? 'bg-green-900/20 border-green-700'
+                        : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="volumeFilter"
+                      checked={!config.minVolumeUsd}
+                      onChange={() => updateConfig({ minVolumeUsd: undefined })}
+                      className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
+                    />
+                    <span className="text-sm text-zinc-400">No volume restriction</span>
+                  </label>
+                </div>
               </div>
             </div>
           )}
@@ -384,6 +450,22 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-400">Min Liquidity</span>
                     <span className="font-medium">{config.minLiquiditySol} SOL</span>
+                  </div>
+                )}
+                {config.maxMigrationTimeMinutes && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Migration Speed</span>
+                    <span className="font-medium">
+                      {config.maxMigrationTimeMinutes < 60
+                        ? `< ${config.maxMigrationTimeMinutes}m`
+                        : `< ${config.maxMigrationTimeMinutes / 60}h`}
+                    </span>
+                  </div>
+                )}
+                {config.minVolumeUsd && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Min Volume</span>
+                    <span className="font-medium">${(config.minVolumeUsd / 1000).toFixed(0)}k+</span>
                   </div>
                 )}
               </div>

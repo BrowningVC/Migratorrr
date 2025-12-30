@@ -196,12 +196,6 @@ export default function OnboardingPage() {
     try {
       const finalConfig = {
         ...pendingSniper.config,
-        namePatterns: pendingSniper.namePatterns
-          ? pendingSniper.namePatterns.split(',').map((p) => p.trim()).filter(Boolean)
-          : undefined,
-        excludedPatterns: pendingSniper.excludedPatterns
-          ? pendingSniper.excludedPatterns.split(',').map((p) => p.trim()).filter(Boolean)
-          : undefined,
       };
 
       const res = await sniperApi.create(authToken, {

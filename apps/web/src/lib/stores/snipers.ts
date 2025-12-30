@@ -28,6 +28,10 @@ export interface SniperConfig {
   minLiquiditySol?: number;
   namePatterns?: string[];
   excludedPatterns?: string[];
+  // Migration time filter (minutes from token creation to migration)
+  maxMigrationTimeMinutes?: number; // 5, 15, 60, or 360
+  // Volume filter (minimum volume in USD since token deployment)
+  minVolumeUsd?: number; // 10000, 25000, 50000, or 100000
 }
 
 interface SnipersState {
