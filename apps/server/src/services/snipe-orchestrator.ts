@@ -2,6 +2,7 @@ import { Queue } from 'bullmq';
 import { redis } from '../db/redis.js';
 import { prisma } from '../db/client.js';
 import { migrationDetector, type MigrationEvent } from './migration-detector.js';
+import { tokenInfoService } from './token-info.js';
 import { emitToUser } from '../websocket/handlers.js';
 
 interface ActiveSniper {
@@ -25,6 +26,10 @@ interface SniperConfig {
   namePatterns?: string[];
   excludedPatterns?: string[];
   creatorWhitelist?: string[];
+  // Migration time filter (minutes from token creation to migration)
+  maxMigrationTimeMinutes?: number; // 5, 15, 60, or 360
+  // Volume filter (minimum volume in USD since token deployment)
+  minVolumeUsd?: number; // 10000, 25000, 50000, or 100000
   [key: string]: unknown;
 }
 
@@ -112,7 +117,8 @@ export class SnipeOrchestrator {
     // Filter and dispatch jobs
     let matched = 0;
     for (const sniper of activeSnipers) {
-      if (this.matchesCriteria(sniper.config, migration)) {
+      const meetsFilter = await this.matchesCriteria(sniper.config, migration);
+      if (meetsFilter) {
         matched++;
         await this.dispatchSnipeJob(sniper, migration);
       }
@@ -156,7 +162,10 @@ export class SnipeOrchestrator {
   /**
    * Check if a migration matches sniper criteria
    */
-  private matchesCriteria(config: SniperConfig, migration: MigrationEvent): boolean {
+  private async matchesCriteria(
+    config: SniperConfig,
+    migration: MigrationEvent & { detectedAt: number }
+  ): Promise<boolean> {
     // Check minimum liquidity
     if (config.minLiquiditySol && migration.initialLiquiditySol < config.minLiquiditySol) {
       return false;
@@ -188,6 +197,35 @@ export class SnipeOrchestrator {
       });
 
       if (excluded) {
+        return false;
+      }
+    }
+
+    // Check migration time filter
+    // migration.timestamp = token creation time
+    // migration.detectedAt = when the migration was detected
+    if (config.maxMigrationTimeMinutes) {
+      const migrationTimeMinutes = tokenInfoService.calculateMigrationTimeMinutes(
+        migration.timestamp,
+        migration.detectedAt
+      );
+
+      if (migrationTimeMinutes > config.maxMigrationTimeMinutes) {
+        console.log(
+          `Skipping ${migration.tokenSymbol}: migration time ${migrationTimeMinutes}m exceeds max ${config.maxMigrationTimeMinutes}m`
+        );
+        return false;
+      }
+    }
+
+    // Check volume filter
+    if (config.minVolumeUsd) {
+      const volumeData = await tokenInfoService.getTokenVolume(migration.tokenMint);
+
+      if (!tokenInfoService.meetsVolumeCriteria(volumeData, config.minVolumeUsd)) {
+        console.log(
+          `Skipping ${migration.tokenSymbol}: volume $${volumeData?.volumeUsdTotal || 0} below min $${config.minVolumeUsd}`
+        );
         return false;
       }
     }
