@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
 import { useSocket } from '@/lib/hooks/useSocket';
@@ -200,10 +201,12 @@ export default function DashboardPage() {
       <header className="border-b border-zinc-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Logo size="md" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-              Migratorrr
-            </h1>
+            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <Logo size="md" />
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+                Migratorrr
+              </h1>
+            </Link>
             <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">
               Beta
             </span>

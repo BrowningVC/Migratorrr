@@ -7,6 +7,7 @@ import { ArrowRight, Zap, Shield, TrendingUp, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
+import { PreAuthSniperModal } from '@/components/sniper/pre-auth-sniper-modal';
 
 // Dynamic import to prevent hydration mismatch with wallet button
 const WalletMultiButton = dynamic(
@@ -17,6 +18,7 @@ const WalletMultiButton = dynamic(
 export default function LandingPage() {
   const { connected } = useWallet();
   const [mounted, setMounted] = useState(false);
+  const [isSniperModalOpen, setIsSniperModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -30,10 +32,10 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Logo size="md" />
             <span className="text-2xl font-bold">Migratorrr</span>
-          </div>
+          </Link>
           <div className="flex items-center gap-4">
             {mounted && connected && (
               <Link href="/dashboard">
@@ -63,7 +65,13 @@ export default function LandingPage() {
                 </Button>
               </Link>
             ) : (
-              WalletButton
+              <Button
+                size="lg"
+                className="gap-2 bg-green-600 hover:bg-green-700"
+                onClick={() => setIsSniperModalOpen(true)}
+              >
+                Get Started <ArrowRight className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>
@@ -127,13 +135,13 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <StepCard
               number={1}
-              title="Connect Wallet"
-              description="Link your Phantom or Solflare wallet, or generate a new one directly in the app."
+              title="Configure Sniper"
+              description="Set your buy amount, slippage, take profit targets, and optional token filters."
             />
             <StepCard
               number={2}
-              title="Configure Sniper"
-              description="Set your buy amount, slippage, take profit targets, and optional token filters."
+              title="Connect Wallet"
+              description="Link your Phantom or Solflare wallet, or generate a new one directly in the app."
             />
             <StepCard
               number={3}
@@ -149,16 +157,22 @@ export default function LandingPage() {
         <div className="max-w-2xl mx-auto">
           <h2 className="text-3xl font-bold mb-4">Ready to Start Sniping?</h2>
           <p className="text-muted-foreground mb-8">
-            Connect your wallet and set up your first sniper in minutes.
+            Configure your sniper in under a minute. No wallet required to start.
           </p>
           {mounted && connected ? (
-            <Link href="/onboarding">
+            <Link href="/dashboard">
               <Button size="lg" className="gap-2">
-                Set Up Your Sniper <ArrowRight className="h-4 w-4" />
+                Go to Dashboard <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
           ) : (
-            WalletButton
+            <Button
+              size="lg"
+              className="gap-2 bg-green-600 hover:bg-green-700"
+              onClick={() => setIsSniperModalOpen(true)}
+            >
+              Configure Your Sniper <ArrowRight className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </section>
@@ -167,16 +181,22 @@ export default function LandingPage() {
       <footer className="border-t border-border">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Logo size="sm" />
               <span className="font-bold">Migratorrr</span>
-            </div>
+            </Link>
             <p className="text-sm text-muted-foreground">
               Trade at your own risk. Cryptocurrency trading involves significant risk of loss.
             </p>
           </div>
         </div>
       </footer>
+
+      {/* Pre-Auth Sniper Configuration Modal */}
+      <PreAuthSniperModal
+        isOpen={isSniperModalOpen}
+        onClose={() => setIsSniperModalOpen(false)}
+      />
     </div>
   );
 }
