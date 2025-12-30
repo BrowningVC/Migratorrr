@@ -17,6 +17,18 @@ interface DexScreenerPair {
   liquidity?: {
     usd: number;
   };
+  volume?: {
+    h24: number;
+    h6: number;
+    h1: number;
+    m5: number;
+  };
+  txns?: {
+    h24: { buys: number; sells: number };
+    h6: { buys: number; sells: number };
+    h1: { buys: number; sells: number };
+    m5: { buys: number; sells: number };
+  };
 }
 
 interface DexScreenerResponse {
@@ -30,6 +42,11 @@ interface TokenPriceData {
   marketCapUsd: number;
   liquidityUsd: number;
   fetchedAt: number;
+  // Legitimacy metrics
+  volumeUsd24h: number;
+  txCount24h: number;
+  buyTxCount24h: number;
+  sellTxCount24h: number;
 }
 
 interface PerformanceStats {
@@ -97,12 +114,28 @@ class PerformanceTrackerService {
         (current.liquidity?.usd || 0) > (best.liquidity?.usd || 0) ? current : best
       );
 
+      // Aggregate legitimacy metrics across all Solana pairs
+      let totalVolume24h = 0;
+      let totalBuys24h = 0;
+      let totalSells24h = 0;
+
+      for (const pair of solanaPairs) {
+        totalVolume24h += pair.volume?.h24 || 0;
+        totalBuys24h += pair.txns?.h24?.buys || 0;
+        totalSells24h += pair.txns?.h24?.sells || 0;
+      }
+
       const priceData: TokenPriceData = {
         priceSol: parseFloat(primaryPair.priceNative) || 0,
         priceUsd: parseFloat(primaryPair.priceUsd) || 0,
         marketCapUsd: primaryPair.marketCap || primaryPair.fdv || 0,
         liquidityUsd: primaryPair.liquidity?.usd || 0,
         fetchedAt: Date.now(),
+        // Legitimacy metrics
+        volumeUsd24h: totalVolume24h,
+        txCount24h: totalBuys24h + totalSells24h,
+        buyTxCount24h: totalBuys24h,
+        sellTxCount24h: totalSells24h,
       };
 
       await redis.setex(cacheKey, this.cacheTtlSeconds, JSON.stringify(priceData));
@@ -132,6 +165,12 @@ class PerformanceTrackerService {
     const updates: Record<string, unknown> = {
       currentPriceSol: priceData.priceSol,
       lastPriceCheck: now,
+      // Update legitimacy metrics
+      volumeUsd24h: priceData.volumeUsd24h,
+      txCount24h: priceData.txCount24h,
+      buyTxCount24h: priceData.buyTxCount24h,
+      sellTxCount24h: priceData.sellTxCount24h,
+      lastVolumeUpdate: now,
     };
 
     // Track highest price

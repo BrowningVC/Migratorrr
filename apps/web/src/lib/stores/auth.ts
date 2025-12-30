@@ -6,9 +6,11 @@ interface AuthState {
   userId: string | null;
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
+  _hasHydrated: boolean;
   setAuth: (token: string, userId: string) => void;
   clearAuth: () => void;
   completeOnboarding: () => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -18,6 +20,7 @@ export const useAuthStore = create<AuthState>()(
       userId: null,
       isAuthenticated: false,
       hasCompletedOnboarding: false,
+      _hasHydrated: false,
 
       setAuth: (token, userId) =>
         set({
@@ -37,6 +40,8 @@ export const useAuthStore = create<AuthState>()(
         set({
           hasCompletedOnboarding: true,
         }),
+
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
       name: 'migratorrr-auth',
@@ -46,6 +51,9 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

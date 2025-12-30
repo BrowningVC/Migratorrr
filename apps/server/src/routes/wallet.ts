@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { prisma } from '../db/client.js';
+import { redis } from '../db/redis.js';
 import { authenticate } from '../middleware/auth.js';
 import { SecureWalletService } from '../services/secure-wallet.js';
 
@@ -11,6 +12,10 @@ const walletService = new SecureWalletService();
 // Solana connection for balance checks
 const RPC_URL = process.env.HELIUS_RPC_URL || process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const connection = new Connection(RPC_URL, 'confirmed');
+
+// Balance cache settings - reduces Helius getBalance calls from user dashboard refreshes
+const USER_BALANCE_CACHE_PREFIX = 'user-wallet-balance:';
+const USER_BALANCE_CACHE_TTL_SECONDS = 15; // Cache for 15 seconds (user dashboard can refresh frequently)
 
 const connectWalletSchema = z.object({
   publicKey: z.string().min(32).max(44),
@@ -61,11 +66,23 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    // Fetch balances in parallel
+    // Fetch balances in parallel (with Redis caching to reduce Helius RPC calls)
     const balancePromises = wallets.map(async (wallet) => {
+      const cacheKey = `${USER_BALANCE_CACHE_PREFIX}${wallet.publicKey}`;
       try {
-        const pubkey = new PublicKey(wallet.publicKey);
-        const balance = await connection.getBalance(pubkey);
+        // Check cache first
+        const cachedBalance = await redis.get(cacheKey);
+        let balance: number;
+
+        if (cachedBalance !== null) {
+          balance = Math.round(parseFloat(cachedBalance) * LAMPORTS_PER_SOL);
+        } else {
+          const pubkey = new PublicKey(wallet.publicKey);
+          balance = await connection.getBalance(pubkey);
+          // Cache the balance in SOL
+          await redis.setex(cacheKey, USER_BALANCE_CACHE_TTL_SECONDS, (balance / LAMPORTS_PER_SOL).toString());
+        }
+
         return {
           walletId: wallet.id,
           publicKey: wallet.publicKey,
@@ -118,9 +135,20 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
+    const cacheKey = `${USER_BALANCE_CACHE_PREFIX}${wallet.publicKey}`;
     try {
-      const pubkey = new PublicKey(wallet.publicKey);
-      const balance = await connection.getBalance(pubkey);
+      // Check cache first
+      const cachedBalance = await redis.get(cacheKey);
+      let balance: number;
+
+      if (cachedBalance !== null) {
+        balance = Math.round(parseFloat(cachedBalance) * LAMPORTS_PER_SOL);
+      } else {
+        const pubkey = new PublicKey(wallet.publicKey);
+        balance = await connection.getBalance(pubkey);
+        // Cache the balance
+        await redis.setex(cacheKey, USER_BALANCE_CACHE_TTL_SECONDS, (balance / LAMPORTS_PER_SOL).toString());
+      }
 
       return {
         success: true,

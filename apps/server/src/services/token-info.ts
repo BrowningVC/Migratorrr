@@ -64,8 +64,24 @@ interface DexScreenerResponse {
  */
 class TokenInfoService {
   private cachePrefix = 'token-volume:';
-  private cacheTtlSeconds = 60; // Cache for 1 minute
+  private cacheTtlSeconds = 120; // Cache for 2 minutes (was 1)
   private dexScreenerBaseUrl = 'https://api.dexscreener.com/latest/dex';
+
+  // Rate limiting for DexScreener API
+  private lastDexScreenerCall = 0;
+  private readonly DEXSCREENER_MIN_INTERVAL_MS = 100; // Max 10 calls/second
+
+  /**
+   * Rate-limited delay for DexScreener API calls
+   */
+  private async rateLimitDexScreener(): Promise<void> {
+    const now = Date.now();
+    const elapsed = now - this.lastDexScreenerCall;
+    if (elapsed < this.DEXSCREENER_MIN_INTERVAL_MS) {
+      await new Promise(resolve => setTimeout(resolve, this.DEXSCREENER_MIN_INTERVAL_MS - elapsed));
+    }
+    this.lastDexScreenerCall = Date.now();
+  }
 
   /**
    * Get volume data for a token from DexScreener
@@ -83,6 +99,9 @@ class TokenInfoService {
         // Invalid cache, continue to fetch
       }
     }
+
+    // Rate limit API calls
+    await this.rateLimitDexScreener();
 
     try {
       // Fetch from DexScreener
@@ -217,6 +236,9 @@ class TokenInfoService {
         // Invalid cache, continue to fetch
       }
     }
+
+    // Rate limit API calls
+    await this.rateLimitDexScreener();
 
     try {
       const response = await fetch(

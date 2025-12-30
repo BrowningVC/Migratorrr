@@ -2,18 +2,17 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  Transaction,
   VersionedTransaction,
   TransactionMessage,
   ComputeBudgetProgram,
   SystemProgram,
   LAMPORTS_PER_SOL,
   TransactionInstruction,
+  AddressLookupTableAccount,
 } from '@solana/web3.js';
 import { SecureWalletService, EncryptedKey } from './secure-wallet.js';
 import { prisma } from '../db/client.js';
 import { emitToUser } from '../websocket/handlers.js';
-import bs58 from 'bs58';
 
 // Jito tip accounts (randomly selected for load distribution)
 const JITO_TIP_ACCOUNTS = [
@@ -27,17 +26,29 @@ const JITO_TIP_ACCOUNTS = [
   '3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT',
 ];
 
+// Multiple Jito block engines for parallel submission (speed optimization)
+const JITO_BLOCK_ENGINES = [
+  'https://mainnet.block-engine.jito.wtf',
+  'https://amsterdam.mainnet.block-engine.jito.wtf',
+  'https://frankfurt.mainnet.block-engine.jito.wtf',
+  'https://ny.mainnet.block-engine.jito.wtf',
+  'https://tokyo.mainnet.block-engine.jito.wtf',
+];
+
+// SOL mint address
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
+
 interface ExecuteSnipeParams {
   userId: string;
   walletId: string;
   tokenMint: string;
-  poolAddress: string;
+  poolAddress?: string;
   amountSol: number;
   slippageBps: number;
   priorityFeeSol: number;
   sniperId?: string;
   tokenSymbol?: string;
-  mevProtection?: boolean; // Use Jito bundles for MEV protection (default: true)
+  mevProtection?: boolean;
 }
 
 interface ExecutionResult {
@@ -46,6 +57,7 @@ interface ExecutionResult {
   error?: string;
   tokenAmount?: number;
   solSpent?: number;
+  solReceived?: number;
   fees?: {
     platformFee: number;
     jitoTip: number;
@@ -53,33 +65,69 @@ interface ExecutionResult {
   };
 }
 
-interface RaydiumQuote {
-  inputMint: string;
-  outputMint: string;
-  inAmount: string;
-  outAmount: string;
-  otherAmountThreshold: string;
-  swapMode: string;
-  priceImpactPct: number;
-  routePlan: Array<{
-    poolId: string;
+interface RaydiumSwapResponse {
+  id: string;
+  success: boolean;
+  data: {
+    swapType: string;
     inputMint: string;
+    inputAmount: string;
     outputMint: string;
-    feeMint: string;
-    feeRate: number;
-    feeAmount: string;
-  }>;
+    outputAmount: string;
+    otherAmountThreshold: string;
+    slippageBps: number;
+    priceImpactPct: number;
+    routePlan: Array<{
+      poolId: string;
+      inputMint: string;
+      outputMint: string;
+      feeMint: string;
+      feeRate: number;
+      feeAmount: string;
+    }>;
+  };
+}
+
+interface RaydiumTxResponse {
+  id: string;
+  success: boolean;
+  data: {
+    transaction: string; // Base64 encoded versioned transaction
+  }[];
+}
+
+// Cache for storing swap data between retries
+interface SwapContext {
+  quote: RaydiumSwapResponse['data'];
+  wallet: Keypair;
+  walletId: string;
+  platformFee: number;
+  tokenMint: string;
+  tokenSymbol?: string;
+  sniperId?: string;
+  userId: string;
+  isBuy: boolean;
+  positionId?: string;
 }
 
 /**
- * TransactionExecutor - Handles Raydium swaps with Jito MEV protection
+ * TransactionExecutor - High-speed Raydium swaps with Jito MEV protection
  *
- * Features:
- * - Raydium Trade API integration for quote/swap building
- * - Jito bundle submission for MEV protection
- * - Multi-path failsafe (Jito → Helius → Direct RPC)
- * - Automatic fee escalation on retries
- * - Platform fee injection (1%)
+ * Speed optimizations:
+ * - Parallel Jito submission to multiple block engines
+ * - Pre-fetched blockhash caching
+ * - Minimal instruction rebuilding on retry
+ * - Skip preflight for faster submission
+ *
+ * MEV Protection:
+ * - Jito private mempool (transactions not visible to searchers)
+ * - Atomic bundle execution
+ * - Random tip account selection
+ *
+ * User Communication:
+ * - Real-time WebSocket events at every step
+ * - Detailed error messages
+ * - Progress tracking for retries
  */
 export class TransactionExecutor {
   private secureWallet: SecureWalletService;
@@ -89,6 +137,16 @@ export class TransactionExecutor {
   private platformFeeWallet: PublicKey;
   private platformFeeBps: number;
 
+  // Blockhash cache for speed
+  // Increased from 2s to 30s to reduce Helius RPC calls significantly
+  // Blockhashes are valid for ~90 slots (~45 seconds), so 30s cache is safe
+  private cachedBlockhash: { blockhash: string; lastValidBlockHeight: number; fetchedAt: number } | null = null;
+  private readonly BLOCKHASH_CACHE_MS = 30000; // Refresh every 30 seconds (was 2s)
+
+  // Lookup table cache - these rarely change, cache for 5 minutes
+  private lookupTableCache = new Map<string, { account: AddressLookupTableAccount; fetchedAt: number }>();
+  private readonly LOOKUP_TABLE_CACHE_MS = 300000; // 5 minutes
+
   constructor() {
     this.secureWallet = new SecureWalletService();
 
@@ -97,27 +155,73 @@ export class TransactionExecutor {
     const heliusUrl =
       process.env.HELIUS_RPC_URL ||
       `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
-    this.primaryConnection = new Connection(heliusUrl, 'confirmed');
+    this.primaryConnection = new Connection(heliusUrl, {
+      commitment: 'confirmed',
+      confirmTransactionInitialTimeout: 30000,
+    });
     this.heliusConnection = this.primaryConnection;
 
     // Backup RPC
     if (process.env.BACKUP_RPC_URL) {
-      this.backupConnection = new Connection(
-        process.env.BACKUP_RPC_URL,
-        'confirmed'
+      this.backupConnection = new Connection(process.env.BACKUP_RPC_URL, 'confirmed');
+    }
+
+    // Platform fee configuration - CRITICAL: Must be a valid wallet address
+    const feeWalletAddress = process.env.PLATFORM_FEE_WALLET;
+    if (!feeWalletAddress || feeWalletAddress === '11111111111111111111111111111111') {
+      throw new Error(
+        'CRITICAL: PLATFORM_FEE_WALLET environment variable must be set to a valid Solana wallet address. ' +
+        'The system program address (11111...11111) is not valid for receiving fees.'
       );
     }
 
-    // Platform fee configuration
-    this.platformFeeWallet = new PublicKey(
-      process.env.PLATFORM_FEE_WALLET ||
-        '11111111111111111111111111111111' // Placeholder
-    );
+    try {
+      this.platformFeeWallet = new PublicKey(feeWalletAddress);
+    } catch {
+      throw new Error(`CRITICAL: Invalid PLATFORM_FEE_WALLET address: ${feeWalletAddress}`);
+    }
+
     this.platformFeeBps = parseInt(process.env.PLATFORM_FEE_BPS || '100'); // 1%
+
+    // Start blockhash refresh loop
+    this.startBlockhashRefresh();
   }
 
   /**
-   * Execute a snipe transaction with multi-path failsafe
+   * Background blockhash refresh for speed
+   */
+  private startBlockhashRefresh(): void {
+    const refresh = async () => {
+      try {
+        const { blockhash, lastValidBlockHeight } = await this.primaryConnection.getLatestBlockhash('confirmed');
+        this.cachedBlockhash = { blockhash, lastValidBlockHeight, fetchedAt: Date.now() };
+      } catch (error) {
+        console.error('Blockhash refresh error:', error);
+      }
+    };
+
+    // Initial fetch
+    refresh();
+
+    // Refresh every 2 seconds
+    setInterval(refresh, this.BLOCKHASH_CACHE_MS);
+  }
+
+  /**
+   * Get cached or fresh blockhash
+   */
+  private async getBlockhash(): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
+    if (this.cachedBlockhash && Date.now() - this.cachedBlockhash.fetchedAt < this.BLOCKHASH_CACHE_MS) {
+      return { blockhash: this.cachedBlockhash.blockhash, lastValidBlockHeight: this.cachedBlockhash.lastValidBlockHeight };
+    }
+
+    const result = await this.primaryConnection.getLatestBlockhash('confirmed');
+    this.cachedBlockhash = { ...result, fetchedAt: Date.now() };
+    return result;
+  }
+
+  /**
+   * Execute a snipe (buy) transaction with multi-path failsafe
    */
   async executeSnipe(params: ExecuteSnipeParams): Promise<ExecutionResult> {
     const {
@@ -129,130 +233,297 @@ export class TransactionExecutor {
       priorityFeeSol,
       sniperId,
       tokenSymbol,
-      mevProtection = true, // Default to enabled
+      mevProtection = true,
     } = params;
 
-    // Notify user that snipe is starting
+    const startTime = Date.now();
+
+    // Notify user immediately
     await emitToUser(userId, 'snipe:started', {
       sniperId,
       tokenMint,
-      tokenSymbol,
+      tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
       amountSol,
+      timestamp: startTime,
     });
 
     try {
-      // 1. Get wallet keypair
-      const wallet = await this.getWalletKeypair(userId, walletId);
+      // 1. Get wallet keypair (parallel with quote fetch for speed)
+      const [wallet, quote] = await Promise.all([
+        this.getWalletKeypair(userId, walletId),
+        this.getRaydiumQuote({
+          inputMint: SOL_MINT,
+          outputMint: tokenMint,
+          amount: Math.floor(amountSol * LAMPORTS_PER_SOL),
+          slippageBps,
+          isBuy: true,
+        }),
+      ]);
+
       if (!wallet) {
         throw new Error('Wallet not found or decryption failed');
       }
 
-      // 2. Calculate fees
-      const platformFee = amountSol * (this.platformFeeBps / 10000);
-      const swapAmountSol = amountSol - platformFee;
-      const amountLamports = Math.floor(swapAmountSol * LAMPORTS_PER_SOL);
-
-      // 3. Get Raydium quote
-      const quote = await this.getRaydiumQuote({
-        inputMint: 'So11111111111111111111111111111111111111112', // SOL
-        outputMint: tokenMint,
-        amount: amountLamports,
-        slippageBps,
-      });
-
       if (!quote) {
-        throw new Error('Failed to get Raydium quote');
+        throw new Error('Failed to get Raydium quote - token may not have liquidity');
       }
 
-      // 4. Build transaction with fee + swap + tip
-      const transaction = await this.buildTransaction({
-        wallet,
-        quote,
-        platformFee,
-        jitoTip: priorityFeeSol,
-        tokenMint,
+      // Notify quote received
+      await emitToUser(userId, 'snipe:quote', {
+        sniperId,
+        tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+        expectedTokens: parseInt(quote.outputAmount) / 1e9,
+        priceImpact: quote.priceImpactPct,
+        latencyMs: Date.now() - startTime,
       });
 
-      // 5. Execute with multi-path failsafe
+      // 2. Calculate fees
+      const platformFee = amountSol * (this.platformFeeBps / 10000);
+
+      // 3. Build and sign transaction
+      const swapContext: SwapContext = {
+        quote,
+        wallet,
+        walletId,
+        platformFee,
+        tokenMint,
+        tokenSymbol,
+        sniperId,
+        userId,
+        isBuy: true,
+      };
+
+      const transaction = await this.buildSwapTransaction(swapContext, priorityFeeSol);
+
+      // 4. Submit with MEV protection
       const result = await this.submitWithFailsafe({
         transaction,
-        wallet,
-        userId,
-        sniperId,
-        tokenSymbol,
+        swapContext,
         initialTip: priorityFeeSol,
         mevProtection,
       });
 
       if (result.success && result.signature) {
-        // 6. Record transaction
-        await this.recordTransaction({
+        const tokenAmount = parseInt(quote.outputAmount) / 1e9;
+
+        // 5. Record transaction (don't await - do in background for speed)
+        this.recordTransaction({
           userId,
+          walletId,
           sniperId,
           signature: result.signature,
           tokenMint,
           tokenSymbol,
           solAmount: amountSol,
-          tokenAmount: parseInt(quote.outAmount) / Math.pow(10, 9), // Assuming 9 decimals
+          tokenAmount,
           platformFee,
           jitoTip: priorityFeeSol,
-        });
+          txType: 'buy',
+        }).catch(err => console.error('Failed to record transaction:', err));
 
-        // 7. Notify success
+        // 6. Notify success
         await emitToUser(userId, 'snipe:success', {
           sniperId,
           signature: result.signature,
           tokenMint,
-          tokenSymbol,
-          tokenAmount: parseInt(quote.outAmount) / Math.pow(10, 9),
+          tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+          tokenAmount,
           solSpent: amountSol,
+          totalLatencyMs: Date.now() - startTime,
         });
 
         return {
           success: true,
           signature: result.signature,
-          tokenAmount: parseInt(quote.outAmount) / Math.pow(10, 9),
+          tokenAmount,
           solSpent: amountSol,
           fees: {
             platformFee,
             jitoTip: priorityFeeSol,
-            networkFee: 0.000005, // Standard tx fee
+            networkFee: 0.000005,
           },
         };
       } else {
-        throw new Error(result.error || 'Transaction failed');
+        throw new Error(result.error || 'Transaction failed after all retries');
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       // Notify failure
       await emitToUser(userId, 'snipe:failed', {
         sniperId,
         tokenMint,
-        tokenSymbol,
+        tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
         error: errorMessage,
+        totalLatencyMs: Date.now() - startTime,
       });
 
-      // Log the failed transaction
-      await prisma.activityLog.create({
+      // Log failure (background)
+      prisma.activityLog.create({
         data: {
           userId,
           sniperId,
           eventType: 'snipe:failed',
-          eventData: {
-            tokenMint,
-            tokenSymbol,
-            amountSol,
-            error: errorMessage,
-          },
+          eventData: { tokenMint, tokenSymbol, amountSol, error: errorMessage },
         },
+      }).catch(err => console.error('Failed to log activity:', err));
+
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Execute a sell transaction
+   */
+  async executeSell(params: {
+    userId: string;
+    walletId: string;
+    positionId: string;
+    tokenMint: string;
+    tokenAmount: number;
+    tokenDecimals?: number;
+    slippageBps: number;
+    priorityFeeSol: number;
+    reason: 'manual' | 'take_profit' | 'stop_loss' | 'trailing_stop';
+    tokenSymbol?: string;
+  }): Promise<ExecutionResult> {
+    const {
+      userId,
+      walletId,
+      positionId,
+      tokenMint,
+      tokenAmount,
+      tokenDecimals = 9,
+      slippageBps,
+      priorityFeeSol,
+      reason,
+      tokenSymbol,
+    } = params;
+
+    const startTime = Date.now();
+
+    // Notify immediately
+    await emitToUser(userId, 'position:selling', {
+      positionId,
+      tokenMint,
+      tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+      tokenAmount,
+      reason,
+      timestamp: startTime,
+    });
+
+    try {
+      // 1. Get wallet and quote in parallel
+      const tokenAmountRaw = Math.floor(tokenAmount * Math.pow(10, tokenDecimals));
+
+      const [wallet, quote] = await Promise.all([
+        this.getWalletKeypair(userId, walletId),
+        this.getRaydiumQuote({
+          inputMint: tokenMint,
+          outputMint: SOL_MINT,
+          amount: tokenAmountRaw,
+          slippageBps,
+          isBuy: false,
+        }),
+      ]);
+
+      if (!wallet) {
+        throw new Error('Wallet not found or decryption failed');
+      }
+
+      if (!quote) {
+        throw new Error('Failed to get sell quote - no liquidity available');
+      }
+
+      const expectedSol = parseInt(quote.outputAmount) / LAMPORTS_PER_SOL;
+
+      // Notify quote
+      await emitToUser(userId, 'position:sell_quote', {
+        positionId,
+        tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+        expectedSol,
+        priceImpact: quote.priceImpactPct,
       });
 
-      return {
-        success: false,
-        error: errorMessage,
+      // 2. Calculate fees (taken from received SOL)
+      const platformFee = expectedSol * (this.platformFeeBps / 10000);
+
+      // 3. Build transaction
+      const swapContext: SwapContext = {
+        quote,
+        wallet,
+        walletId,
+        platformFee,
+        tokenMint,
+        tokenSymbol,
+        userId,
+        isBuy: false,
+        positionId,
       };
+
+      const transaction = await this.buildSwapTransaction(swapContext, priorityFeeSol);
+
+      // 4. Submit with MEV protection (always on for sells)
+      const result = await this.submitWithFailsafe({
+        transaction,
+        swapContext,
+        initialTip: priorityFeeSol,
+        mevProtection: true, // Always protect sells
+      });
+
+      if (result.success && result.signature) {
+        // 5. Update position and record transaction (background)
+        this.recordSellTransaction({
+          userId,
+          positionId,
+          signature: result.signature,
+          tokenMint,
+          tokenSymbol,
+          tokenAmount,
+          solReceived: expectedSol,
+          platformFee,
+          jitoTip: priorityFeeSol,
+          reason,
+        }).catch(err => console.error('Failed to record sell:', err));
+
+        // 6. Notify success
+        await emitToUser(userId, 'position:sold', {
+          positionId,
+          signature: result.signature,
+          tokenMint,
+          tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+          tokenAmount,
+          solReceived: expectedSol - platformFee,
+          reason,
+          totalLatencyMs: Date.now() - startTime,
+        });
+
+        return {
+          success: true,
+          signature: result.signature,
+          tokenAmount,
+          solReceived: expectedSol - platformFee,
+          fees: {
+            platformFee,
+            jitoTip: priorityFeeSol,
+            networkFee: 0.000005,
+          },
+        };
+      } else {
+        throw new Error(result.error || 'Sell failed after all retries');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      await emitToUser(userId, 'position:sell_failed', {
+        positionId,
+        tokenMint,
+        tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+        error: errorMessage,
+        reason,
+      });
+
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -264,33 +535,33 @@ export class TransactionExecutor {
     outputMint: string;
     amount: number;
     slippageBps: number;
-  }): Promise<RaydiumQuote | null> {
+    isBuy: boolean;
+  }): Promise<RaydiumSwapResponse['data'] | null> {
     try {
-      // Raydium Trade API endpoint
-      const response = await fetch(
-        'https://transaction-v1.raydium.io/compute/swap-base-in',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: 'quote-request',
-            inputMint: params.inputMint,
-            outputMint: params.outputMint,
-            amount: params.amount.toString(),
-            slippageBps: params.slippageBps,
-            txVersion: 'V0',
-          }),
-        }
-      );
+      const response = await fetch('https://transaction-v1.raydium.io/compute/swap-base-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `quote-${Date.now()}`,
+          inputMint: params.inputMint,
+          outputMint: params.outputMint,
+          amount: params.amount.toString(),
+          slippageBps: params.slippageBps,
+          txVersion: 'V0',
+        }),
+      });
 
       if (!response.ok) {
         console.error('Raydium quote error:', await response.text());
         return null;
       }
 
-      const data = await response.json();
+      const data: RaydiumSwapResponse = await response.json();
+      if (!data.success) {
+        console.error('Raydium quote failed:', data);
+        return null;
+      }
+
       return data.data;
     } catch (error) {
       console.error('Failed to get Raydium quote:', error);
@@ -299,42 +570,105 @@ export class TransactionExecutor {
   }
 
   /**
-   * Build transaction with platform fee, swap, and Jito tip
+   * Build swap transaction using Raydium's serialized transaction
+   * This is faster than building from scratch
    */
-  private async buildTransaction(params: {
-    wallet: Keypair;
-    quote: RaydiumQuote;
-    platformFee: number;
-    jitoTip: number;
-    tokenMint: string;
-  }): Promise<VersionedTransaction> {
-    const { wallet, quote, platformFee, jitoTip } = params;
+  private async buildSwapTransaction(
+    context: SwapContext,
+    jitoTip: number
+  ): Promise<VersionedTransaction> {
+    const { quote, wallet, platformFee, isBuy } = context;
 
-    // Get recent blockhash
-    const { blockhash, lastValidBlockHeight } =
-      await this.primaryConnection.getLatestBlockhash('confirmed');
+    // Get serialized swap transaction from Raydium
+    const txResponse = await fetch('https://transaction-v1.raydium.io/transaction/swap-base-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        computeUnitPriceMicroLamports: Math.floor((jitoTip * LAMPORTS_PER_SOL) / 400_000).toString(),
+        swapResponse: quote,
+        txVersion: 'V0',
+        wallet: wallet.publicKey.toBase58(),
+        wrapSol: isBuy, // Wrap SOL when buying
+        unwrapSol: !isBuy, // Unwrap when selling
+      }),
+    });
 
+    if (!txResponse.ok) {
+      throw new Error(`Raydium transaction API error: ${await txResponse.text()}`);
+    }
+
+    const txData: RaydiumTxResponse = await txResponse.json();
+    if (!txData.success || !txData.data?.[0]?.transaction) {
+      throw new Error('Raydium returned no transaction data');
+    }
+
+    // Decode the base64 transaction
+    const txBuffer = Buffer.from(txData.data[0].transaction, 'base64');
+    let transaction = VersionedTransaction.deserialize(txBuffer);
+
+    // Now we need to add our platform fee and Jito tip
+    // We'll rebuild with the swap instructions + our additions
+    const { blockhash, lastValidBlockHeight } = await this.getBlockhash();
+
+    // Get the message and extract lookup tables
+    const message = transaction.message;
+    const lookupTableAddresses = message.addressTableLookups.map(lookup => lookup.accountKey);
+
+    // Fetch lookup tables with caching (reduces Helius RPC calls significantly)
+    let lookupTables: AddressLookupTableAccount[] = [];
+    if (lookupTableAddresses.length > 0) {
+      const now = Date.now();
+      const uncachedAddresses: PublicKey[] = [];
+      const uncachedIndices: number[] = [];
+
+      // Check cache first
+      for (let i = 0; i < lookupTableAddresses.length; i++) {
+        const key = lookupTableAddresses[i].toBase58();
+        const cached = this.lookupTableCache.get(key);
+        if (cached && now - cached.fetchedAt < this.LOOKUP_TABLE_CACHE_MS) {
+          lookupTables.push(cached.account);
+        } else {
+          uncachedAddresses.push(lookupTableAddresses[i]);
+          uncachedIndices.push(i);
+        }
+      }
+
+      // Fetch uncached lookup tables
+      if (uncachedAddresses.length > 0) {
+        const fetchedAccounts = await this.primaryConnection.getMultipleAccountsInfo(uncachedAddresses);
+        for (let i = 0; i < fetchedAccounts.length; i++) {
+          const account = fetchedAccounts[i];
+          if (account) {
+            const lookupTable = new AddressLookupTableAccount({
+              key: uncachedAddresses[i],
+              state: AddressLookupTableAccount.deserialize(account.data),
+            });
+            lookupTables.push(lookupTable);
+            // Cache the lookup table
+            this.lookupTableCache.set(uncachedAddresses[i].toBase58(), {
+              account: lookupTable,
+              fetchedAt: now,
+            });
+          }
+        }
+      }
+    }
+
+    // Decompile the transaction to get instructions
+    const decompiledMessage = TransactionMessage.decompile(message, { addressLookupTableAccounts: lookupTables });
+    const originalInstructions = decompiledMessage.instructions;
+
+    // Build new instructions array
     const instructions: TransactionInstruction[] = [];
 
-    // 1. Set compute budget (high for complex swaps)
-    instructions.push(
-      ComputeBudgetProgram.setComputeUnitLimit({
-        units: 400_000,
-      })
-    );
+    // 1. Compute budget (replace Raydium's with our higher limit)
+    instructions.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }));
+    instructions.push(ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: Math.floor((jitoTip * LAMPORTS_PER_SOL) / 400_000),
+    }));
 
-    // 2. Set priority fee (micro-lamports per CU)
-    const priorityFeePerCu = Math.floor(
-      (jitoTip * LAMPORTS_PER_SOL) / 400_000
-    );
-    instructions.push(
-      ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: priorityFeePerCu,
-      })
-    );
-
-    // 3. Platform fee transfer
-    if (platformFee > 0) {
+    // 2. Platform fee transfer (before swap for buys, we take from input)
+    if (platformFee > 0 && isBuy) {
       instructions.push(
         SystemProgram.transfer({
           fromPubkey: wallet.publicKey,
@@ -344,16 +678,27 @@ export class TransactionExecutor {
       );
     }
 
-    // 4. Get swap instructions from Raydium
-    const swapInstructions = await this.getSwapInstructions({
-      wallet: wallet.publicKey,
-      quote,
-    });
-    instructions.push(...swapInstructions);
+    // 3. Add original swap instructions (skip compute budget instructions from Raydium)
+    for (const ix of originalInstructions) {
+      const isComputeBudget = ix.programId.equals(ComputeBudgetProgram.programId);
+      if (!isComputeBudget) {
+        instructions.push(ix);
+      }
+    }
 
-    // 5. Jito tip (to random tip account)
-    const tipAccount =
-      JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
+    // 4. Platform fee for sells (taken from output SOL)
+    if (platformFee > 0 && !isBuy) {
+      instructions.push(
+        SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey: this.platformFeeWallet,
+          lamports: Math.floor(platformFee * LAMPORTS_PER_SOL),
+        })
+      );
+    }
+
+    // 5. Jito tip (random tip account for load distribution)
+    const tipAccount = JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
     instructions.push(
       SystemProgram.transfer({
         fromPubkey: wallet.publicKey,
@@ -362,89 +707,41 @@ export class TransactionExecutor {
       })
     );
 
-    // Build versioned transaction
-    const messageV0 = new TransactionMessage({
+    // Build new versioned transaction
+    const newMessage = new TransactionMessage({
       payerKey: wallet.publicKey,
       recentBlockhash: blockhash,
       instructions,
-    }).compileToV0Message();
+    }).compileToV0Message(lookupTables);
 
-    const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([wallet]);
+    const newTransaction = new VersionedTransaction(newMessage);
+    newTransaction.sign([wallet]);
 
-    return transaction;
+    return newTransaction;
   }
 
   /**
-   * Get swap instructions from Raydium
-   */
-  private async getSwapInstructions(params: {
-    wallet: PublicKey;
-    quote: RaydiumQuote;
-  }): Promise<TransactionInstruction[]> {
-    try {
-      // Get serialized swap transaction from Raydium
-      const response = await fetch(
-        'https://transaction-v1.raydium.io/transaction/swap-base-in',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            computeUnitPriceMicroLamports: '1',
-            swapResponse: params.quote,
-            txVersion: 'V0',
-            wallet: params.wallet.toBase58(),
-            wrapSol: true,
-            unwrapSol: false,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Raydium swap API error: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-
-      // Decode the transaction and extract instructions
-      // For now, we'll use the serialized transaction approach
-      return []; // Placeholder - actual implementation extracts from response
-    } catch (error) {
-      console.error('Failed to get swap instructions:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Submit transaction with multi-path failsafe
-   * When mevProtection is enabled (default), uses Jito bundles first
-   * When disabled, skips Jito and goes directly to Helius/RPC
+   * Submit with multi-path failsafe and parallel Jito submission
    */
   private async submitWithFailsafe(params: {
     transaction: VersionedTransaction;
-    wallet: Keypair;
-    userId: string;
-    sniperId?: string;
-    tokenSymbol?: string;
+    swapContext: SwapContext;
     initialTip: number;
-    mevProtection?: boolean;
+    mevProtection: boolean;
   }): Promise<{ success: boolean; signature?: string; error?: string }> {
-    const { wallet, userId, sniperId, tokenSymbol, initialTip, mevProtection = true } = params;
+    const { swapContext, initialTip, mevProtection } = params;
     let { transaction } = params;
+    const { userId, sniperId, tokenSymbol } = swapContext;
 
-    // Build attempt sequence based on MEV protection setting
+    // Build attempt sequence
     const attempts = mevProtection
       ? [
-          // MEV protected: Jito first, then fallback to Helius/direct
-          { path: 'jito', tipMultiplier: 1 },
-          { path: 'jito', tipMultiplier: 2 },
-          { path: 'helius', tipMultiplier: 2.5 },
-          { path: 'direct', tipMultiplier: 3 },
+          { path: 'jito-parallel', tipMultiplier: 1 },      // Parallel to all Jito endpoints
+          { path: 'jito-parallel', tipMultiplier: 1.5 },    // Retry with higher tip
+          { path: 'helius', tipMultiplier: 2 },              // Helius staked
+          { path: 'direct', tipMultiplier: 2.5 },            // Direct RPC fallback
         ]
       : [
-          // No MEV protection: Skip Jito, use Helius/direct only (faster, cheaper)
           { path: 'helius', tipMultiplier: 1 },
           { path: 'helius', tipMultiplier: 1.5 },
           { path: 'direct', tipMultiplier: 2 },
@@ -453,7 +750,7 @@ export class TransactionExecutor {
     for (let i = 0; i < attempts.length; i++) {
       const attempt = attempts[i];
 
-      // Notify user of retry (if not first attempt)
+      // Rebuild transaction with new tip if not first attempt
       if (i > 0) {
         await emitToUser(userId, 'snipe:retrying', {
           sniperId,
@@ -461,29 +758,33 @@ export class TransactionExecutor {
           attempt: i + 1,
           maxAttempts: attempts.length,
           path: attempt.path,
+          newTip: initialTip * attempt.tipMultiplier,
         });
 
-        // Rebuild transaction with higher tip
-        transaction = await this.rebuildWithNewTip(
-          transaction,
-          wallet,
-          initialTip * attempt.tipMultiplier
-        );
+        transaction = await this.rebuildWithNewTip(swapContext, initialTip * attempt.tipMultiplier);
       }
 
       try {
-        // Notify that transaction is being submitted
-        await emitToUser(userId, 'snipe:submitted', {
+        await emitToUser(userId, 'snipe:submitting', {
           sniperId,
           tokenSymbol,
           path: attempt.path,
+          attempt: i + 1,
         });
 
-        const signature = await this.submitViaPath(transaction, attempt.path);
+        let signature: string | null = null;
+
+        if (attempt.path === 'jito-parallel') {
+          signature = await this.submitToJitoParallel(transaction);
+        } else if (attempt.path === 'helius') {
+          signature = await this.submitToHelius(transaction);
+        } else {
+          signature = await this.submitDirect(transaction);
+        }
 
         if (signature) {
-          // Wait for confirmation
-          const confirmed = await this.confirmTransaction(signature);
+          // Confirm transaction
+          const confirmed = await this.confirmTransactionFast(signature);
 
           if (confirmed) {
             return { success: true, signature };
@@ -493,9 +794,9 @@ export class TransactionExecutor {
         console.error(`Attempt ${i + 1} (${attempt.path}) failed:`, error);
       }
 
-      // Brief delay before retry
+      // Brief delay before retry (exponential backoff but capped)
       if (i < attempts.length - 1) {
-        await this.sleep(100 * (i + 1));
+        await this.sleep(Math.min(50 * (i + 1), 150));
       }
     }
 
@@ -503,79 +804,130 @@ export class TransactionExecutor {
   }
 
   /**
-   * Submit transaction via specific path
+   * Submit to ALL Jito block engines in parallel - first success wins
+   * Returns the transaction signature after polling for bundle confirmation
    */
-  private async submitViaPath(
-    transaction: VersionedTransaction,
-    path: string
-  ): Promise<string | null> {
+  private async submitToJitoParallel(transaction: VersionedTransaction): Promise<string | null> {
     const serialized = Buffer.from(transaction.serialize()).toString('base64');
 
-    switch (path) {
-      case 'jito':
-        return await this.submitToJito(serialized);
+    // Get the transaction signature from the signed transaction
+    // This is used to verify the bundle was included
+    const txSignature = transaction.signatures[0]
+      ? Buffer.from(transaction.signatures[0]).toString('base64')
+      : null;
 
-      case 'helius':
-        return await this.submitToHelius(transaction);
+    // Submit to all Jito endpoints in parallel
+    const submissions = JITO_BLOCK_ENGINES.map(async (endpoint) => {
+      try {
+        const response = await fetch(`${endpoint}/api/v1/bundles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'sendBundle',
+            params: [[serialized]],
+          }),
+        });
 
-      case 'direct':
-        return await this.submitDirect(transaction);
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
 
-      default:
-        throw new Error(`Unknown submission path: ${path}`);
-    }
-  }
-
-  /**
-   * Submit to Jito block engine
-   */
-  private async submitToJito(serializedTx: string): Promise<string | null> {
-    const jitoUrl =
-      process.env.JITO_BLOCK_ENGINE_URL ||
-      'https://mainnet.block-engine.jito.wtf';
-
-    try {
-      const response = await fetch(`${jitoUrl}/api/v1/bundles`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'sendBundle',
-          params: [[serializedTx]],
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.error) {
-        throw new Error(result.error.message);
+        return { bundleId: result.result as string, endpoint };
+      } catch (error) {
+        // Silent fail - other endpoints may succeed
+        return null;
       }
+    });
 
-      // Return bundle ID (we'll need to poll for confirmation)
-      return result.result;
-    } catch (error) {
-      console.error('Jito submission error:', error);
+    // Wait for first successful response
+    const results = await Promise.allSettled(submissions);
+
+    let bundleId: string | null = null;
+    let successEndpoint: string | null = null;
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) {
+        bundleId = result.value.bundleId;
+        successEndpoint = result.value.endpoint;
+        break;
+      }
+    }
+
+    if (!bundleId) {
       return null;
     }
+
+    console.log(`Jito bundle submitted: ${bundleId} via ${successEndpoint}`);
+
+    // Poll for bundle status to get the actual transaction signature
+    // Jito bundles typically land within 1-2 slots (~800ms)
+    const signature = await this.pollJitoBundleStatus(bundleId, successEndpoint!);
+
+    return signature;
   }
 
   /**
-   * Submit via Helius (staked connections)
+   * Poll Jito for bundle status and return the transaction signature when confirmed
    */
-  private async submitToHelius(
-    transaction: VersionedTransaction
-  ): Promise<string | null> {
-    try {
-      const signature = await this.heliusConnection.sendTransaction(
-        transaction,
-        {
-          skipPreflight: true,
-          maxRetries: 0,
+  private async pollJitoBundleStatus(bundleId: string, endpoint: string): Promise<string | null> {
+    const maxAttempts = 20; // ~10 seconds total
+    const pollIntervalMs = 500;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await fetch(`${endpoint}/api/v1/bundles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getBundleStatuses',
+            params: [[bundleId]],
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.result?.value?.[0]) {
+          const bundleStatus = result.result.value[0];
+          const status = bundleStatus.confirmation_status;
+
+          if (status === 'confirmed' || status === 'finalized') {
+            // Bundle landed - extract transaction signatures
+            const txSignatures = bundleStatus.transactions || [];
+            if (txSignatures.length > 0) {
+              console.log(`Jito bundle ${bundleId} confirmed with signature: ${txSignatures[0]}`);
+              return txSignatures[0];
+            }
+          } else if (status === 'failed' || bundleStatus.err) {
+            console.error(`Jito bundle ${bundleId} failed:`, bundleStatus.err);
+            return null;
+          }
+          // Status is 'processed' or pending - keep polling
         }
-      );
+      } catch (error) {
+        console.error(`Error polling Jito bundle status:`, error);
+      }
+
+      await this.sleep(pollIntervalMs);
+    }
+
+    console.warn(`Jito bundle ${bundleId} status polling timed out`);
+    return null;
+  }
+
+  /**
+   * Submit via Helius staked connections
+   */
+  private async submitToHelius(transaction: VersionedTransaction): Promise<string | null> {
+    try {
+      const signature = await this.heliusConnection.sendTransaction(transaction, {
+        skipPreflight: true, // Skip for speed
+        maxRetries: 0,
+      });
       return signature;
     } catch (error) {
       console.error('Helius submission error:', error);
@@ -584,17 +936,15 @@ export class TransactionExecutor {
   }
 
   /**
-   * Submit directly to RPC (fallback)
+   * Submit directly to RPC
    */
-  private async submitDirect(
-    transaction: VersionedTransaction
-  ): Promise<string | null> {
+  private async submitDirect(transaction: VersionedTransaction): Promise<string | null> {
     const connection = this.backupConnection || this.primaryConnection;
 
     try {
       const signature = await connection.sendTransaction(transaction, {
         skipPreflight: true,
-        maxRetries: 3,
+        maxRetries: 2,
       });
       return signature;
     } catch (error) {
@@ -604,24 +954,37 @@ export class TransactionExecutor {
   }
 
   /**
-   * Confirm transaction
+   * Fast transaction confirmation with timeout
+   * Uses exponential backoff to reduce RPC calls while still being responsive
    */
-  private async confirmTransaction(signature: string): Promise<boolean> {
-    try {
-      const confirmation = await this.primaryConnection.confirmTransaction(
-        {
-          signature,
-          blockhash: (
-            await this.primaryConnection.getLatestBlockhash()
-          ).blockhash,
-          lastValidBlockHeight: (
-            await this.primaryConnection.getLatestBlockhash()
-          ).lastValidBlockHeight,
-        },
-        'confirmed'
-      );
+  private async confirmTransactionFast(signature: string): Promise<boolean> {
+    const startTime = Date.now();
+    const timeout = 30000; // 30 second timeout
+    let pollInterval = 1000; // Start with 1 second (was 500ms)
+    const maxPollInterval = 3000; // Max 3 seconds between polls
 
-      return !confirmation.value.err;
+    try {
+      // Poll for confirmation with exponential backoff
+      while (Date.now() - startTime < timeout) {
+        const status = await this.primaryConnection.getSignatureStatus(signature);
+
+        if (status.value) {
+          if (status.value.err) {
+            console.error('Transaction failed:', status.value.err);
+            return false;
+          }
+
+          if (status.value.confirmationStatus === 'confirmed' || status.value.confirmationStatus === 'finalized') {
+            return true;
+          }
+        }
+
+        // Wait before next poll (with backoff to reduce RPC calls)
+        await this.sleep(pollInterval);
+        pollInterval = Math.min(pollInterval * 1.5, maxPollInterval);
+      }
+
+      return false;
     } catch (error) {
       console.error('Confirmation error:', error);
       return false;
@@ -629,72 +992,23 @@ export class TransactionExecutor {
   }
 
   /**
-   * Rebuild transaction with new tip
+   * Rebuild transaction with new tip (preserves swap instructions)
    */
-  private async rebuildWithNewTip(
-    _oldTx: VersionedTransaction,
-    wallet: Keypair,
-    newTip: number
-  ): Promise<VersionedTransaction> {
-    // Get fresh blockhash
-    const { blockhash } =
-      await this.primaryConnection.getLatestBlockhash('confirmed');
-
-    // For simplicity, we rebuild the entire transaction
-    // In production, you'd extract and modify the existing instructions
-
-    // This is a placeholder - actual implementation would deserialize,
-    // update the tip instruction, and re-sign
-    const instructions: TransactionInstruction[] = [];
-
-    // Set compute budget
-    instructions.push(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 })
-    );
-
-    instructions.push(
-      ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: Math.floor((newTip * LAMPORTS_PER_SOL) / 400_000),
-      })
-    );
-
-    // Add tip to random Jito account
-    const tipAccount =
-      JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
-    instructions.push(
-      SystemProgram.transfer({
-        fromPubkey: wallet.publicKey,
-        toPubkey: new PublicKey(tipAccount),
-        lamports: Math.floor(newTip * LAMPORTS_PER_SOL),
-      })
-    );
-
-    const messageV0 = new TransactionMessage({
-      payerKey: wallet.publicKey,
-      recentBlockhash: blockhash,
-      instructions,
-    }).compileToV0Message();
-
-    const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([wallet]);
-
-    return transaction;
+  private async rebuildWithNewTip(context: SwapContext, newTip: number): Promise<VersionedTransaction> {
+    // Rebuild the entire transaction with new tip
+    return this.buildSwapTransaction(context, newTip);
   }
 
   /**
    * Get wallet keypair securely
    */
-  private async getWalletKeypair(
-    userId: string,
-    walletId: string
-  ): Promise<Keypair | null> {
+  private async getWalletKeypair(userId: string, walletId: string): Promise<Keypair | null> {
     try {
       const wallet = await prisma.wallet.findFirst({
         where: { id: walletId, userId },
       });
 
       if (!wallet || wallet.walletType !== 'generated') {
-        // For connected wallets, we can't sign on their behalf
         return null;
       }
 
@@ -705,13 +1019,10 @@ export class TransactionExecutor {
         version: 1,
       };
 
-      const privateKey = await this.secureWallet.decryptPrivateKey(
-        encrypted,
-        userId
-      );
+      const privateKey = await this.secureWallet.decryptPrivateKey(encrypted, userId);
       const keypair = Keypair.fromSecretKey(privateKey);
 
-      // Zero out the private key
+      // Zero out private key
       privateKey.fill(0);
 
       return keypair;
@@ -722,10 +1033,11 @@ export class TransactionExecutor {
   }
 
   /**
-   * Record transaction in database
+   * Record buy transaction in database
    */
   private async recordTransaction(params: {
     userId: string;
+    walletId: string;
     sniperId?: string;
     signature: string;
     tokenMint: string;
@@ -734,23 +1046,15 @@ export class TransactionExecutor {
     tokenAmount: number;
     platformFee: number;
     jitoTip: number;
+    txType: 'buy' | 'sell';
   }): Promise<void> {
-    const {
-      userId,
-      sniperId,
-      signature,
-      tokenMint,
-      tokenSymbol,
-      solAmount,
-      tokenAmount,
-      platformFee,
-      jitoTip,
-    } = params;
+    const { userId, walletId, sniperId, signature, tokenMint, tokenSymbol, solAmount, tokenAmount, platformFee, jitoTip } = params;
 
     // Create position record
     const position = await prisma.position.create({
       data: {
         userId,
+        walletId,
         sniperId,
         tokenMint,
         tokenSymbol,
@@ -793,63 +1097,104 @@ export class TransactionExecutor {
         userId,
         sniperId,
         eventType: 'snipe:success',
-        eventData: {
-          signature,
-          tokenMint,
-          tokenSymbol,
-          solAmount,
-          tokenAmount,
-          platformFee,
-          jitoTip,
-        },
+        eventData: { signature, tokenMint, tokenSymbol, solAmount, tokenAmount, platformFee, jitoTip },
       },
     });
   }
 
   /**
-   * Execute a sell transaction
+   * Record sell transaction
    */
-  async executeSell(params: {
+  private async recordSellTransaction(params: {
     userId: string;
-    walletId: string;
     positionId: string;
+    signature: string;
     tokenMint: string;
+    tokenSymbol?: string;
     tokenAmount: number;
-    slippageBps: number;
-    priorityFeeSol: number;
-    reason: 'manual' | 'take_profit' | 'stop_loss' | 'trailing_stop';
-  }): Promise<ExecutionResult> {
-    // Similar to executeSnipe but swaps token → SOL
-    // Implementation follows same pattern with Raydium quote and multi-path submission
-    const { userId, positionId, tokenMint, reason } = params;
+    solReceived: number;
+    platformFee: number;
+    jitoTip: number;
+    reason: string;
+  }): Promise<void> {
+    const { userId, positionId, signature, tokenMint, tokenSymbol, tokenAmount, solReceived, platformFee, jitoTip, reason } = params;
 
-    await emitToUser(userId, 'position:selling', {
-      positionId,
-      tokenMint,
-      reason,
+    // Update position to closed
+    const position = await prisma.position.update({
+      where: { id: positionId },
+      data: {
+        status: 'closed',
+        exitSol: solReceived,
+        exitPrice: solReceived / tokenAmount,
+        currentTokenAmount: 0,
+        closedAt: new Date(),
+      },
     });
 
-    // ... Implementation similar to executeSnipe
-    // For brevity, returning placeholder
-    return { success: false, error: 'Not yet implemented' };
+    // Create sell transaction record
+    await prisma.transaction.create({
+      data: {
+        userId,
+        positionId,
+        signature,
+        txType: 'sell',
+        solAmount: solReceived,
+        tokenAmount,
+        platformFee,
+        jitoTip,
+        status: 'confirmed',
+      },
+    });
+
+    // Record fee
+    await prisma.feeLedger.create({
+      data: {
+        userId,
+        feeAmount: platformFee,
+        feeSol: platformFee,
+        settled: false,
+      },
+    });
+
+    // Activity log
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        sniperId: position.sniperId,
+        eventType: `position:${reason}`,
+        eventData: { signature, tokenMint, tokenSymbol, tokenAmount, solReceived, platformFee },
+      },
+    });
   }
 
   /**
-   * Get current token price
+   * Get current token price from Jupiter (more reliable than Raydium for new tokens)
    */
   async getTokenPrice(tokenMint: string): Promise<number | null> {
     try {
-      // Use Raydium API or Jupiter for price
-      const response = await fetch(
+      // Try Jupiter first (better for new tokens)
+      const jupiterResponse = await fetch(
+        `https://price.jup.ag/v6/price?ids=${tokenMint}`
+      );
+
+      if (jupiterResponse.ok) {
+        const data = await jupiterResponse.json();
+        if (data.data?.[tokenMint]?.price) {
+          return data.data[tokenMint].price;
+        }
+      }
+
+      // Fallback to Raydium
+      const raydiumResponse = await fetch(
         `https://api.raydium.io/v2/main/price?tokens=${tokenMint}`
       );
 
-      if (!response.ok) {
-        return null;
+      if (raydiumResponse.ok) {
+        const data = await raydiumResponse.json();
+        return data.data?.[tokenMint] || null;
       }
 
-      const data = await response.json();
-      return data.data?.[tokenMint] || null;
+      return null;
     } catch (error) {
       console.error('Failed to get token price:', error);
       return null;
@@ -858,6 +1203,37 @@ export class TransactionExecutor {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get executor status for admin dashboard
+   */
+  getStatus(): {
+    rpcConnections: {
+      primary: boolean;
+      helius: boolean;
+      backup: boolean;
+    };
+    jitoEndpoints: string[];
+    mevProtection: boolean;
+    blockhashCacheAge: number | null;
+    platformFeeWallet: string;
+    platformFeeBps: number;
+  } {
+    return {
+      rpcConnections: {
+        primary: !!this.primaryConnection,
+        helius: !!this.heliusConnection,
+        backup: !!this.backupConnection,
+      },
+      jitoEndpoints: JITO_BLOCK_ENGINES,
+      mevProtection: true,
+      blockhashCacheAge: this.cachedBlockhash
+        ? Date.now() - this.cachedBlockhash.fetchedAt
+        : null,
+      platformFeeWallet: this.platformFeeWallet.toBase58(),
+      platformFeeBps: this.platformFeeBps,
+    };
   }
 }
 

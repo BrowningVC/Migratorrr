@@ -1,15 +1,17 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { Shield, ChevronDown, Filter, AlertTriangle } from 'lucide-react';
+import { Shield, ChevronDown, Filter, AlertTriangle, Copy, Check, Wallet } from 'lucide-react';
 import { Sniper } from '@/lib/stores/snipers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 interface SniperCardProps {
   sniper: Sniper;
   walletBalance?: number; // SOL balance of associated wallet
+  walletAddress?: string; // Public key of the wallet
   onToggle?: (sniperId: string, hasInsufficientFunds: boolean) => void;
   onEdit?: (sniperId: string) => void;
   onDelete?: (sniperId: string) => void;
@@ -18,6 +20,7 @@ interface SniperCardProps {
 export const SniperCard = memo(function SniperCard({
   sniper,
   walletBalance,
+  walletAddress,
   onToggle,
   onEdit,
   onDelete,
@@ -26,8 +29,20 @@ export const SniperCard = memo(function SniperCard({
 
   // Calculate minimum required balance (snipe amount + priority fee + buffer for tx fees)
   const minRequiredBalance = config.snipeAmountSol + config.priorityFeeSol + 0.002;
-  const hasInsufficientFunds = walletBalance !== undefined && walletBalance < minRequiredBalance;
+  // Treat undefined balance as 0 (wallet not funded yet)
+  const effectiveBalance = walletBalance ?? 0;
+  const hasInsufficientFunds = effectiveBalance < minRequiredBalance;
   const [showFilters, setShowFilters] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+
+  const handleCopyAddress = async () => {
+    if (walletAddress) {
+      await navigator.clipboard.writeText(walletAddress);
+      setCopiedAddress(true);
+      toast.success('Wallet address copied!');
+      setTimeout(() => setCopiedAddress(false), 2000);
+    }
+  };
 
   const winRate =
     stats.totalSnipes > 0
@@ -59,7 +74,7 @@ export const SniperCard = memo(function SniperCard({
       )}
     >
       <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="font-semibold text-lg flex items-center gap-2">
               {name}
@@ -83,12 +98,33 @@ export const SniperCard = memo(function SniperCard({
           </Button>
         </div>
 
+        {/* Wallet Address */}
+        {walletAddress && (
+          <div className="flex items-center gap-2 mb-4 p-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+            <Wallet className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+            <code className="text-xs text-zinc-400 font-mono flex-1 truncate">
+              {walletAddress}
+            </code>
+            <button
+              onClick={handleCopyAddress}
+              className="p-1 hover:bg-zinc-700 rounded transition-colors flex-shrink-0"
+              title="Copy address"
+            >
+              {copiedAddress ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300" />
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Insufficient funds warning */}
         {hasInsufficientFunds && (
           <div className="flex items-center gap-2 p-2.5 mb-4 bg-amber-900/20 border border-amber-700/50 rounded-lg">
             <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
             <p className="text-xs text-amber-300">
-              Wallet needs {minRequiredBalance.toFixed(3)} SOL to snipe. Current: {walletBalance?.toFixed(4) || '0'} SOL
+              Wallet needs {minRequiredBalance.toFixed(3)} SOL to snipe. Current: {effectiveBalance.toFixed(4)} SOL
             </p>
           </div>
         )}

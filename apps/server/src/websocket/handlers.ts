@@ -6,7 +6,34 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 );
 
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'migratorrr-admin-2024';
+
 export function setupSocketHandlers(io: Server) {
+  // Setup admin namespace (separate auth)
+  const adminNamespace = io.of('/admin');
+
+  adminNamespace.use((socket, next) => {
+    const adminKey = socket.handshake.auth.adminKey;
+
+    if (!adminKey || adminKey !== ADMIN_SECRET) {
+      return next(new Error('Invalid admin key'));
+    }
+
+    next();
+  });
+
+  adminNamespace.on('connection', (socket: Socket) => {
+    console.log('Admin connected to WebSocket');
+
+    // Join admin room for migrations broadcast
+    socket.join('admin:migrations');
+
+    socket.on('disconnect', (reason) => {
+      console.log(`Admin disconnected: ${reason}`);
+    });
+  });
+
+  // Regular user namespace with JWT auth
   // Middleware for authentication
   io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
@@ -69,12 +96,12 @@ export function setupSocketHandlers(io: Server) {
   });
 
   // Subscribe to Redis pub/sub for broadcasting events
-  setupRedisPubSub(io);
+  setupRedisPubSub(io, adminNamespace);
 
   console.log('Socket.IO handlers initialized');
 }
 
-function setupRedisPubSub(io: Server) {
+function setupRedisPubSub(io: Server, adminNamespace: ReturnType<Server['of']>) {
   // Subscribe to migration events channel
   redisSub.subscribe('migrations', (err) => {
     if (err) {
@@ -102,6 +129,21 @@ function setupRedisPubSub(io: Server) {
         case 'migrations':
           // Broadcast to all connected users
           io.emit('migration:detected', event);
+
+          // Also broadcast to admin namespace for live feed (only PumpFun tokens)
+          if (event.tokenMint && event.tokenMint.endsWith('pump')) {
+            adminNamespace.to('admin:migrations').emit('migration:live', {
+              id: `live-${Date.now()}-${event.tokenMint.slice(-8)}`,
+              tokenMint: event.tokenMint,
+              tokenSymbol: event.tokenSymbol || null,
+              tokenName: event.tokenName || null,
+              poolAddress: event.poolAddress,
+              initialLiquiditySol: event.initialLiquiditySol || 0,
+              detectionLatencyMs: event.latencyMs || 0,
+              source: event.detectedBy || 'unknown',
+              detectedAt: new Date().toISOString(),
+            });
+          }
           break;
 
         case 'user-events':

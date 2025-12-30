@@ -7,6 +7,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { useAuthStore } from '@/lib/stores/auth';
+import { usePendingSniperStore } from '@/lib/stores/pending-sniper';
 import { useWalletsStore } from '@/lib/stores/wallets';
 import { usePositionsStore } from '@/lib/stores/positions';
 import { useSnipersStore } from '@/lib/stores/snipers';
@@ -16,13 +17,12 @@ import { ActivityLog } from '@/components/dashboard/activity-log';
 import { PositionCard } from '@/components/dashboard/position-card';
 import { SniperCard } from '@/components/dashboard/sniper-card';
 import { WalletBalanceCard } from '@/components/dashboard/wallet-balance-card';
-import { CreateSniperModal } from '@/components/sniper/create-sniper-modal';
+import { PreAuthSniperModal } from '@/components/sniper/pre-auth-sniper-modal';
 import { DashboardSkeleton } from '@/components/dashboard/loading-skeletons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo, LogoText } from '@/components/logo';
-import { usePendingSniperStore } from '@/lib/stores/pending-sniper';
-import { Wallet, Copy, Check, ArrowRight, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Copy, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Wallet balance type for tracking
@@ -41,12 +41,14 @@ const WalletMultiButton = dynamic(
 export default function DashboardPage() {
   const router = useRouter();
   const { publicKey, connected } = useWallet();
-  const { token, isAuthenticated, hasCompletedOnboarding } = useAuthStore();
-  const { setWallets } = useWalletsStore();
+  const { token, isAuthenticated, hasCompletedOnboarding, _hasHydrated, clearAuth } = useAuthStore();
+  const { hasPendingSniper } = usePendingSniperStore();
+  const { setWallets, wallets } = useWalletsStore();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [copiedAddress, setCopiedAddress] = useState(false);
   const [walletBalances, setWalletBalances] = useState<WalletBalance[]>([]);
   const [depositModalData, setDepositModalData] = useState<{
     isOpen: boolean;
@@ -57,10 +59,6 @@ export default function DashboardPage() {
     requiredAmount: number;
     currentBalance: number;
   } | null>(null);
-
-  // Get pending sniper to show generated wallet address
-  const pendingSniper = usePendingSniperStore((state) => state.pendingSniper);
-  const generatedWalletAddress = pendingSniper?.generatedWallet?.publicKey;
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -73,9 +71,11 @@ export default function DashboardPage() {
   // Stores
   const positions = usePositionsStore((state) => state.positions);
   const snipers = useSnipersStore((state) => state.snipers);
+  const snipersHydrated = useSnipersStore((state) => state._hasHydrated);
   const setSnipers = useSnipersStore((state) => state.setSnipers);
   const setPositions = usePositionsStore((state) => state.setPositions);
   const toggleSniper = useSnipersStore((state) => state.toggleSniper);
+  const walletsHydrated = useWalletsStore((state) => state._hasHydrated);
 
   // Memoized stats calculations - prevents recalculation on every render
   const openPositions = useMemo(
@@ -87,6 +87,14 @@ export default function DashboardPage() {
     () => snipers.filter((s) => s.isActive),
     [snipers]
   );
+
+  // Primary wallet - all snipers use ONE wallet for deposits
+  const primaryWallet = useMemo(() => {
+    if (walletBalances.length === 0) return null;
+    // Find primary wallet (isPrimary flag from backend) or fall back to first generated wallet
+    const primary = walletBalances.find(b => b.walletId && b.publicKey);
+    return primary || walletBalances[0];
+  }, [walletBalances]);
 
   const stats = useMemo(() => {
     const totalPnlSol = openPositions.reduce((sum, p) => sum + (p.pnlSol || 0), 0);
@@ -139,31 +147,87 @@ export default function DashboardPage() {
     };
   }, [openPositions, positions, snipers]);
 
-  // Redirect to onboarding if not completed
+  // CRITICAL: Redirect unauthenticated users to home page
+  // Dashboard is ONLY accessible to authenticated users with snipers
   useEffect(() => {
-    if (!hasCompletedOnboarding && connected) {
-      router.push('/onboarding');
-    }
-  }, [hasCompletedOnboarding, connected, router]);
+    // Wait for ALL stores to hydrate before making redirect decisions
+    const allHydrated = _hasHydrated && snipersHydrated && walletsHydrated;
+    if (!allHydrated || !mounted) return;
 
-  // Fetch initial data
+    // If not authenticated, redirect to home page
+    if (!isAuthenticated || !token) {
+      router.push('/');
+      return;
+    }
+
+    // If authenticated but hasn't completed onboarding, redirect to onboarding
+    if (!hasCompletedOnboarding) {
+      router.push('/onboarding');
+      return;
+    }
+  }, [_hasHydrated, snipersHydrated, walletsHydrated, mounted, isAuthenticated, token, hasCompletedOnboarding, router]);
+
+  // Fetch initial data - wait for all stores to hydrate first
+  // Use stores as source of truth if they already have data (from onboarding)
   useEffect(() => {
-    if (!connected || !publicKey || !token) {
+    // Wait for ALL stores to hydrate from localStorage
+    const allHydrated = _hasHydrated && snipersHydrated && walletsHydrated;
+    if (!allHydrated || !mounted) {
+      return;
+    }
+
+    // Must be authenticated to fetch data
+    if (!isAuthenticated || !token) {
       setIsLoading(false);
       return;
     }
 
-    const authToken = token; // Capture token for use in async function
+    const authToken = token;
 
     async function fetchData() {
+      setLoadError(null); // Clear any previous error
+
       try {
-        // Parallel fetch for faster loading
+        // Always fetch fresh data from API to ensure sync
+        // The stores already have data from onboarding, but we refresh for latest state
         const [walletsRes, snipersRes, positionsRes, balancesRes] = await Promise.all([
           walletApi.getAll(authToken),
           sniperApi.getAll(authToken),
           positionApi.getAll(authToken),
           walletApi.getBalances(authToken),
         ]);
+
+        // Check for API errors
+        const errors: string[] = [];
+        if (!walletsRes.success) errors.push(`Wallets: ${walletsRes.error}`);
+        if (!snipersRes.success) errors.push(`Snipers: ${snipersRes.error}`);
+        if (!positionsRes.success) errors.push(`Positions: ${positionsRes.error}`);
+        if (!balancesRes.success) errors.push(`Balances: ${balancesRes.error}`);
+
+        // Check for auth errors (401 - invalid/expired token)
+        const hasAuthError = errors.some(e =>
+          e.toLowerCase().includes('invalid') ||
+          e.toLowerCase().includes('expired') ||
+          e.toLowerCase().includes('unauthorized') ||
+          e.includes('401')
+        );
+
+        // If we have auth errors, clear the invalid token and redirect
+        if (hasAuthError && errors.length >= 3) {
+          console.warn('Auth token invalid/expired, clearing auth state');
+          clearAuth();
+          toast.error('Session expired. Please sign in again.');
+          // Redirect to onboarding if there's a pending sniper, otherwise home
+          router.push(hasPendingSniper() ? '/onboarding' : '/');
+          return;
+        }
+
+        // If all API calls failed and we have no store data, show error state
+        if (errors.length === 4 && snipers.length === 0) {
+          setLoadError(errors[0]); // Show first error
+          setIsLoading(false);
+          return;
+        }
 
         // Process wallets
         if (walletsRes.success && walletsRes.data) {
@@ -184,22 +248,33 @@ export default function DashboardPage() {
           })));
         }
 
-        // Process snipers
+        // Process snipers - merge with existing store data if API returns less
         if (snipersRes.success && snipersRes.data) {
           const snipersList = Array.isArray(snipersRes.data)
             ? snipersRes.data
             : (snipersRes.data as any).snipers || [];
-          setSnipers(snipersList.map((s: any) => ({
-            ...s,
-            stats: {
-              totalSnipes: s.totalSnipes || 0,
-              successfulSnipes: s.successfulSnipes || 0,
-              failedSnipes: s.failedSnipes || 0,
-              totalSolSpent: s.totalSolSpent || 0,
-              totalSolProfit: 0,
-              tokensFiltered: s.tokensFiltered || 0,
-            },
-          })));
+
+          // If API returns snipers, use them; otherwise keep existing store state
+          if (snipersList.length > 0) {
+            setSnipers(snipersList.map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              isActive: s.isActive,
+              walletId: s.walletId || s.wallet?.id,
+              config: s.config,
+              createdAt: s.createdAt,
+              updatedAt: s.updatedAt,
+              stats: {
+                totalSnipes: s.totalSnipes || 0,
+                successfulSnipes: s.successfulSnipes || 0,
+                failedSnipes: s.failedSnipes || 0,
+                totalSolSpent: s.totalSolSpent || 0,
+                totalSolProfit: 0,
+                tokensFiltered: s.tokensFiltered || 0,
+              },
+            })));
+          }
+          // If no snipers from API but store has snipers (from onboarding), keep them
         }
 
         // Process positions
@@ -209,15 +284,26 @@ export default function DashboardPage() {
             : (positionsRes.data as any).positions || [];
           setPositions(positionsList);
         }
-      } catch {
-        toast.error('Failed to load dashboard data');
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        // Only set error state if we have no data from stores
+        if (snipers.length === 0) {
+          setLoadError(error instanceof Error ? error.message : 'Network error');
+        }
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchData();
-  }, [connected, publicKey, token, setSnipers, setPositions, setWallets]);
+  }, [_hasHydrated, snipersHydrated, walletsHydrated, mounted, isAuthenticated, token, setSnipers, setPositions, setWallets, snipers.length, retryCount, clearAuth, hasPendingSniper, router]);
+
+  // Retry handler for failed data loading
+  const handleRetryLoad = useCallback(() => {
+    setIsLoading(true);
+    setLoadError(null);
+    setRetryCount(prev => prev + 1);
+  }, []);
 
   // Memoized handlers to prevent unnecessary re-renders
   const handleToggleSniper = useCallback(async (sniperId: string, hasInsufficientFunds?: boolean) => {
@@ -227,18 +313,18 @@ export default function DashboardPage() {
     if (!sniper) return;
 
     // If trying to activate with insufficient funds, show deposit modal
+    // Use primary wallet (ONE wallet for all snipers)
     if (hasInsufficientFunds && !sniper.isActive) {
-      const walletBalance = walletBalances.find(b => b.walletId === sniper.walletId);
       const requiredAmount = sniper.config.snipeAmountSol + sniper.config.priorityFeeSol + 0.002;
 
       setDepositModalData({
         isOpen: true,
-        walletAddress: walletBalance?.publicKey || '',
-        walletId: sniper.walletId,
+        walletAddress: primaryWallet?.publicKey || '',
+        walletId: primaryWallet?.walletId || sniper.walletId,
         sniperName: sniper.name,
         sniperId: sniperId,
         requiredAmount,
-        currentBalance: walletBalance?.balanceSol || 0,
+        currentBalance: primaryWallet?.balanceSol || 0,
       });
       return;
     }
@@ -257,7 +343,7 @@ export default function DashboardPage() {
     } catch {
       toast.error('Failed to toggle sniper');
     }
-  }, [token, snipers, walletBalances, toggleSniper]);
+  }, [token, snipers, primaryWallet, toggleSniper]);
 
   const handleSellPosition = useCallback(async (positionId: string) => {
     if (!token) return;
@@ -275,85 +361,57 @@ export default function DashboardPage() {
     }
   }, [token]);
 
-  // Show skeleton until mounted to prevent hydration mismatch
-  if (!mounted || isLoading) {
+  // Show skeleton until all stores are hydrated
+  // IMPORTANT: No preview mode - dashboard requires authentication
+  const allStoresHydrated = _hasHydrated && snipersHydrated && walletsHydrated;
+
+  if (!mounted || !allStoresHydrated) {
     return <DashboardSkeleton />;
   }
 
-  if (!connected) {
-    const handleCopyAddress = async () => {
-      if (generatedWalletAddress) {
-        await navigator.clipboard.writeText(generatedWalletAddress);
-        setCopiedAddress(true);
-        toast.success('Address copied!');
-        setTimeout(() => setCopiedAddress(false), 2000);
-      }
-    };
+  // If not authenticated or loading, show skeleton (redirect will happen via useEffect)
+  if (!isAuthenticated || !token || isLoading) {
+    return <DashboardSkeleton />;
+  }
 
+  // Show error state with retry button if data loading failed
+  if (loadError && snipers.length === 0) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
-        <Card className="bg-zinc-900/50 border-zinc-800 p-8 text-center max-w-md w-full">
-          <CardContent className="space-y-6">
-            {/* Header with wallet icon */}
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-16 h-16 rounded-full bg-green-900/30 flex items-center justify-center">
-                <Wallet className="w-8 h-8 text-green-400" />
-              </div>
-              <h1 className="text-2xl font-bold">Final Step</h1>
-              <p className="text-zinc-400">
-                Connect your wallet to access the Sniper Dashboard
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <Card className="bg-zinc-900 border-zinc-800 max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="w-14 h-14 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+              <AlertTriangle className="w-7 h-7 text-red-400" />
+            </div>
+            <CardTitle className="text-xl text-white">Failed to load dashboard</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-zinc-400 text-sm text-center">
+              Unable to connect to the server. Please check your connection and try again.
+            </p>
+
+            <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+              <p className="text-xs text-zinc-500 font-mono truncate">
+                {loadError}
               </p>
             </div>
 
-            {/* Generated wallet info */}
-            {generatedWalletAddress && (
-              <div className="space-y-3">
-                <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700">
-                  <p className="text-xs text-zinc-500 mb-2">Your Generated Wallet</p>
-                  <div className="flex items-center gap-2">
-                    <code className="text-sm text-green-400 font-mono flex-1 truncate">
-                      {generatedWalletAddress}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCopyAddress}
-                      className="shrink-0"
-                    >
-                      {copiedAddress ? (
-                        <Check className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <p className="text-xs text-zinc-500">
-                  Import this wallet into Phantom or Solflare using your private key, then connect below
-                </p>
-
-                {/* Sniper ready indicator */}
-                {pendingSniper && (
-                  <div className="flex items-center gap-2 text-sm text-zinc-300 justify-center">
-                    <ArrowRight className="w-4 h-4 text-green-400" />
-                    <span>Your Migration Sniper "<span className="text-green-400 font-medium">{pendingSniper.name}</span>" is ready to deploy live & track results.</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Connect button */}
-            <div className="pt-2">
-              <WalletMultiButton />
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.push('/')}
+              >
+                Go Home
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                onClick={handleRetryLoad}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
             </div>
-
-            {/* Security note */}
-            {generatedWalletAddress && (
-              <p className="text-xs text-amber-500/80">
-                For security, connect with the wallet shown above
-              </p>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -361,18 +419,38 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-zinc-950 text-white relative">
       {/* Header */}
       <header className="border-b border-zinc-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <Logo size="md" />
-              <LogoText size="md" />
-            </Link>
-            <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">
-              Beta
-            </span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <Logo size="md" />
+                <LogoText size="md" />
+              </Link>
+              <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">
+                Beta
+              </span>
+            </div>
+            {/* Navigation Tabs */}
+            <nav className="flex items-center gap-1">
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm" className="text-green-400 bg-green-900/20">
+                  Dashboard
+                </Button>
+              </Link>
+              <Link href="/migrator">
+                <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
+                  $MIGRATOR
+                </Button>
+              </Link>
+              <Link href="/how-it-works">
+                <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
+                  How it Works
+                </Button>
+              </Link>
+            </nav>
           </div>
           <div className="flex items-center gap-4">
             <Button
@@ -413,10 +491,61 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {openPositions.length === 0 ? (
-                  <p className="text-zinc-500 text-center py-8">
-                    No open positions. Your snipers will create positions when
-                    they detect matching migrations.
-                  </p>
+                  <div className="space-y-4">
+                    {/* Example Position Table - Binance Style */}
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center justify-center z-10 bg-zinc-900/60 rounded-lg backdrop-blur-[1px]">
+                        <span className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-full text-sm text-zinc-300">
+                          Example Position
+                        </span>
+                      </div>
+                      <div className="opacity-70 pointer-events-none">
+                        {/* Table Header */}
+                        <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.9fr_0.9fr_0.8fr_auto] gap-2 px-3 py-2 text-xs text-zinc-500 border-b border-zinc-800">
+                          <div>Symbol</div>
+                          <div className="text-right">Size</div>
+                          <div className="text-right">Entry</div>
+                          <div className="text-right">PnL (SOL)</div>
+                          <div className="text-right">ROE%</div>
+                          <div className="text-right">Value</div>
+                          <div className="text-right">Action</div>
+                        </div>
+                        {/* Table Row */}
+                        <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.9fr_0.9fr_0.8fr_auto] gap-2 px-3 py-3 items-center text-sm hover:bg-zinc-800/30 transition-colors border-b border-zinc-800/50">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-[10px] font-bold text-black">P</div>
+                            <div>
+                              <p className="font-medium">$PEPE</p>
+                              <p className="text-[10px] text-zinc-500 font-mono">7GCi...pump</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">4.08M</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">0.10</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-green-400">+0.1245</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-green-400">+124.50%</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">0.2245</p>
+                          </div>
+                          <div className="text-right">
+                            <Button variant="outline" size="sm" className="h-7 px-3 text-xs" disabled>
+                              Sell
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-zinc-500 text-center text-sm">
+                      Your snipers will create positions like this when they detect matching migrations.
+                    </p>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {openPositions.map((position) => (
@@ -449,28 +578,27 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {snipers.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-zinc-500 mb-4">
-                      No snipers configured yet. Create your first sniper to
-                      start catching migrations.
+                  <div className="space-y-4">
+                    <p className="text-zinc-500 text-center text-sm">
+                      Create your first sniper to start catching migrations.
                     </p>
-                    <Button onClick={() => setIsCreateModalOpen(true)}>
-                      Create Sniper
-                    </Button>
+                    <div className="text-center">
+                      <Button onClick={() => setIsCreateModalOpen(true)}>
+                        Create Sniper
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {snipers.map((sniper) => {
-                      const balance = walletBalances.find(b => b.walletId === sniper.walletId);
-                      return (
-                        <SniperCard
-                          key={sniper.id}
-                          sniper={sniper}
-                          walletBalance={balance?.balanceSol}
-                          onToggle={handleToggleSniper}
-                        />
-                      );
-                    })}
+                    {snipers.map((sniper) => (
+                      <SniperCard
+                        key={sniper.id}
+                        sniper={sniper}
+                        walletBalance={primaryWallet?.balanceSol}
+                        walletAddress={primaryWallet?.publicKey}
+                        onToggle={handleToggleSniper}
+                      />
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -485,8 +613,8 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* Create Sniper Modal */}
-      <CreateSniperModal
+      {/* Pre-Auth Sniper Modal - handles full flow including wallet generation */}
+      <PreAuthSniperModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
       />

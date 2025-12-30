@@ -306,6 +306,16 @@ model MigrationEvent {
   currentPriceSol     Float?    @map("current_price_sol")
   isRugged            Boolean   @default(false) @map("is_rugged")
 
+  // Volume and legitimacy metrics (for filtering fake/botted tokens)
+  volumeUsd24h        Float?    @map("volume_usd_24h")
+  volumeUsdTotal      Float?    @map("volume_usd_total")
+  txCount24h          Int?      @map("tx_count_24h")
+  holderCount         Int?      @map("holder_count")
+  buyTxCount24h       Int?      @map("buy_tx_count_24h")
+  sellTxCount24h      Int?      @map("sell_tx_count_24h")
+  lastVolumeUpdate    DateTime? @map("last_volume_update")
+  isVerified          Boolean   @default(false) @map("is_verified") // Manually verified as legitimate
+
   @@index([tokenMint])
   @@index([detectedAt])
   @@index([reached2x])

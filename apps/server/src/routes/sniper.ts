@@ -11,6 +11,7 @@ const sniperParamsSchema = z.object({
   takeProfitPct: z.number().min(1).max(10000).optional(), // 1% - 100x
   stopLossPct: z.number().min(1).max(100).optional(),
   trailingStopPct: z.number().min(1).max(100).optional(),
+  coverInitials: z.boolean().optional(), // Sell 50% at 2x to cover initial investment
   maxMarketCapUsd: z.number().positive().optional(),
   minLiquiditySol: z.number().positive().optional(),
   namePatterns: z.array(z.string()).optional(),
@@ -22,6 +23,16 @@ const sniperParamsSchema = z.object({
   minVolumeUsd: z.number().positive().optional(),
   // MEV Protection - use Jito bundles for sandwich attack protection
   mevProtection: z.boolean().optional(),
+  // Holder count filter - minimum unique holders
+  minHolderCount: z.number().int().min(1).optional(), // 25, 50, 100, 250
+  // Dev wallet holdings filter - max % of supply held by dev/creator
+  maxDevHoldingsPct: z.number().min(0).max(100).optional(), // 5, 15, 30, 50
+  // Social presence filters
+  requireTwitter: z.boolean().optional(),
+  requireTelegram: z.boolean().optional(),
+  requireWebsite: z.boolean().optional(),
+  // Top 10 wallet concentration - max % of supply held by top 10 wallets
+  maxTop10HoldingsPct: z.number().min(0).max(100).optional(), // 30, 50, 70, 90
 }).passthrough(); // Allow additional custom parameters
 
 const createSniperSchema = z.object({
@@ -68,6 +79,7 @@ export const sniperRoutes: FastifyPluginAsync = async (fastify) => {
         name: s.name,
         isActive: s.isActive,
         config: s.config,
+        walletId: s.walletId, // Include walletId directly for frontend store
         wallet: s.wallet,
         openPositions: s._count.positions,
         // Include stats
@@ -140,7 +152,7 @@ export const sniperRoutes: FastifyPluginAsync = async (fastify) => {
         userId,
         walletId: body.walletId,
         name: body.name,
-        config: body.config,
+        config: body.config as object,
         isActive: body.isActive ?? false,
       },
       include: {
@@ -193,7 +205,7 @@ export const sniperRoutes: FastifyPluginAsync = async (fastify) => {
       where: { id: sniperId },
       data: {
         name: body.name,
-        config: body.config ?? existing.config,
+        config: (body.config as object | undefined) ?? (existing.config as object),
         isActive: body.isActive,
         updatedAt: new Date(),
       },

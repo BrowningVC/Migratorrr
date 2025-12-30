@@ -9,11 +9,16 @@ export interface GeneratedWalletPublic {
   publicKey: string;
 }
 
+export interface ConnectedWalletPublic {
+  publicKey: string;
+}
+
 export interface PendingSniperConfig {
   name: string;
   config: SniperConfig;
   createdAt: number; // timestamp to expire old configs
   generatedWallet?: GeneratedWalletPublic; // Only public key - private key is NEVER stored
+  connectedWallet?: ConnectedWalletPublic; // Wallet connected via wallet adapter (e.g., Phantom)
 }
 
 interface PendingSniperStore {
@@ -30,11 +35,14 @@ export const usePendingSniperStore = create<PendingSniperStore>()(
 
       setPendingSniper: (config) => {
         // SECURITY: Ensure private key is never in the persisted config
-        // Only store public key from generated wallet
+        // Only store public key from generated or connected wallet
         const safeConfig: PendingSniperConfig = {
           ...config,
           generatedWallet: config.generatedWallet
             ? { publicKey: config.generatedWallet.publicKey }
+            : undefined,
+          connectedWallet: config.connectedWallet
+            ? { publicKey: config.connectedWallet.publicKey }
             : undefined,
         };
         set({ pendingSniper: safeConfig });

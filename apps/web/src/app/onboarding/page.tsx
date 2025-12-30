@@ -33,7 +33,7 @@ export default function OnboardingPage() {
   const { setAuth, token, completeOnboarding, hasCompletedOnboarding } = useAuthStore();
   const { setWallets, addWallet, wallets } = useWalletsStore();
   const { addSniper } = useSnipersStore();
-  const { pendingSniper, clearPendingSniper, hasPendingSniper } = usePendingSniperStore();
+  const { pendingSniper, clearPendingSniper, hasPendingSniper, setPendingSniper } = usePendingSniperStore();
 
   const [step, setStep] = useState<OnboardingStep>('connect');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,6 +41,7 @@ export default function OnboardingPage() {
   const [mounted, setMounted] = useState(false);
   const [createdSniperId, setCreatedSniperId] = useState<string | null>(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [isCreatingForExistingUser, setIsCreatingForExistingUser] = useState(false);
 
   // Get generated wallet address from pending sniper
   const generatedWalletAddress = pendingSniper?.generatedWallet?.publicKey;
@@ -63,11 +64,32 @@ export default function OnboardingPage() {
   }, []);
 
   // Redirect if already completed onboarding
+  // BUT: If there's a pending sniper, create it first before redirecting
   useEffect(() => {
+    // Prevent running multiple times
+    if (isCreatingForExistingUser) return;
+
     if (hasCompletedOnboarding && token) {
-      router.push('/dashboard');
+      // Check if there's a pending sniper that needs to be created
+      if (hasPendingSniper() && pendingSniper) {
+        // Find a generated wallet to use
+        const existingGeneratedWallet = wallets.find(w => w.walletType === 'generated');
+
+        if (existingGeneratedWallet) {
+          // Create the pending sniper before redirecting
+          setIsCreatingForExistingUser(true);
+          createPendingSniperForExistingUser(token, existingGeneratedWallet.id);
+        } else {
+          // User has no generated wallet - need to go through wallet-setup
+          setStep('wallet-setup');
+          return;
+        }
+      } else {
+        // No pending sniper, just redirect
+        router.push('/dashboard');
+      }
     }
-  }, [hasCompletedOnboarding, token, router]);
+  }, [hasCompletedOnboarding, token, wallets, isCreatingForExistingUser]);
 
   // Auto-advance when wallet connects
   useEffect(() => {
@@ -137,12 +159,71 @@ export default function OnboardingPage() {
       }
 
       // Connect the current wallet if not already connected
-      await walletApi.connect(authToken, publicKey.toBase58(), true);
+      const connectRes = await walletApi.connect(authToken, publicKey.toBase58(), true);
 
-      // Skip wallet-setup if user already has a generated wallet
-      if (hasGeneratedWallet) {
+      // Check if the connected wallet matches the pre-generated wallet from the modal
+      const connectedWalletAddress = publicKey.toBase58();
+      const preGeneratedWalletAddress = pendingSniper?.generatedWallet?.publicKey;
+
+      // IMPORTANT: For snipers to work, we need a SERVER-SIDE generated wallet.
+      // - "generated" wallets: Server stores the private key and can sign transactions
+      // - "connected" wallets: User controls the key, server CANNOT sign for them
+      //
+      // Only skip wallet-setup if:
+      // 1. User already has a generated wallet on the server, OR
+      // 2. User connected with the exact wallet they generated in the modal
+      //    (they imported the generated wallet into Phantom)
+      //
+      // If user just "connected" with Phantom (pendingSniper.connectedWallet),
+      // they STILL need a server-side generated wallet.
+
+      const userHasGeneratedWalletOnServer = hasGeneratedWallet;
+      const userConnectedWithTheirGeneratedWallet =
+        preGeneratedWalletAddress && connectedWalletAddress === preGeneratedWalletAddress;
+
+      if (userHasGeneratedWalletOnServer) {
+        // User has an existing generated wallet on server - use it
+        const existingGeneratedWallet = walletsRes.data?.find(
+          (w: any) => w.walletType === 'generated'
+        );
+
+        if (existingGeneratedWallet && hasPendingSniper() && pendingSniper) {
+          await createPendingSniper(authToken, existingGeneratedWallet.id);
+        }
         setStep('complete');
+      } else if (userConnectedWithTheirGeneratedWallet) {
+        // User imported their modal-generated wallet into Phantom and connected with it
+        // This is a special case - we need to create a server-side generated wallet
+        // that matches this address. But since we can't import private keys to server,
+        // we need to go to wallet-setup to generate a NEW server wallet.
+        // The user will need to use the server-generated wallet for trading.
+        toast(
+          'For security, we\'ll generate a separate trading wallet on our servers.',
+          { duration: 5000, icon: 'ℹ️' }
+        );
+        setStep('wallet-setup');
       } else {
+        // User connected with a different wallet than expected
+        // If they generated a wallet in the modal but connected with a different one,
+        // warn them and proceed to wallet-setup where they'll get a NEW server-side wallet
+        if (preGeneratedWalletAddress && connectedWalletAddress !== preGeneratedWalletAddress) {
+          toast.error(
+            'You connected with a different wallet than the one you generated. ' +
+            'We\'ll generate a new trading wallet for you.',
+            { duration: 6000 }
+          );
+          // Clear the useless generated wallet reference
+          clearPendingSniper();
+          // Re-save without the generated wallet
+          if (pendingSniper) {
+            setPendingSniper({
+              name: pendingSniper.name,
+              config: pendingSniper.config,
+              createdAt: Date.now(),
+              connectedWallet: { publicKey: connectedWalletAddress },
+            });
+          }
+        }
         setStep('wallet-setup');
       }
     } catch (error) {
@@ -202,21 +283,21 @@ export default function OnboardingPage() {
     }
   };
 
-  // Create sniper from pending config
-  const createPendingSniper = async (authToken: string, walletId: string) => {
-    if (!pendingSniper) return;
+  // Create sniper for returning authenticated user with pending config
+  // This handles the case where user already completed onboarding but came back with a new sniper config
+  const createPendingSniperForExistingUser = async (authToken: string, walletId: string) => {
+    if (!pendingSniper) {
+      router.push('/dashboard');
+      return;
+    }
 
     const sniperToastId = toast.loading(`Creating sniper "${pendingSniper.name}"...`);
 
     try {
-      const finalConfig = {
-        ...pendingSniper.config,
-      };
-
       const res = await sniperApi.create(authToken, {
         walletId,
         name: pendingSniper.name,
-        config: finalConfig,
+        config: pendingSniper.config as unknown as Record<string, unknown>,
         isActive: false,
       });
 
@@ -227,7 +308,57 @@ export default function OnboardingPage() {
           name: sniperData.name,
           isActive: sniperData.isActive || false,
           walletId,
-          config: finalConfig,
+          config: pendingSniper.config,
+          stats: {
+            totalSnipes: 0,
+            successfulSnipes: 0,
+            failedSnipes: 0,
+            totalSolSpent: 0,
+            totalSolProfit: 0,
+          },
+          createdAt: sniperData.createdAt || new Date().toISOString(),
+          updatedAt: sniperData.updatedAt || new Date().toISOString(),
+        };
+
+        addSniper(newSniper);
+        clearPendingSniper();
+        toast.success(`Sniper "${pendingSniper.name}" created!`, { id: sniperToastId });
+      } else {
+        throw new Error(res.error || 'Failed to create sniper');
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to create sniper',
+        { id: sniperToastId }
+      );
+    }
+
+    // Always redirect to dashboard after attempt
+    router.push('/dashboard');
+  };
+
+  // Create sniper from pending config
+  const createPendingSniper = async (authToken: string, walletId: string) => {
+    if (!pendingSniper) return;
+
+    const sniperToastId = toast.loading(`Creating sniper "${pendingSniper.name}"...`);
+
+    try {
+      const res = await sniperApi.create(authToken, {
+        walletId,
+        name: pendingSniper.name,
+        config: pendingSniper.config as unknown as Record<string, unknown>,
+        isActive: false,
+      });
+
+      if (res.success && res.data) {
+        const sniperData = res.data;
+        const newSniper: Sniper = {
+          id: sniperData.id,
+          name: sniperData.name,
+          isActive: sniperData.isActive || false,
+          walletId,
+          config: pendingSniper.config,
           stats: {
             totalSnipes: 0,
             successfulSnipes: 0,

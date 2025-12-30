@@ -3,6 +3,7 @@ import { redis } from '../db/redis.js';
 import { prisma } from '../db/client.js';
 import { migrationDetector, type MigrationEvent } from './migration-detector.js';
 import { tokenInfoService } from './token-info.js';
+import { tokenAnalysisService } from './token-analysis.js';
 import { emitToUser } from '../websocket/handlers.js';
 
 interface ActiveSniper {
@@ -30,6 +31,16 @@ interface SniperConfig {
   maxMigrationTimeMinutes?: number; // 5, 15, 60, or 360
   // Volume filter (minimum volume in USD since token deployment)
   minVolumeUsd?: number; // 10000, 25000, 50000, or 100000
+  // Holder count filter - minimum unique holders
+  minHolderCount?: number; // 25, 50, 100, 250
+  // Dev wallet holdings filter - max % of supply held by dev/creator
+  maxDevHoldingsPct?: number; // 5, 15, 30, 50
+  // Social presence filters
+  requireTwitter?: boolean;
+  requireTelegram?: boolean;
+  requireWebsite?: boolean;
+  // Top 10 wallet concentration - max % of supply held by top 10 wallets
+  maxTop10HoldingsPct?: number; // 30, 50, 70, 90
   [key: string]: unknown;
 }
 
@@ -58,6 +69,11 @@ interface SnipeJob {
 export class SnipeOrchestrator {
   private snipeQueue: Queue;
   private isRunning = false;
+
+  // Redis key prefix for tracking sniped tokens per sniper
+  // Format: snipe-lock:{sniperId}:{tokenMint} = "1" (TTL: 24 hours)
+  private readonly SNIPE_LOCK_PREFIX = 'snipe-lock:';
+  private readonly SNIPE_LOCK_TTL_SECONDS = 86400; // 24 hours
 
   constructor() {
     this.snipeQueue = new Queue('snipe-queue', {
@@ -116,27 +132,34 @@ export class SnipeOrchestrator {
 
     // Filter and dispatch jobs
     let matched = 0;
+    let dispatched = 0;
     const filteredSniperIds: string[] = [];
 
     for (const sniper of activeSnipers) {
       const meetsFilter = await this.matchesCriteria(sniper.config, migration);
       if (meetsFilter) {
         matched++;
-        await this.dispatchSnipeJob(sniper, migration);
+        // dispatchSnipeJob returns false if token was already sniped (duplicate blocked)
+        const wasDispatched = await this.dispatchSnipeJob(sniper, migration);
+        if (wasDispatched) {
+          dispatched++;
+        }
       } else {
         // Track that this sniper filtered out this migration
         filteredSniperIds.push(sniper.id);
       }
     }
 
-    console.log(`Dispatched ${matched} snipe jobs for ${migration.tokenSymbol || migration.tokenMint}`);
+    console.log(`Dispatched ${dispatched}/${matched} snipe jobs for ${migration.tokenSymbol || migration.tokenMint}`);
     console.log(`Filtered ${filteredSniperIds.length} snipers for ${migration.tokenSymbol || migration.tokenMint}`);
 
-    // Update migration event with snipe count
-    await prisma.migrationEvent.updateMany({
-      where: { tokenMint: migration.tokenMint },
-      data: { totalSnipesAttempted: { increment: matched } },
-    });
+    // Update migration event with snipe count (only count actually dispatched)
+    if (dispatched > 0) {
+      await prisma.migrationEvent.updateMany({
+        where: { tokenMint: migration.tokenMint },
+        data: { totalSnipesAttempted: { increment: dispatched } },
+      });
+    }
 
     // Update tokensFiltered counter for each sniper that filtered this migration
     if (filteredSniperIds.length > 0) {
@@ -180,6 +203,19 @@ export class SnipeOrchestrator {
     config: SniperConfig,
     migration: MigrationEvent & { detectedAt: number }
   ): Promise<boolean> {
+    // CRITICAL: Reject stale migrations - only snipe real-time events
+    // This prevents sniping historical tokens on startup or reconnection
+    const MAX_MIGRATION_AGE_MS = 30_000; // 30 seconds max age
+    const migrationAge = Date.now() - migration.detectedAt;
+
+    if (migrationAge > MAX_MIGRATION_AGE_MS) {
+      console.log(
+        `Rejecting stale migration: ${migration.tokenSymbol || migration.tokenMint} ` +
+        `(age: ${Math.round(migrationAge / 1000)}s, max: ${MAX_MIGRATION_AGE_MS / 1000}s)`
+      );
+      return false;
+    }
+
     // Check minimum liquidity
     if (config.minLiquiditySol && migration.initialLiquiditySol < config.minLiquiditySol) {
       return false;
@@ -256,6 +292,70 @@ export class SnipeOrchestrator {
       }
     }
 
+    // Check holder count, dev holdings, top 10 concentration, and social filters
+    const needsTokenAnalysis =
+      config.minHolderCount ||
+      config.maxDevHoldingsPct ||
+      config.maxTop10HoldingsPct ||
+      config.requireTwitter ||
+      config.requireTelegram ||
+      config.requireWebsite;
+
+    if (needsTokenAnalysis) {
+      const tokenAnalysis = await tokenAnalysisService.getTokenAnalysis(migration.tokenMint);
+
+      // Check minimum holder count
+      if (config.minHolderCount) {
+        if (!tokenAnalysisService.meetsHolderCountCriteria(tokenAnalysis, config.minHolderCount)) {
+          console.log(
+            `Skipping ${migration.tokenSymbol}: holder count ${tokenAnalysis?.holderCount || 0} below min ${config.minHolderCount}`
+          );
+          return false;
+        }
+      }
+
+      // Check max dev wallet holdings
+      if (config.maxDevHoldingsPct) {
+        if (!tokenAnalysisService.meetsDevHoldingsCriteria(tokenAnalysis, config.maxDevHoldingsPct)) {
+          console.log(
+            `Skipping ${migration.tokenSymbol}: dev holdings ${tokenAnalysis?.devHoldingsPct || 0}% exceeds max ${config.maxDevHoldingsPct}%`
+          );
+          return false;
+        }
+      }
+
+      // Check max top 10 wallet concentration
+      if (config.maxTop10HoldingsPct) {
+        if (!tokenAnalysisService.meetsTop10Criteria(tokenAnalysis, config.maxTop10HoldingsPct)) {
+          console.log(
+            `Skipping ${migration.tokenSymbol}: top 10 holdings ${tokenAnalysis?.top10HoldingsPct || 0}% exceeds max ${config.maxTop10HoldingsPct}%`
+          );
+          return false;
+        }
+      }
+
+      // Check social presence requirements
+      if (config.requireTwitter || config.requireTelegram || config.requireWebsite) {
+        if (
+          !tokenAnalysisService.meetsSocialCriteria(
+            tokenAnalysis,
+            config.requireTwitter || false,
+            config.requireTelegram || false,
+            config.requireWebsite || false
+          )
+        ) {
+          const missing: string[] = [];
+          if (config.requireTwitter && !tokenAnalysis?.socials.twitter) missing.push('Twitter');
+          if (config.requireTelegram && !tokenAnalysis?.socials.telegram) missing.push('Telegram');
+          if (config.requireWebsite && !tokenAnalysis?.socials.website) missing.push('Website');
+          console.log(
+            `Skipping ${migration.tokenSymbol}: missing required socials: ${missing.join(', ')}`
+          );
+          return false;
+        }
+      }
+    }
+
     // All criteria passed
     return true;
   }
@@ -266,7 +366,20 @@ export class SnipeOrchestrator {
   private async dispatchSnipeJob(
     sniper: ActiveSniper,
     migration: MigrationEvent & { detectedBy: string; detectedAt: number }
-  ): Promise<void> {
+  ): Promise<boolean> {
+    // CRITICAL: Atomic lock to prevent sniping the same token twice
+    // Uses Redis SETNX (set if not exists) for atomic check-and-set
+    const lockKey = `${this.SNIPE_LOCK_PREFIX}${sniper.id}:${migration.tokenMint}`;
+    const acquired = await redis.set(lockKey, '1', 'EX', this.SNIPE_LOCK_TTL_SECONDS, 'NX');
+
+    if (!acquired) {
+      console.log(
+        `Duplicate snipe blocked: ${migration.tokenSymbol || migration.tokenMint} ` +
+        `already sniped by sniper "${sniper.name}"`
+      );
+      return false;
+    }
+
     const job: SnipeJob = {
       sniperId: sniper.id,
       userId: sniper.userId,
@@ -315,6 +428,8 @@ export class SnipeOrchestrator {
         },
       },
     });
+
+    return true;
   }
 
   /**

@@ -47,16 +47,56 @@ export const statsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * Get recent top performing migrations
    * Public endpoint for showcasing success stories
+   *
+   * Includes legitimacy filters to exclude fake/botted tokens:
+   * - Minimum 24h volume of $10k
+   * - Minimum 50 holders
+   * - Minimum 100 transactions in 24h
+   * - Must have both buys and sells (not just one-way wash trading)
+   * - Not marked as rugged
    */
   fastify.get('/top-performers', async (request, reply) => {
     try {
+      // Get migrations from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Minimum thresholds to filter out fake/botted tokens
+      const MIN_VOLUME_24H = 10000; // $10k minimum 24h volume
+      const MIN_HOLDERS = 50; // At least 50 unique holders
+      const MIN_TX_COUNT = 100; // At least 100 transactions in 24h
+      const MIN_BUY_SELL_RATIO = 0.2; // Buy/sell ratio between 0.2 and 5 (not heavily one-sided)
+      const MAX_BUY_SELL_RATIO = 5;
+
       const topByMultiplier = await prisma.migrationEvent.findMany({
         where: {
           initialPriceSol: { not: null },
           highestPriceSol: { not: null },
+          detectedAt: { gte: thirtyDaysAgo },
+          isRugged: false,
+          // Volume and legitimacy checks
+          OR: [
+            // Either verified manually
+            { isVerified: true },
+            // Or passes automated checks
+            {
+              AND: [
+                { volumeUsd24h: { gte: MIN_VOLUME_24H } },
+                { holderCount: { gte: MIN_HOLDERS } },
+                { txCount24h: { gte: MIN_TX_COUNT } },
+              ],
+            },
+            // Fallback: if no volume data yet, allow but will filter by other metrics
+            {
+              AND: [
+                { volumeUsd24h: null },
+                { highestMarketCapUsd: { gte: 100000 } }, // At least $100k market cap
+              ],
+            },
+          ],
         },
         orderBy: { highestPriceSol: 'desc' },
-        take: 10,
+        take: 50, // Fetch more to filter down
         select: {
           tokenMint: true,
           tokenName: true,
@@ -67,26 +107,49 @@ export const statsRoutes: FastifyPluginAsync = async (fastify) => {
           reached10x: true,
           reached100x: true,
           detectedAt: true,
+          volumeUsd24h: true,
+          holderCount: true,
+          txCount24h: true,
+          buyTxCount24h: true,
+          sellTxCount24h: true,
+          isVerified: true,
         },
       });
 
-      // Calculate multipliers
+      // Calculate multipliers and apply additional filtering
       const performers = topByMultiplier
-        .map((m) => ({
-          tokenSymbol: m.tokenSymbol || 'Unknown',
-          tokenName: m.tokenName,
-          tokenMint: m.tokenMint,
-          multiplier: m.initialPriceSol
-            ? Math.round((m.highestPriceSol! / m.initialPriceSol) * 10) / 10
-            : 0,
-          highestMarketCap: m.highestMarketCapUsd,
-          reached10x: m.reached10x,
-          reached100x: m.reached100x,
-          migrationDate: m.detectedAt,
-        }))
-        .filter((p) => p.multiplier > 1)
+        .map((m) => {
+          // Calculate buy/sell ratio if data available
+          let buySellRatioValid = true;
+          if (m.buyTxCount24h && m.sellTxCount24h && m.sellTxCount24h > 0) {
+            const ratio = m.buyTxCount24h / m.sellTxCount24h;
+            buySellRatioValid = ratio >= MIN_BUY_SELL_RATIO && ratio <= MAX_BUY_SELL_RATIO;
+          }
+
+          return {
+            tokenSymbol: m.tokenSymbol || 'Unknown',
+            tokenName: m.tokenName,
+            tokenMint: m.tokenMint,
+            multiplier: m.initialPriceSol
+              ? Math.round((m.highestPriceSol! / m.initialPriceSol) * 10) / 10
+              : 0,
+            highestMarketCap: m.highestMarketCapUsd,
+            reached10x: m.reached10x,
+            reached100x: m.reached100x,
+            migrationDate: m.detectedAt,
+            // Include legitimacy metrics for transparency
+            volumeUsd24h: m.volumeUsd24h,
+            holderCount: m.holderCount,
+            isVerified: m.isVerified,
+            buySellRatioValid,
+          };
+        })
+        // Filter out tokens with suspicious buy/sell ratios
+        .filter((p) => p.multiplier > 1 && p.buySellRatioValid)
         .sort((a, b) => b.multiplier - a.multiplier)
-        .slice(0, 5);
+        .slice(0, 10)
+        // Remove internal fields from response
+        .map(({ buySellRatioValid, ...rest }) => rest);
 
       return {
         success: true,

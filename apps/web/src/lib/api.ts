@@ -6,10 +6,38 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000; // Start with 1 second delay
+const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504]; // Timeout, rate limit, server errors
+
+/**
+ * Delay helper with exponential backoff
+ */
+async function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if an error is retryable
+ */
+function isRetryableError(error: unknown, status?: number): boolean {
+  // Network errors are retryable
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return true;
+  }
+  // Certain HTTP status codes are retryable
+  if (status && RETRYABLE_STATUS_CODES.includes(status)) {
+    return true;
+  }
+  return false;
+}
+
 async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {},
-  token?: string | null
+  token?: string | null,
+  retryCount = 0
 ): Promise<ApiResponse<T>> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -26,6 +54,14 @@ async function fetchApi<T>(
       headers,
     });
 
+    // Check if we should retry on server errors
+    if (!response.ok && isRetryableError(null, response.status) && retryCount < MAX_RETRIES) {
+      const delayMs = RETRY_DELAY_MS * Math.pow(2, retryCount); // Exponential backoff
+      console.warn(`API call to ${endpoint} failed with ${response.status}, retrying in ${delayMs}ms... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      await delay(delayMs);
+      return fetchApi<T>(endpoint, options, token, retryCount + 1);
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -37,6 +73,14 @@ async function fetchApi<T>(
 
     return data;
   } catch (error) {
+    // Retry on network errors
+    if (isRetryableError(error) && retryCount < MAX_RETRIES) {
+      const delayMs = RETRY_DELAY_MS * Math.pow(2, retryCount);
+      console.warn(`API call to ${endpoint} failed with network error, retrying in ${delayMs}ms... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      await delay(delayMs);
+      return fetchApi<T>(endpoint, options, token, retryCount + 1);
+    }
+
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Network error',
@@ -308,6 +352,9 @@ export const statsApi = {
       reached10x: boolean;
       reached100x: boolean;
       migrationDate: string;
+      volumeUsd24h: number | null;
+      holderCount: number | null;
+      isVerified: boolean;
     }>>('/api/stats/top-performers'),
 
   getRecentMigrations: () =>

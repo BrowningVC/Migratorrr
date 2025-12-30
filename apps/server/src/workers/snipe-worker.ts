@@ -1,7 +1,18 @@
 import { Worker, Job } from 'bullmq';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { transactionExecutor } from '../services/transaction-executor.js';
 import { prisma } from '../db/client.js';
 import { emitToUser } from '../websocket/handlers.js';
+import { redis } from '../db/redis.js';
+
+// Initialize Solana connection
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
+const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+
+// Balance cache settings - reduces Helius getBalance calls significantly
+const BALANCE_CACHE_PREFIX = 'wallet-balance:';
+const BALANCE_CACHE_TTL_SECONDS = 30; // Cache balances for 30 seconds
 
 interface SnipeJob {
   sniperId: string;
@@ -131,10 +142,10 @@ export class SnipeWorker {
 
       await job.updateProgress(20);
 
-      // Check wallet balance
+      // Check wallet balance using the public key from the job data
       const hasBalance = await this.checkWalletBalance(
-        walletId,
-        config.snipeAmountSol + config.priorityFeeSol + 0.001 // Extra for fees
+        job.data.walletPublicKey,
+        config.snipeAmountSol + config.priorityFeeSol + 0.002 // Extra for network fees + platform fee
       );
 
       if (!hasBalance) {
@@ -163,6 +174,33 @@ export class SnipeWorker {
       }
 
       await job.updateProgress(30);
+
+      // CRITICAL: Final check - verify no existing position for this token + wallet
+      // This is a last-resort safeguard against duplicate snipes
+      const existingPosition = await prisma.position.findFirst({
+        where: {
+          walletId,
+          tokenMint: migration.tokenMint,
+          status: { in: ['open', 'pending'] },
+        },
+      });
+
+      if (existingPosition) {
+        console.log(
+          `Duplicate snipe blocked at worker level: position ${existingPosition.id} ` +
+          `already exists for ${migration.tokenSymbol || migration.tokenMint}`
+        );
+        await emitToUser(userId, 'snipe:skipped', {
+          sniperId,
+          sniperName,
+          reason: 'Position already exists for this token',
+          tokenMint: migration.tokenMint,
+          tokenSymbol: migration.tokenSymbol,
+        });
+        return;
+      }
+
+      await job.updateProgress(40);
 
       // Execute the snipe
       const result = await transactionExecutor.executeSnipe({
@@ -237,19 +275,48 @@ export class SnipeWorker {
   }
 
   /**
-   * Check if wallet has sufficient balance
+   * Check if wallet has sufficient balance (with Redis caching to reduce Helius RPC calls)
    */
   private async checkWalletBalance(
-    _walletId: string,
-    _requiredSol: number
+    walletPublicKey: string,
+    requiredSol: number
   ): Promise<boolean> {
-    // In production, this would:
-    // 1. Get wallet public key from database
-    // 2. Query Solana RPC for balance
-    // 3. Return true if balance >= requiredSol
+    const cacheKey = `${BALANCE_CACHE_PREFIX}${walletPublicKey}`;
 
-    // For now, assume sufficient balance
-    return true;
+    try {
+      // Check cache first
+      const cachedBalance = await redis.get(cacheKey);
+      let balanceSol: number;
+
+      if (cachedBalance !== null) {
+        balanceSol = parseFloat(cachedBalance);
+        console.log(`Wallet ${walletPublicKey.slice(0, 8)}... balance (cached): ${balanceSol.toFixed(4)} SOL (required: ${requiredSol.toFixed(4)} SOL)`);
+      } else {
+        // Fetch from chain and cache
+        const publicKey = new PublicKey(walletPublicKey);
+        const balance = await connection.getBalance(publicKey);
+        balanceSol = balance / LAMPORTS_PER_SOL;
+
+        // Cache the balance
+        await redis.setex(cacheKey, BALANCE_CACHE_TTL_SECONDS, balanceSol.toString());
+
+        console.log(`Wallet ${walletPublicKey.slice(0, 8)}... balance (fresh): ${balanceSol.toFixed(4)} SOL (required: ${requiredSol.toFixed(4)} SOL)`);
+      }
+
+      return balanceSol >= requiredSol;
+    } catch (error) {
+      console.error('Error checking wallet balance:', error);
+      // Return false on error to be safe - don't execute snipes if we can't verify balance
+      return false;
+    }
+  }
+
+  /**
+   * Invalidate balance cache after a transaction (call this after successful snipes)
+   */
+  static async invalidateBalanceCache(walletPublicKey: string): Promise<void> {
+    const cacheKey = `${BALANCE_CACHE_PREFIX}${walletPublicKey}`;
+    await redis.del(cacheKey);
   }
 
   /**

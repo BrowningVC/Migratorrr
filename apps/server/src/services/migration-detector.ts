@@ -38,9 +38,18 @@ export class MigrationDetector extends EventEmitter {
   private recentMigrations = new Map<string, number>();
   private deduplicationWindowMs = 300000; // 5 minutes
 
+  // Subscription confirmation tracking
+  private subscriptionConfirmed = { pumpPortal: false, helius: false };
+
   // Configuration
   private pumpPortalUrl = 'wss://pumpportal.fun/api/data';
   private heliusApiKey = process.env.HELIUS_API_KEY || '';
+
+  // Rate limiting for Helius API calls
+  private lastHeliusFetch = 0;
+  private readonly HELIUS_MIN_INTERVAL_MS = 500; // Max 2 transaction fetches/second
+  private pendingHeliusFetches: string[] = [];
+  private heliusFetchTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
@@ -53,18 +62,17 @@ export class MigrationDetector extends EventEmitter {
     }
 
     this.isRunning = true;
-    console.log('Starting Migration Detector with triple redundancy...');
+    console.log('Starting Migration Detector...');
 
-    // Start all detection sources in parallel
-    await Promise.allSettled([
-      this.initPumpPortal(),
-      this.initHeliusMonitor(),
-    ]);
+    // Start PumpPortal only - it's the primary and lowest latency source
+    // Helius WebSocket monitor disabled to save credits (was consuming ~500k+ credits/month)
+    // PumpPortal is free and provides migration events directly
+    await this.initPumpPortal();
 
     // Start cleanup interval for deduplication map
     setInterval(() => this.cleanupDeduplicationMap(), 60000);
 
-    console.log('Migration Detector started');
+    console.log('Migration Detector started (PumpPortal primary source)');
   }
 
   async stop(): Promise<void> {
@@ -79,6 +87,13 @@ export class MigrationDetector extends EventEmitter {
       this.heliusWs.close();
       this.heliusWs = null;
     }
+
+    // Clear pending Helius fetches
+    if (this.heliusFetchTimer) {
+      clearTimeout(this.heliusFetchTimer);
+      this.heliusFetchTimer = null;
+    }
+    this.pendingHeliusFetches = [];
 
     console.log('Migration Detector stopped');
   }
@@ -132,8 +147,28 @@ export class MigrationDetector extends EventEmitter {
   }
 
   private handlePumpPortalMessage(message: any): void {
+    // Handle subscription confirmation
+    if (message.method === 'subscribeMigration' || message.subscribed === 'migration') {
+      this.subscriptionConfirmed.pumpPortal = true;
+      console.log('✓ PumpPortal migration subscription confirmed');
+      return;
+    }
+
+    // Handle subscription acknowledgment (different format)
+    if (message.message && message.message.includes('subscribed')) {
+      this.subscriptionConfirmed.pumpPortal = true;
+      console.log('✓ PumpPortal subscription acknowledged:', message.message);
+      return;
+    }
+
     // PumpPortal migration event structure
     if (message.txType === 'migration' || message.type === 'migration') {
+      // Mark subscription as confirmed if we receive migration events
+      if (!this.subscriptionConfirmed.pumpPortal) {
+        this.subscriptionConfirmed.pumpPortal = true;
+        console.log('✓ PumpPortal subscription confirmed (received migration event)');
+      }
+
       const migration: MigrationEvent = {
         tokenMint: message.mint || message.tokenMint,
         tokenName: message.name || message.tokenName || null,
@@ -235,7 +270,8 @@ export class MigrationDetector extends EventEmitter {
   private handleHeliusMessage(message: any): void {
     // Handle subscription confirmation
     if (message.result !== undefined) {
-      console.log('Helius subscription confirmed:', message.result);
+      this.subscriptionConfirmed.helius = true;
+      console.log('✓ Helius subscription confirmed:', message.result);
       return;
     }
 
@@ -244,22 +280,146 @@ export class MigrationDetector extends EventEmitter {
       const logs = message.params?.result?.value?.logs || [];
       const signature = message.params?.result?.value?.signature;
 
-      // Look for pool initialization logs
+      // Look for pool initialization logs (Raydium CPMM)
       const isPoolInit = logs.some((log: string) =>
         log.includes('Program log: Instruction: Initialize') ||
-        log.includes('InitializePool')
+        log.includes('InitializePool') ||
+        log.includes('Create pool')
       );
 
-      if (isPoolInit) {
-        // Extract pool info from logs (simplified - real implementation would parse properly)
+      if (isPoolInit && signature) {
         console.log(`Potential new pool detected via Helius: ${signature}`);
 
-        // In a real implementation, you would:
-        // 1. Fetch the transaction details
-        // 2. Parse the pool creation instruction
-        // 3. Extract token mint, pool address, liquidity info
-        // For now, we'll rely primarily on PumpPortal which has cleaner data
+        // Queue the fetch with rate limiting instead of immediate fetch
+        this.queueHeliusFetch(signature);
       }
+    }
+  }
+
+  /**
+   * Queue a Helius transaction fetch with rate limiting
+   */
+  private queueHeliusFetch(signature: string): void {
+    // Avoid duplicate fetches
+    if (this.pendingHeliusFetches.includes(signature)) return;
+
+    this.pendingHeliusFetches.push(signature);
+
+    // Process queue if not already running
+    if (!this.heliusFetchTimer) {
+      this.processHeliusFetchQueue();
+    }
+  }
+
+  /**
+   * Process the Helius fetch queue with rate limiting
+   */
+  private processHeliusFetchQueue(): void {
+    if (this.pendingHeliusFetches.length === 0) {
+      this.heliusFetchTimer = null;
+      return;
+    }
+
+    const now = Date.now();
+    const elapsed = now - this.lastHeliusFetch;
+    const delay = Math.max(0, this.HELIUS_MIN_INTERVAL_MS - elapsed);
+
+    this.heliusFetchTimer = setTimeout(async () => {
+      const signature = this.pendingHeliusFetches.shift();
+      if (signature) {
+        this.lastHeliusFetch = Date.now();
+        try {
+          await this.fetchAndProcessHeliusTransaction(signature);
+        } catch (error) {
+          console.error('Error processing Helius transaction:', error);
+        }
+      }
+      // Continue processing queue
+      this.processHeliusFetchQueue();
+    }, delay);
+  }
+
+  /**
+   * Fetch and process a Raydium pool creation transaction from Helius
+   */
+  private async fetchAndProcessHeliusTransaction(signature: string): Promise<void> {
+    if (!this.heliusApiKey) return;
+
+    try {
+      // Use Helius enhanced transaction API for parsed data
+      const response = await fetch(
+        `https://api.helius.xyz/v0/transactions/?api-key=${this.heliusApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: [signature] }),
+        }
+      );
+
+      if (!response.ok) {
+        console.error('Helius transaction fetch failed:', await response.text());
+        return;
+      }
+
+      const transactions = await response.json();
+      const tx = transactions[0];
+
+      if (!tx) {
+        console.log(`No transaction data found for ${signature}`);
+        return;
+      }
+
+      // Look for Raydium CPMM pool creation in the transaction
+      // The token transfers and account keys tell us about the pool
+      const accountKeys = tx.accountData?.map((a: any) => a.account) || [];
+      const tokenTransfers = tx.tokenTransfers || [];
+
+      // Try to identify the token mint and pool from the transaction
+      // Raydium CPMM pools have specific instruction patterns
+      let tokenMint: string | null = null;
+      let poolAddress: string | null = null;
+      let liquiditySol = 0;
+
+      // Look for non-SOL token transfers (the new token being added to pool)
+      for (const transfer of tokenTransfers) {
+        if (transfer.mint && transfer.mint !== 'So11111111111111111111111111111111111111112') {
+          tokenMint = transfer.mint;
+          break;
+        }
+      }
+
+      // Look for SOL amount (native transfers represent liquidity)
+      const nativeTransfers = tx.nativeTransfers || [];
+      for (const transfer of nativeTransfers) {
+        if (transfer.amount > liquiditySol) {
+          liquiditySol = transfer.amount / 1e9; // Convert lamports to SOL
+        }
+      }
+
+      // Pool address is typically in the account keys
+      if (accountKeys.length > 2) {
+        // The pool account is usually one of the first few accounts after the payer
+        poolAddress = accountKeys[1] || accountKeys[2];
+      }
+
+      if (tokenMint && poolAddress) {
+        console.log(`Helius detected pool: token=${tokenMint}, pool=${poolAddress}, liq=${liquiditySol} SOL`);
+
+        const migration: MigrationEvent = {
+          tokenMint,
+          tokenName: null, // Would need additional lookup
+          tokenSymbol: null,
+          poolAddress,
+          bondingCurveAddress: null,
+          initialLiquiditySol: liquiditySol,
+          initialPriceSol: 0, // Would need price calculation
+          timestamp: tx.timestamp ? tx.timestamp * 1000 : Date.now(),
+        };
+
+        this.processMigration(migration, 'helius');
+      }
+    } catch (error) {
+      console.error('Error fetching Helius transaction:', error);
     }
   }
 
@@ -292,6 +452,19 @@ export class MigrationDetector extends EventEmitter {
   ): Promise<void> {
     const key = event.tokenMint;
     const now = Date.now();
+
+    // CRITICAL: Reject historical migrations
+    // This prevents sniping old tokens that come through on reconnection or backfill
+    const MAX_EVENT_AGE_MS = 60_000; // 60 seconds max - event timestamp to now
+    const eventAge = now - event.timestamp;
+
+    if (eventAge > MAX_EVENT_AGE_MS) {
+      console.log(
+        `Ignoring historical migration: ${event.tokenSymbol || event.tokenMint} ` +
+        `(event age: ${Math.round(eventAge / 1000)}s)`
+      );
+      return;
+    }
 
     // Check for duplicates
     if (this.recentMigrations.has(key)) {
@@ -372,6 +545,10 @@ export class MigrationDetector extends EventEmitter {
       pumpPortal: boolean;
       helius: boolean;
     };
+    subscriptions: {
+      pumpPortal: boolean;
+      helius: boolean;
+    };
     recentMigrations: number;
   } {
     return {
@@ -379,6 +556,10 @@ export class MigrationDetector extends EventEmitter {
       connections: {
         pumpPortal: this.pumpPortalWs?.readyState === WebSocket.OPEN,
         helius: this.heliusWs?.readyState === WebSocket.OPEN,
+      },
+      subscriptions: {
+        pumpPortal: this.subscriptionConfirmed.pumpPortal,
+        helius: this.subscriptionConfirmed.helius,
       },
       recentMigrations: this.recentMigrations.size,
     };

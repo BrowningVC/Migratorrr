@@ -10,6 +10,7 @@ import { walletRoutes } from './routes/wallet.js';
 import { sniperRoutes } from './routes/sniper.js';
 import { positionRoutes } from './routes/position.js';
 import { statsRoutes } from './routes/stats.js';
+import { adminRoutes } from './routes/admin.js';
 import { setupSocketHandlers } from './websocket/handlers.js';
 import { prisma } from './db/client.js';
 import { redis } from './db/redis.js';
@@ -27,6 +28,49 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
+// Validate critical environment variables at startup
+function validateEnvironment(): void {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  // Critical - will prevent snipes from executing
+  if (!process.env.PLATFORM_FEE_WALLET || process.env.PLATFORM_FEE_WALLET === '11111111111111111111111111111111') {
+    errors.push('PLATFORM_FEE_WALLET must be set to a valid Solana wallet address');
+  }
+
+  if (!process.env.HELIUS_API_KEY) {
+    errors.push('HELIUS_API_KEY is required for RPC access and transaction execution');
+  }
+
+  if (!process.env.MASTER_ENCRYPTION_KEY) {
+    errors.push('MASTER_ENCRYPTION_KEY is required for wallet encryption');
+  }
+
+  // Warnings - will affect functionality but won't prevent startup
+  if (!process.env.BACKUP_RPC_URL) {
+    warnings.push('BACKUP_RPC_URL not set - no fallback RPC if Helius fails');
+  }
+
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-jwt-secret-change-in-production') {
+    warnings.push('JWT_SECRET should be set to a secure random value in production');
+  }
+
+  // Print warnings
+  if (warnings.length > 0) {
+    console.warn('\n⚠️  Configuration Warnings:');
+    warnings.forEach(w => console.warn(`   - ${w}`));
+    console.warn('');
+  }
+
+  // Print errors and exit if critical config is missing
+  if (errors.length > 0) {
+    console.error('\n❌ Critical Configuration Errors:');
+    errors.forEach(e => console.error(`   - ${e}`));
+    console.error('\nPlease set these environment variables before starting the server.\n');
+    process.exit(1);
+  }
+}
+
 // Store io instance globally for access in routes
 let ioInstance: Server | null = null;
 
@@ -35,6 +79,9 @@ export function getIO(): Server | null {
 }
 
 async function main() {
+  // Validate environment before starting
+  validateEnvironment();
+
   // Create Fastify instance
   const fastify = Fastify({
     logger: {
@@ -70,6 +117,7 @@ async function main() {
   await fastify.register(sniperRoutes, { prefix: '/api/sniper' });
   await fastify.register(positionRoutes, { prefix: '/api/position' });
   await fastify.register(statsRoutes, { prefix: '/api/stats' });
+  await fastify.register(adminRoutes, { prefix: '/api/admin' });
 
   // Health check
   fastify.get('/health', async () => {

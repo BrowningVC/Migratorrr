@@ -58,151 +58,151 @@ export function StatsCards({ stats }: StatsCardsProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Row 1: Core Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Total P&L</p>
+      <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Total P&L</p>
             <p
               className={cn(
-                'text-2xl font-bold',
+                'text-lg font-bold',
                 isProfitable ? 'text-green-400' : 'text-red-400'
               )}
             >
               {totalPnlSol >= 0 ? '+' : ''}{totalPnlSol.toFixed(4)}
             </p>
-            <p className="text-zinc-500 text-xs">
+            <p className="text-zinc-500 text-[10px]">
               ({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%)
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Open Positions</p>
-            <p className="text-2xl font-bold text-white">{openPositions}</p>
-            <p className="text-zinc-500 text-xs">Active trades</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Open Positions</p>
+            <p className="text-lg font-bold text-white">{openPositions}</p>
+            <p className="text-zinc-500 text-[10px]">Active trades</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Active Snipers</p>
-            <p className="text-2xl font-bold text-green-400">{activeSnipers}</p>
-            <p className="text-zinc-500 text-xs">Watching for migrations</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Active Snipers</p>
+            <p className="text-lg font-bold text-green-400">{activeSnipers}</p>
+            <p className="text-zinc-500 text-[10px]">Watching</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Snipes Today</p>
-            <p className="text-2xl font-bold text-white">{snipesToday}</p>
-            <p className="text-zinc-500 text-xs">Last 24 hours</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Snipes Today</p>
+            <p className="text-lg font-bold text-white">{snipesToday}</p>
+            <p className="text-zinc-500 text-[10px]">Last 24h</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Success Rate</p>
-            <p className="text-2xl font-bold text-white">{successRate}%</p>
-            <p className="text-zinc-500 text-xs">Transaction success</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Success Rate</p>
+            <p className="text-lg font-bold text-white">{successRate}%</p>
+            <p className="text-zinc-500 text-[10px]">Tx success</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Status</p>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <p className="text-lg font-medium text-green-400">Connected</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Status</p>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              <p className="text-sm font-medium text-green-400">Connected</p>
             </div>
-            <p className="text-zinc-500 text-xs">Real-time updates active</p>
+            <p className="text-zinc-500 text-[10px]">Real-time</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Row 2: Extended Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Best Trade</p>
+      <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Best Trade</p>
             <p className={cn(
-              'text-2xl font-bold',
+              'text-lg font-bold',
               bestTradeSol > 0 ? 'text-green-400' : 'text-zinc-400'
             )}>
               {bestTradeSol > 0 ? `+${bestTradeSol.toFixed(2)}` : '—'}
             </p>
-            <p className="text-zinc-500 text-xs">
-              {bestTradePct > 0 ? `+${bestTradePct.toFixed(0)}% gain` : 'No trades yet'}
+            <p className="text-zinc-500 text-[10px]">
+              {bestTradePct > 0 ? `+${bestTradePct.toFixed(0)}%` : 'No trades'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Worst Trade</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Worst Trade</p>
             <p className={cn(
-              'text-2xl font-bold',
+              'text-lg font-bold',
               worstTradeSol < 0 ? 'text-red-400' : 'text-zinc-400'
             )}>
               {worstTradeSol < 0 ? worstTradeSol.toFixed(2) : '—'}
             </p>
-            <p className="text-zinc-500 text-xs">
-              {worstTradePct < 0 ? `${worstTradePct.toFixed(0)}% loss` : 'No losses yet'}
+            <p className="text-zinc-500 text-[10px]">
+              {worstTradePct < 0 ? `${worstTradePct.toFixed(0)}%` : 'No losses'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Tokens Caught</p>
-            <p className="text-2xl font-bold text-green-400">{tokensCaught}</p>
-            <p className="text-zinc-500 text-xs">Successfully sniped</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Tokens Caught</p>
+            <p className="text-lg font-bold text-green-400">{tokensCaught}</p>
+            <p className="text-zinc-500 text-[10px]">Sniped</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Tokens Avoided</p>
-            <p className="text-2xl font-bold text-yellow-400">{tokensAvoided}</p>
-            <p className="text-zinc-500 text-xs">Filtered out by rules</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Tokens Avoided</p>
+            <p className="text-lg font-bold text-yellow-400">{tokensAvoided}</p>
+            <p className="text-zinc-500 text-[10px]">Filtered</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardContent className="p-4">
-            <p className="text-zinc-500 text-sm mb-1">Biggest Miss</p>
+        <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
+          <CardContent className="p-3">
+            <p className="text-zinc-500 text-xs mb-0.5">Biggest Miss</p>
             {biggestMiss ? (
               <>
-                <p className="text-2xl font-bold text-orange-400">${biggestMiss.ticker}</p>
-                <p className="text-zinc-500 text-xs">ATH: {formatMcap(biggestMiss.athMcap)}</p>
+                <p className="text-lg font-bold text-orange-400">${biggestMiss.ticker}</p>
+                <p className="text-zinc-500 text-[10px]">{formatMcap(biggestMiss.athMcap)}</p>
               </>
             ) : (
               <>
-                <p className="text-2xl font-bold text-zinc-400">—</p>
-                <p className="text-zinc-500 text-xs">No data yet</p>
+                <p className="text-lg font-bold text-zinc-400">—</p>
+                <p className="text-zinc-500 text-[10px]">No data</p>
               </>
             )}
           </CardContent>
         </Card>
 
         <Card
-          className="bg-zinc-900/50 border-zinc-800 hover:border-green-800/50 transition-colors cursor-pointer group"
+          className="bg-zinc-900/50 border-zinc-800 hover:border-green-800/50 transition-colors cursor-pointer group col-span-2"
           onClick={() => setShowComingSoon(true)}
         >
-          <CardContent className="p-4 flex flex-col items-center justify-center h-full">
-            <div className="w-10 h-10 rounded-full bg-green-900/30 flex items-center justify-center mb-2 group-hover:bg-green-900/50 transition-colors overflow-hidden">
+          <CardContent className="p-3 flex flex-col items-center justify-center h-full">
+            <div className="w-8 h-8 rounded-full bg-green-900/30 flex items-center justify-center mb-1 group-hover:bg-green-900/50 transition-colors overflow-hidden">
               <Image
                 src="/share-icon.svg"
                 alt="Share"
-                width={24}
-                height={24}
+                width={18}
+                height={18}
                 className="object-contain"
               />
             </div>
-            <p className="text-sm font-medium text-green-400">Share Results</p>
-            <p className="text-zinc-500 text-xs">Show off your gains</p>
+            <p className="text-xs font-medium text-green-400">Share Results</p>
+            <p className="text-zinc-500 text-[10px]">Show off gains</p>
           </CardContent>
         </Card>
       </div>
