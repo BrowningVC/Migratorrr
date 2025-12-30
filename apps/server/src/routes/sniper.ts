@@ -16,6 +16,12 @@ const sniperParamsSchema = z.object({
   namePatterns: z.array(z.string()).optional(),
   excludedPatterns: z.array(z.string()).optional(),
   creatorWhitelist: z.array(z.string()).optional(),
+  // Migration time filter (minutes from token creation to migration)
+  maxMigrationTimeMinutes: z.number().int().min(1).max(1440).optional(), // 1 min - 24 hours
+  // Volume filter (minimum volume in USD since token deployment)
+  minVolumeUsd: z.number().positive().optional(),
+  // MEV Protection - use Jito bundles for sandwich attack protection
+  mevProtection: z.boolean().optional(),
 }).passthrough(); // Allow additional custom parameters
 
 const createSniperSchema = z.object({
