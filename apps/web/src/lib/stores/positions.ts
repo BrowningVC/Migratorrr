@@ -52,18 +52,30 @@ export const usePositionsStore = create<PositionsState>((set) => ({
     })),
 
   updatePrice: (tokenMint, price) =>
-    set((state) => ({
-      positions: state.positions.map((p) => {
-        if (p.tokenMint !== tokenMint) return p;
-        const pnlPct = ((price - p.entryPrice) / p.entryPrice) * 100;
-        const pnlSol = (price - p.entryPrice) * p.currentTokenAmount;
-        return {
-          ...p,
-          currentPrice: price,
-          pnlPct,
-          pnlSol,
-          highestPrice: Math.max(p.highestPrice || price, price),
-        };
-      }),
-    })),
+    set((state) => {
+      // Find index for O(n) search once, then O(1) update
+      const idx = state.positions.findIndex((p) => p.tokenMint === tokenMint);
+      if (idx === -1) return state; // No matching position, skip update
+
+      const p = state.positions[idx];
+      // Skip if price hasn't changed meaningfully (< 0.01% change)
+      if (p.currentPrice && Math.abs(price - p.currentPrice) / p.currentPrice < 0.0001) {
+        return state;
+      }
+
+      const pnlPct = ((price - p.entryPrice) / p.entryPrice) * 100;
+      const pnlSol = (price - p.entryPrice) * p.currentTokenAmount;
+      const updated = {
+        ...p,
+        currentPrice: price,
+        pnlPct,
+        pnlSol,
+        highestPrice: Math.max(p.highestPrice || price, price),
+      };
+
+      // Create new array with only the changed position
+      const newPositions = [...state.positions];
+      newPositions[idx] = updated;
+      return { positions: newPositions };
+    }),
 }));

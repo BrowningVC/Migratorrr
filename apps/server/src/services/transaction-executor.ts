@@ -37,6 +37,7 @@ interface ExecuteSnipeParams {
   priorityFeeSol: number;
   sniperId?: string;
   tokenSymbol?: string;
+  mevProtection?: boolean; // Use Jito bundles for MEV protection (default: true)
 }
 
 interface ExecutionResult {
@@ -128,6 +129,7 @@ export class TransactionExecutor {
       priorityFeeSol,
       sniperId,
       tokenSymbol,
+      mevProtection = true, // Default to enabled
     } = params;
 
     // Notify user that snipe is starting
@@ -179,6 +181,7 @@ export class TransactionExecutor {
         sniperId,
         tokenSymbol,
         initialTip: priorityFeeSol,
+        mevProtection,
       });
 
       if (result.success && result.signature) {
@@ -416,6 +419,8 @@ export class TransactionExecutor {
 
   /**
    * Submit transaction with multi-path failsafe
+   * When mevProtection is enabled (default), uses Jito bundles first
+   * When disabled, skips Jito and goes directly to Helius/RPC
    */
   private async submitWithFailsafe(params: {
     transaction: VersionedTransaction;
@@ -424,16 +429,26 @@ export class TransactionExecutor {
     sniperId?: string;
     tokenSymbol?: string;
     initialTip: number;
+    mevProtection?: boolean;
   }): Promise<{ success: boolean; signature?: string; error?: string }> {
-    const { wallet, userId, sniperId, tokenSymbol, initialTip } = params;
+    const { wallet, userId, sniperId, tokenSymbol, initialTip, mevProtection = true } = params;
     let { transaction } = params;
 
-    const attempts = [
-      { path: 'jito', tipMultiplier: 1 },
-      { path: 'jito', tipMultiplier: 2 },
-      { path: 'helius', tipMultiplier: 2.5 },
-      { path: 'direct', tipMultiplier: 3 },
-    ];
+    // Build attempt sequence based on MEV protection setting
+    const attempts = mevProtection
+      ? [
+          // MEV protected: Jito first, then fallback to Helius/direct
+          { path: 'jito', tipMultiplier: 1 },
+          { path: 'jito', tipMultiplier: 2 },
+          { path: 'helius', tipMultiplier: 2.5 },
+          { path: 'direct', tipMultiplier: 3 },
+        ]
+      : [
+          // No MEV protection: Skip Jito, use Helius/direct only (faster, cheaper)
+          { path: 'helius', tipMultiplier: 1 },
+          { path: 'helius', tipMultiplier: 1.5 },
+          { path: 'direct', tipMultiplier: 2 },
+        ];
 
     for (let i = 0; i < attempts.length; i++) {
       const attempt = attempts[i];

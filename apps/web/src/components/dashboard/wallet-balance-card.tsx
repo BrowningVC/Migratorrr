@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Copy, Check, RefreshCw, Wallet, ExternalLink } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useWalletsStore } from '@/lib/stores/wallets';
@@ -38,8 +38,7 @@ export function WalletBalanceCard() {
           toast.success('Balances refreshed');
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch balances:', error);
+    } catch {
       if (showToast) {
         toast.error('Failed to refresh balances');
       }
@@ -63,16 +62,16 @@ export function WalletBalanceCard() {
     return () => clearInterval(interval);
   }, [fetchBalances]);
 
-  const handleCopyAddress = async (address: string) => {
+  const handleCopyAddress = useCallback(async (address: string) => {
     try {
       await navigator.clipboard.writeText(address);
       setCopiedAddress(address);
       toast.success('Address copied!');
       setTimeout(() => setCopiedAddress(null), 2000);
-    } catch (error) {
+    } catch {
       toast.error('Failed to copy address');
     }
-  };
+  }, []);
 
   const handleRefresh = () => {
     fetchBalances(true);
@@ -82,9 +81,12 @@ export function WalletBalanceCard() {
     window.open(`https://solscan.io/account/${address}`, '_blank');
   };
 
-  // Filter to show only generated (trading) wallets
-  const tradingWallets = balances.filter(b => b.walletType === 'generated');
-  const totalBalance = tradingWallets.reduce((sum, w) => sum + w.balanceSol, 0);
+  // Memoize filtered wallets and total
+  const { tradingWallets, totalBalance } = useMemo(() => {
+    const filtered = balances.filter(b => b.walletType === 'generated');
+    const total = filtered.reduce((sum, w) => sum + w.balanceSol, 0);
+    return { tradingWallets: filtered, totalBalance: total };
+  }, [balances]);
 
   if (isLoading) {
     return (

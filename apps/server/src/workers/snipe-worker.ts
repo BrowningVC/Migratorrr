@@ -16,6 +16,7 @@ interface SnipeJob {
     takeProfitPct?: number;
     stopLossPct?: number;
     trailingStopPct?: number;
+    mevProtection?: boolean;
     [key: string]: unknown;
   };
   migration: {
@@ -174,6 +175,7 @@ export class SnipeWorker {
         priorityFeeSol: config.priorityFeeSol,
         sniperId,
         tokenSymbol: migration.tokenSymbol,
+        mevProtection: config.mevProtection ?? true, // Default to enabled
       });
 
       await job.updateProgress(80);

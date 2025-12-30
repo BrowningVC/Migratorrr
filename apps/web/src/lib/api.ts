@@ -65,7 +65,7 @@ export const authApi = {
     ),
 
   logout: (token: string) =>
-    fetchApi('/api/auth/logout', { method: 'POST' }, token),
+    fetchApi('/api/auth/logout', { method: 'POST', body: '{}' }, token),
 };
 
 // Wallet API
@@ -112,14 +112,14 @@ export const walletApi = {
   exportKey: (token: string, walletId: string) =>
     fetchApi<{ privateKey: string }>(
       `/api/wallet/${walletId}/export`,
-      { method: 'POST' },
+      { method: 'POST', body: '{}' },
       token
     ),
 
   setPrimary: (token: string, walletId: string) =>
     fetchApi(
       `/api/wallet/${walletId}/primary`,
-      { method: 'POST' },
+      { method: 'POST', body: '{}' },
       token
     ),
 
@@ -215,7 +215,7 @@ export const sniperApi = {
   toggle: (token: string, sniperId: string) =>
     fetchApi<{ data: { id: string; isActive: boolean } }>(
       `/api/sniper/${sniperId}/toggle`,
-      { method: 'POST' },
+      { method: 'POST', body: '{}' },
       token
     ),
 
@@ -261,7 +261,7 @@ export const positionApi = {
   close: (token: string, positionId: string) =>
     fetchApi(
       `/api/position/${positionId}/close`,
-      { method: 'POST' },
+      { method: 'POST', body: '{}' },
       token
     ),
 
@@ -274,4 +274,55 @@ export const positionApi = {
       {},
       token
     ),
+};
+
+// Stats API (public endpoints, no auth required)
+export const statsApi = {
+  getPlatformStats: () =>
+    fetchApi<{
+      totalMigrations: number;
+      performance: {
+        pct2x: number;
+        pct5x: number;
+        pct10x: number;
+        pct50x: number;
+        pct100x: number;
+      };
+      topPerformers: {
+        highestMultiplier: number;
+        highestMultiplierToken: string | null;
+        highestMarketCap: number;
+        highestMarketCapToken: string | null;
+      };
+      avgTimeToReach2x: number | null;
+      lastUpdated: string;
+    }>('/api/stats/platform'),
+
+  getTopPerformers: () =>
+    fetchApi<Array<{
+      tokenSymbol: string;
+      tokenName: string | null;
+      tokenMint: string;
+      multiplier: number;
+      highestMarketCap: number | null;
+      reached10x: boolean;
+      reached100x: boolean;
+      migrationDate: string;
+    }>>('/api/stats/top-performers'),
+
+  getRecentMigrations: () =>
+    fetchApi<Array<{
+      tokenSymbol: string;
+      tokenName: string | null;
+      tokenMint: string;
+      initialLiquidity: number | null;
+      initialMarketCap: number | null;
+      milestones: {
+        reached2x: boolean;
+        reached5x: boolean;
+        reached10x: boolean;
+      };
+      snipedCount: number;
+      migrationTime: string;
+    }>>('/api/stats/recent-migrations'),
 };

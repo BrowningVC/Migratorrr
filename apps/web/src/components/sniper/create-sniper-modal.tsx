@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { Shield, Check } from 'lucide-react';
 
 interface CreateSniperModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ const DEFAULT_CONFIG: SniperConfig = {
   stopLossPct: 50,
   trailingStopPct: undefined,
   minLiquiditySol: 5,
+  mevProtection: true, // Enabled by default
 };
 
 export function CreateSniperModal({
@@ -96,7 +98,7 @@ export function CreateSniperModal({
       const res = await sniperApi.create(token, {
         walletId: selectedWalletId,
         name,
-        config: finalConfig,
+        config: finalConfig as unknown as Record<string, unknown>,
         isActive: false,
       });
 
@@ -301,6 +303,37 @@ export function CreateSniperModal({
                   Sell when price drops this % from highest point (leave empty to disable)
                 </p>
               </div>
+
+              {/* MEV Protection */}
+              <div className="mt-6 pt-4 border-t border-zinc-700/50">
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="relative mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={config.mevProtection ?? true}
+                      onChange={(e) => updateConfig({ mevProtection: e.target.checked })}
+                      className="sr-only"
+                    />
+                    <div className={cn(
+                      'w-5 h-5 rounded border-2 transition-colors flex items-center justify-center',
+                      config.mevProtection ?? true
+                        ? 'bg-green-600 border-green-600'
+                        : 'border-zinc-600 group-hover:border-zinc-500'
+                    )}>
+                      {(config.mevProtection ?? true) && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-green-400" />
+                      <span className="text-sm font-medium text-white">MEV Protection</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      Uses Jito bundles to protect your buy and sell transactions from sandwich attacks and front-running bots.
+                    </p>
+                  </div>
+                </label>
+              </div>
             </div>
           )}
 
@@ -369,10 +402,16 @@ export function CreateSniperModal({
           {/* Step 4: Filters */}
           {step === 'filters' && (
             <div className="space-y-6">
-              {/* Token Type Badge */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded-full w-fit">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-green-400">Newly Migrated Tokens</span>
+              {/* Token Type Badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium text-green-400">Newly Migrated Tokens ONLY</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 bg-yellow-900/30 border border-yellow-700/50 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                  <span className="text-sm font-medium text-yellow-400">More Options Soon</span>
+                </div>
               </div>
 
               {/* Migration Speed Filter */}
@@ -474,63 +513,101 @@ export function CreateSniperModal({
           {/* Step 5: Review */}
           {step === 'review' && (
             <div className="space-y-4">
-              <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
+              {/* Sniper Name & Wallet */}
+              <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Sniper Name</span>
+                  <span className="font-semibold text-white">{name || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Wallet</span>
+                  <span className="font-medium text-white text-sm">
+                    {wallets.find(w => w.id === selectedWalletId)?.label ||
+                     wallets.find(w => w.id === selectedWalletId)?.publicKey?.slice(0, 8) + '...'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Token Type */}
+              <div className="bg-zinc-800/50 rounded-lg p-4">
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Token Type</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium text-green-400">Newly Migrated Tokens ONLY</span>
+                </div>
+              </div>
+
+              {/* Buy Settings */}
+              <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Buy Settings</p>
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Name</span>
-                  <span className="font-medium">{name || '-'}</span>
+                  <span className="text-zinc-400">Amount per Snipe</span>
+                  <span className="font-medium text-white">{config.snipeAmountSol} SOL</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Snipe Amount</span>
-                  <span className="font-medium">{config.snipeAmountSol} SOL</span>
+                  <span className="text-zinc-400">Max Slippage</span>
+                  <span className="font-medium text-white">{config.slippageBps / 100}%</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Slippage</span>
-                  <span className="font-medium">{config.slippageBps / 100}%</span>
+                  <span className="text-zinc-400">Priority Fee (Jito)</span>
+                  <span className="font-medium text-white">{config.priorityFeeSol} SOL</span>
+                </div>
+              </div>
+
+              {/* Exit Strategy */}
+              <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Exit Strategy</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Take Profit</span>
+                  <span className="font-medium text-green-400">
+                    {config.takeProfitPct ? `+${config.takeProfitPct}% (${(config.takeProfitPct / 100 + 1).toFixed(1)}x)` : 'Not set'}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Priority Fee</span>
-                  <span className="font-medium">{config.priorityFeeSol} SOL</span>
+                  <span className="text-zinc-400">Stop Loss</span>
+                  <span className="font-medium text-red-400">
+                    {config.stopLossPct ? `-${config.stopLossPct}%` : 'Not set'}
+                  </span>
                 </div>
-                {config.takeProfitPct && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Take Profit</span>
-                    <span className="font-medium text-green-400">+{config.takeProfitPct}%</span>
-                  </div>
-                )}
-                {config.stopLossPct && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Stop Loss</span>
-                    <span className="font-medium text-red-400">-{config.stopLossPct}%</span>
-                  </div>
-                )}
                 {config.trailingStopPct && (
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-400">Trailing Stop</span>
-                    <span className="font-medium text-yellow-400">{config.trailingStopPct}%</span>
+                    <span className="font-medium text-yellow-400">{config.trailingStopPct}% from peak</span>
                   </div>
                 )}
-                {config.minLiquiditySol && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Min Liquidity</span>
-                    <span className="font-medium">{config.minLiquiditySol} SOL</span>
-                  </div>
-                )}
-                {config.maxMigrationTimeMinutes && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Migration Speed</span>
-                    <span className="font-medium">
-                      {config.maxMigrationTimeMinutes < 60
-                        ? `< ${config.maxMigrationTimeMinutes}m`
-                        : `< ${config.maxMigrationTimeMinutes / 60}h`}
-                    </span>
-                  </div>
-                )}
-                {config.minVolumeUsd && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Min Volume</span>
-                    <span className="font-medium">${(config.minVolumeUsd / 1000).toFixed(0)}k+</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400 flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5" />
+                    MEV Protection
+                  </span>
+                  <span className={cn(
+                    'font-medium',
+                    config.mevProtection ?? true ? 'text-green-400' : 'text-zinc-500'
+                  )}>
+                    {config.mevProtection ?? true ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Token Filters</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Migration Speed</span>
+                  <span className="font-medium text-white">
+                    {config.maxMigrationTimeMinutes
+                      ? config.maxMigrationTimeMinutes < 60
+                        ? `< ${config.maxMigrationTimeMinutes} min`
+                        : `< ${config.maxMigrationTimeMinutes / 60} hour${config.maxMigrationTimeMinutes > 60 ? 's' : ''}`
+                      : 'Any'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Min Volume</span>
+                  <span className="font-medium text-white">
+                    {config.minVolumeUsd ? `$${(config.minVolumeUsd / 1000).toFixed(0)}k+` : 'Any'}
+                  </span>
+                </div>
               </div>
 
               <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-lg p-3">

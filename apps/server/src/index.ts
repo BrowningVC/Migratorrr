@@ -9,6 +9,7 @@ import { authRoutes } from './routes/auth.js';
 import { walletRoutes } from './routes/wallet.js';
 import { sniperRoutes } from './routes/sniper.js';
 import { positionRoutes } from './routes/position.js';
+import { statsRoutes } from './routes/stats.js';
 import { setupSocketHandlers } from './websocket/handlers.js';
 import { prisma } from './db/client.js';
 import { redis } from './db/redis.js';
@@ -20,6 +21,7 @@ import { snipeOrchestrator } from './services/snipe-orchestrator.js';
 // Workers
 import { snipeWorker } from './workers/snipe-worker.js';
 import { automationWorker } from './workers/automation-worker.js';
+import { performanceWorker } from './workers/performance-worker.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -67,6 +69,7 @@ async function main() {
   await fastify.register(walletRoutes, { prefix: '/api/wallet' });
   await fastify.register(sniperRoutes, { prefix: '/api/sniper' });
   await fastify.register(positionRoutes, { prefix: '/api/position' });
+  await fastify.register(statsRoutes, { prefix: '/api/stats' });
 
   // Health check
   fastify.get('/health', async () => {
@@ -86,11 +89,15 @@ async function main() {
   await automationWorker.start();
   fastify.log.info('Automation Worker started');
 
+  await performanceWorker.start();
+  fastify.log.info('Performance Worker started');
+
   // Graceful shutdown
   const shutdown = async () => {
     fastify.log.info('Shutting down...');
 
     // Stop workers first
+    await performanceWorker.stop();
     await automationWorker.stop();
     await snipeWorker.stop();
 

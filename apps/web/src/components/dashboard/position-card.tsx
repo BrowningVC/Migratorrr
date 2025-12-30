@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Position } from '@/lib/stores/positions';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ interface PositionCardProps {
   onSell?: (positionId: string) => void;
 }
 
-export function PositionCard({ position, onSell }: PositionCardProps) {
+export const PositionCard = memo(function PositionCard({ position, onSell }: PositionCardProps) {
   const {
     id,
     tokenSymbol,
@@ -37,7 +38,7 @@ export function PositionCard({ position, onSell }: PositionCardProps) {
   return (
     <Card
       className={cn(
-        'bg-zinc-900/50 border-zinc-800 transition-all',
+        'bg-zinc-900/50 border-zinc-800 transition-[border-color,opacity] duration-200',
         status === 'selling' && 'opacity-60',
         isProfitable && 'border-green-900/50',
         !isProfitable && pnlPct !== undefined && 'border-red-900/50'
@@ -136,4 +137,4 @@ export function PositionCard({ position, onSell }: PositionCardProps) {
       </CardContent>
     </Card>
   );
-}
+});

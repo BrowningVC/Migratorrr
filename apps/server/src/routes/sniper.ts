@@ -64,6 +64,12 @@ export const sniperRoutes: FastifyPluginAsync = async (fastify) => {
         config: s.config,
         wallet: s.wallet,
         openPositions: s._count.positions,
+        // Include stats
+        totalSnipes: s.totalSnipes,
+        successfulSnipes: s.successfulSnipes,
+        failedSnipes: s.failedSnipes,
+        totalSolSpent: s.totalSolSpent,
+        tokensFiltered: s.tokensFiltered,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
       })),

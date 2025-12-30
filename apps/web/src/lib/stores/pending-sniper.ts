@@ -4,10 +4,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { SniperConfig } from './snipers';
 
+// Only public key is stored - private key is NEVER persisted
+export interface GeneratedWalletPublic {
+  publicKey: string;
+}
+
 export interface PendingSniperConfig {
   name: string;
   config: SniperConfig;
   createdAt: number; // timestamp to expire old configs
+  generatedWallet?: GeneratedWalletPublic; // Only public key - private key is NEVER stored
 }
 
 interface PendingSniperStore {
@@ -23,7 +29,15 @@ export const usePendingSniperStore = create<PendingSniperStore>()(
       pendingSniper: null,
 
       setPendingSniper: (config) => {
-        set({ pendingSniper: config });
+        // SECURITY: Ensure private key is never in the persisted config
+        // Only store public key from generated wallet
+        const safeConfig: PendingSniperConfig = {
+          ...config,
+          generatedWallet: config.generatedWallet
+            ? { publicKey: config.generatedWallet.publicKey }
+            : undefined,
+        };
+        set({ pendingSniper: safeConfig });
       },
 
       clearPendingSniper: () => {

@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Copy, Check, Wallet, ArrowRight } from 'lucide-react';
 
 // Dynamic import to prevent hydration mismatch with wallet button
 const WalletMultiButton = dynamic(
@@ -39,6 +40,22 @@ export default function OnboardingPage() {
   const [walletLabel, setWalletLabel] = useState('');
   const [mounted, setMounted] = useState(false);
   const [createdSniperId, setCreatedSniperId] = useState<string | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+
+  // Get generated wallet address from pending sniper
+  const generatedWalletAddress = pendingSniper?.generatedWallet?.publicKey;
+
+  const copyAddress = async () => {
+    if (!generatedWalletAddress) return;
+    try {
+      await navigator.clipboard.writeText(generatedWalletAddress);
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+      toast.success('Address copied!');
+    } catch {
+      toast.error('Failed to copy');
+    }
+  };
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -129,7 +146,6 @@ export default function OnboardingPage() {
         setStep('wallet-setup');
       }
     } catch (error) {
-      console.error('Authentication error:', error);
       toast.error(
         error instanceof Error ? error.message : 'Authentication failed',
         { id: toastId }
@@ -177,7 +193,6 @@ export default function OnboardingPage() {
 
       setStep('complete');
     } catch (error) {
-      console.error('Wallet generation error:', error);
       toast.error(
         error instanceof Error ? error.message : 'Failed to generate wallet',
         { id: toastId }
@@ -231,8 +246,7 @@ export default function OnboardingPage() {
       } else {
         throw new Error(res.error || 'Failed to create sniper');
       }
-    } catch (error) {
-      console.error('Failed to create pending sniper:', error);
+    } catch {
       toast.error('Sniper creation failed, you can create it from the dashboard', { id: sniperToastId });
     }
   };
@@ -277,25 +291,83 @@ export default function OnboardingPage() {
           {/* Step 1: Connect Wallet */}
           {step === 'connect' && (
             <>
-              <CardHeader>
-                <CardTitle className="text-xl">Connect Your Wallet</CardTitle>
+              <CardHeader className="text-center pb-2">
+                <div className="w-14 h-14 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Wallet className="w-7 h-7 text-green-400" />
+                </div>
+                <CardTitle className="text-2xl">Connect Your Wallet</CardTitle>
+                <p className="text-zinc-400 text-sm mt-2">
+                  Final step before accessing your Sniper Dashboard
+                </p>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5 pt-2">
+                {/* Show generated wallet info if available */}
+                {generatedWalletAddress && (
+                  <div className="bg-green-900/20 border border-green-600/50 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-5 h-5 text-green-400" />
+                      <span className="text-green-400 font-medium text-sm">Your Trading Wallet</span>
+                    </div>
+
+                    <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-700">
+                      <p className="text-xs text-zinc-500 mb-1">Wallet Address</p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 text-sm text-white font-mono truncate">
+                          {generatedWalletAddress}
+                        </code>
+                        <button
+                          onClick={copyAddress}
+                          className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
+                          title="Copy address"
+                        >
+                          {copiedAddress ? (
+                            <Check className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <Copy className="w-4 h-4 text-zinc-400" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 text-sm">
+                      <ArrowRight className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
+                      <p className="text-green-300/80">
+                        <strong>Import this wallet</strong> into Phantom or Solflare using your private key, then connect below.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sniper info if available */}
                 {hasPendingSniper() && pendingSniper && (
-                  <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-3 mb-2">
-                    <p className="text-green-400 text-sm">
-                      Your sniper <strong>"{pendingSniper.name}"</strong> is ready to be created.
-                      Connect your wallet to continue.
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400 text-sm">Sniper Ready</span>
+                      <span className="text-white font-medium text-sm">"{pendingSniper.name}"</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Will be created after you connect
                     </p>
                   </div>
                 )}
-                <p className="text-zinc-400 text-sm">
-                  Connect your Solana wallet to get started. We support Phantom,
-                  Solflare, and other major wallets.
-                </p>
-                <div className="flex justify-center pt-4">
+
+                {/* Instructions if no generated wallet */}
+                {!generatedWalletAddress && (
+                  <p className="text-zinc-400 text-sm text-center">
+                    Connect your Solana wallet to get started. We support Phantom,
+                    Solflare, and other major wallets.
+                  </p>
+                )}
+
+                <div className="flex justify-center pt-2">
                   <WalletMultiButton />
                 </div>
+
+                {generatedWalletAddress && (
+                  <p className="text-xs text-zinc-500 text-center">
+                    Make sure to connect with the wallet address shown above for security
+                  </p>
+                )}
               </CardContent>
             </>
           )}

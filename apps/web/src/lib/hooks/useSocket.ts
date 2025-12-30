@@ -184,15 +184,14 @@ export function useSocket(token: string | null) {
     });
 
     socket.on('connect', () => {
-      console.log('Socket connected');
+      // Connection established silently
     });
 
     socket.on('disconnect', () => {
-      console.log('Socket disconnected');
+      // Disconnected - socket will auto-reconnect
     });
 
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
+    socket.on('error', () => {
       toast.error('Connection error. Reconnecting...');
     });
 

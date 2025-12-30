@@ -1,5 +1,7 @@
 'use client';
 
+import { memo, useState } from 'react';
+import { Shield, ChevronDown, Filter, AlertTriangle } from 'lucide-react';
 import { Sniper } from '@/lib/stores/snipers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,28 +9,52 @@ import { cn } from '@/lib/utils';
 
 interface SniperCardProps {
   sniper: Sniper;
-  onToggle?: (sniperId: string) => void;
+  walletBalance?: number; // SOL balance of associated wallet
+  onToggle?: (sniperId: string, hasInsufficientFunds: boolean) => void;
   onEdit?: (sniperId: string) => void;
   onDelete?: (sniperId: string) => void;
 }
 
-export function SniperCard({
+export const SniperCard = memo(function SniperCard({
   sniper,
+  walletBalance,
   onToggle,
   onEdit,
   onDelete,
 }: SniperCardProps) {
   const { id, name, isActive, config, stats } = sniper;
 
+  // Calculate minimum required balance (snipe amount + priority fee + buffer for tx fees)
+  const minRequiredBalance = config.snipeAmountSol + config.priorityFeeSol + 0.002;
+  const hasInsufficientFunds = walletBalance !== undefined && walletBalance < minRequiredBalance;
+  const [showFilters, setShowFilters] = useState(false);
+
   const winRate =
     stats.totalSnipes > 0
       ? ((stats.successfulSnipes / stats.totalSnipes) * 100).toFixed(0)
       : '--';
 
+  // Format migration time filter for display
+  const formatMigrationTime = (minutes?: number) => {
+    if (!minutes) return 'Any';
+    if (minutes < 60) return `< ${minutes} min`;
+    return `< ${minutes / 60}h`;
+  };
+
+  // Format volume filter for display
+  const formatVolume = (usd?: number) => {
+    if (!usd) return 'Any';
+    if (usd >= 1000) return `$${(usd / 1000).toFixed(0)}k+`;
+    return `$${usd}+`;
+  };
+
+  // Check if any migration filters are set
+  const hasFilters = config.maxMigrationTimeMinutes || config.minVolumeUsd || config.minLiquiditySol;
+
   return (
     <Card
       className={cn(
-        'bg-zinc-900/50 border-zinc-800 transition-all',
+        'bg-zinc-900/50 border-zinc-800 transition-[border-color,box-shadow] duration-200',
         isActive && 'border-green-900/50 ring-1 ring-green-500/20'
       )}
     >
@@ -48,7 +74,7 @@ export function SniperCard({
           <Button
             variant={isActive ? 'default' : 'outline'}
             size="sm"
-            onClick={() => onToggle?.(id)}
+            onClick={() => onToggle?.(id, !isActive && hasInsufficientFunds)}
             className={cn(
               isActive && 'bg-green-600 hover:bg-green-700'
             )}
@@ -56,6 +82,16 @@ export function SniperCard({
             {isActive ? 'Active' : 'Paused'}
           </Button>
         </div>
+
+        {/* Insufficient funds warning */}
+        {hasInsufficientFunds && (
+          <div className="flex items-center gap-2 p-2.5 mb-4 bg-amber-900/20 border border-amber-700/50 rounded-lg">
+            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-300">
+              Wallet needs {minRequiredBalance.toFixed(3)} SOL to snipe. Current: {walletBalance?.toFixed(4) || '0'} SOL
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-3 text-sm mb-4">
           <div>
@@ -105,9 +141,59 @@ export function SniperCard({
               <span>{config.minLiquiditySol} SOL</span>
             </div>
           )}
+          <div className="flex justify-between">
+            <span className="text-zinc-500 flex items-center gap-1">
+              <Shield className="w-3 h-3" />
+              MEV Protection
+            </span>
+            <span className={cn(
+              'font-medium',
+              config.mevProtection ?? true ? 'text-green-400' : 'text-zinc-500'
+            )}>
+              {config.mevProtection ?? true ? 'On' : 'Off'}
+            </span>
+          </div>
         </div>
 
-        {/* Filters */}
+        {/* Migration Filters Toggle */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="w-full flex items-center justify-between px-3 py-2 mb-3 text-sm bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-colors"
+        >
+          <span className="flex items-center gap-2 text-zinc-400">
+            <Filter className="w-3.5 h-3.5" />
+            Migration Filters
+            {hasFilters && (
+              <span className="px-1.5 py-0.5 text-xs bg-blue-900/40 text-blue-400 rounded">
+                {[config.maxMigrationTimeMinutes, config.minVolumeUsd, config.minLiquiditySol].filter(Boolean).length}
+              </span>
+            )}
+          </span>
+          <ChevronDown className={cn(
+            'w-4 h-4 text-zinc-500 transition-transform',
+            showFilters && 'rotate-180'
+          )} />
+        </button>
+
+        {/* Migration Filters Content */}
+        {showFilters && (
+          <div className="space-y-2 text-sm mb-4 p-3 bg-zinc-800/30 rounded-lg border border-zinc-800">
+            <div className="flex justify-between">
+              <span className="text-zinc-500">Migration Speed</span>
+              <span className="text-white">{formatMigrationTime(config.maxMigrationTimeMinutes)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-500">Min Volume</span>
+              <span className="text-white">{formatVolume(config.minVolumeUsd)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-500">Min Liquidity</span>
+              <span className="text-white">{config.minLiquiditySol ? `${config.minLiquiditySol} SOL` : 'Any'}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Name Filters */}
         {(config.namePatterns?.length || config.excludedPatterns?.length) && (
           <div className="space-y-2 text-sm mb-4 pt-2 border-t border-zinc-800">
             {config.namePatterns && config.namePatterns.length > 0 && (
@@ -164,4 +250,4 @@ export function SniperCard({
       </CardContent>
     </Card>
   );
-}
+});

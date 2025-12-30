@@ -12,6 +12,7 @@ export interface Sniper {
     failedSnipes: number;
     totalSolSpent: number;
     totalSolProfit: number;
+    tokensFiltered?: number;
   };
   createdAt: string;
   updatedAt: string;
@@ -32,6 +33,8 @@ export interface SniperConfig {
   maxMigrationTimeMinutes?: number; // 5, 15, 60, or 360
   // Volume filter (minimum volume in USD since token deployment)
   minVolumeUsd?: number; // 10000, 25000, 50000, or 100000
+  // MEV Protection - use Jito bundles for sandwich attack protection
+  mevProtection?: boolean;
 }
 
 interface SnipersState {

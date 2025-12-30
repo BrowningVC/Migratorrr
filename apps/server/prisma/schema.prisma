@@ -78,6 +78,7 @@ model SniperConfig {
   successfulSnipes Int   @default(0) @map("successful_snipes")
   failedSnipes     Int   @default(0) @map("failed_snipes")
   totalSolSpent    Float @default(0) @map("total_sol_spent")
+  tokensFiltered   Int   @default(0) @map("tokens_filtered")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -272,6 +273,7 @@ model MigrationEvent {
   poolAddress         String? @map("pool_address")
   initialLiquiditySol Float?  @map("initial_liquidity_sol")
   initialPriceSol     Float?  @map("initial_price_sol")
+  initialMarketCapUsd Float?  @map("initial_market_cap_usd")
 
   // Detection metadata
   detectedAt     DateTime @default(now()) @map("detected_at")
@@ -282,7 +284,74 @@ model MigrationEvent {
   totalSnipesAttempted  Int @default(0) @map("total_snipes_attempted")
   totalSnipesSuccessful Int @default(0) @map("total_snipes_successful")
 
+  // Price performance tracking
+  highestPriceSol     Float?   @map("highest_price_sol")
+  highestMarketCapUsd Float?   @map("highest_market_cap_usd")
+  highestPriceAt      DateTime? @map("highest_price_at")
+
+  // Milestone achievements (when price first hit these multipliers)
+  reached2x           Boolean  @default(false) @map("reached_2x")
+  reached2xAt         DateTime? @map("reached_2x_at")
+  reached5x           Boolean  @default(false) @map("reached_5x")
+  reached5xAt         DateTime? @map("reached_5x_at")
+  reached10x          Boolean  @default(false) @map("reached_10x")
+  reached10xAt        DateTime? @map("reached_10x_at")
+  reached50x          Boolean  @default(false) @map("reached_50x")
+  reached50xAt        DateTime? @map("reached_50x_at")
+  reached100x         Boolean  @default(false) @map("reached_100x")
+  reached100xAt       DateTime? @map("reached_100x_at")
+
+  // Current status
+  lastPriceCheck      DateTime? @map("last_price_check")
+  currentPriceSol     Float?    @map("current_price_sol")
+  isRugged            Boolean   @default(false) @map("is_rugged")
+
   @@index([tokenMint])
   @@index([detectedAt])
+  @@index([reached2x])
+  @@index([reached5x])
+  @@index([reached10x])
   @@map("migration_events")
+}
+
+// ============================================
+// Platform Statistics (aggregated metrics)
+// ============================================
+
+model PlatformStats {
+  id        String   @id @default(uuid())
+
+  // Time period
+  periodType  String   @map("period_type") // 'all_time' | 'daily' | 'weekly' | 'monthly'
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+
+  // Migration counts
+  totalMigrations     Int @default(0) @map("total_migrations")
+  migrationsTracked   Int @default(0) @map("migrations_tracked")
+
+  // Performance percentages
+  pctReached2x   Float @default(0) @map("pct_reached_2x")
+  pctReached5x   Float @default(0) @map("pct_reached_5x")
+  pctReached10x  Float @default(0) @map("pct_reached_10x")
+  pctReached50x  Float @default(0) @map("pct_reached_50x")
+  pctReached100x Float @default(0) @map("pct_reached_100x")
+
+  // Top performers
+  highestMultiplier     Float?  @map("highest_multiplier")
+  highestMultiplierMint String? @map("highest_multiplier_mint")
+  highestMarketCapUsd   Float?  @map("highest_market_cap_usd")
+  highestMarketCapMint  String? @map("highest_market_cap_mint")
+
+  // Platform performance
+  totalSnipesExecuted   Int   @default(0) @map("total_snipes_executed")
+  avgSnipeLatencyMs     Float @default(0) @map("avg_snipe_latency_ms")
+  totalSolTraded        Float @default(0) @map("total_sol_traded")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([periodType, periodStart])
+  @@index([periodType])
+  @@map("platform_stats")
 }

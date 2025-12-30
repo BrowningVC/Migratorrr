@@ -6,6 +6,13 @@ interface TokenVolumeData {
   fetchedAt: number;
 }
 
+interface TokenMarketData {
+  marketCapUsd: number;
+  priceUsd: number;
+  liquidityUsd: number;
+  fetchedAt: number;
+}
+
 interface DexScreenerPair {
   chainId: string;
   dexId: string;
@@ -20,6 +27,9 @@ interface DexScreenerPair {
     name: string;
     symbol: string;
   };
+  priceUsd?: string;
+  marketCap?: number;
+  fdv?: number;
   volume: {
     h24: number;
     h6: number;
@@ -193,11 +203,115 @@ class TokenInfoService {
   }
 
   /**
+   * Get market data for a token from DexScreener
+   * Returns market cap, price, and liquidity
+   */
+  async getTokenMarketData(tokenMint: string): Promise<TokenMarketData | null> {
+    const cacheKey = `token-market:${tokenMint}`;
+    const cached = await redis.get(cacheKey);
+
+    if (cached) {
+      try {
+        return JSON.parse(cached) as TokenMarketData;
+      } catch {
+        // Invalid cache, continue to fetch
+      }
+    }
+
+    try {
+      const response = await fetch(
+        `${this.dexScreenerBaseUrl}/tokens/${tokenMint}`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error(`DexScreener API error: ${response.status}`);
+        return null;
+      }
+
+      const data: DexScreenerResponse = await response.json();
+
+      if (!data.pairs || data.pairs.length === 0) {
+        return null;
+      }
+
+      // Get market data from the first Solana pair (usually Raydium)
+      let marketCapUsd = 0;
+      let priceUsd = 0;
+      let liquidityUsd = 0;
+
+      for (const pair of data.pairs) {
+        if (pair.chainId === 'solana') {
+          // Use the highest market cap found
+          if (pair.marketCap && pair.marketCap > marketCapUsd) {
+            marketCapUsd = pair.marketCap;
+          }
+          // Use fdv as fallback
+          if (!marketCapUsd && pair.fdv && pair.fdv > marketCapUsd) {
+            marketCapUsd = pair.fdv;
+          }
+          // Get price from first valid pair
+          if (!priceUsd && pair.priceUsd) {
+            priceUsd = parseFloat(pair.priceUsd);
+          }
+          // Sum liquidity across pairs
+          liquidityUsd += pair.liquidity?.usd || 0;
+        }
+      }
+
+      const marketData: TokenMarketData = {
+        marketCapUsd,
+        priceUsd,
+        liquidityUsd,
+        fetchedAt: Date.now(),
+      };
+
+      // Cache for 30 seconds (market data changes frequently)
+      await redis.setex(cacheKey, 30, JSON.stringify(marketData));
+
+      return marketData;
+    } catch (error) {
+      console.error(`Failed to fetch market data for ${tokenMint}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if a token meets the market cap criteria
+   *
+   * @param marketData - Market data from DexScreener
+   * @param maxMarketCapUsd - Maximum allowed market cap in USD
+   */
+  meetsMarketCapCriteria(
+    marketData: TokenMarketData | null,
+    maxMarketCapUsd: number
+  ): boolean {
+    if (!marketData) {
+      // If we can't fetch market data, fail open (allow the trade)
+      // For new migrations, DexScreener may not have data yet
+      console.warn('Market data unavailable, allowing trade');
+      return true;
+    }
+
+    // If market cap is 0, it's likely a very new token - allow it
+    if (marketData.marketCapUsd === 0) {
+      return true;
+    }
+
+    return marketData.marketCapUsd <= maxMarketCapUsd;
+  }
+
+  /**
    * Clear the volume cache for a specific token
    */
   async clearCache(tokenMint: string): Promise<void> {
     const cacheKey = `${this.cachePrefix}${tokenMint}`;
     await redis.del(cacheKey);
+    await redis.del(`token-market:${tokenMint}`);
   }
 }
 

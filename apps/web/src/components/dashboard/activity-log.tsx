@@ -1,6 +1,7 @@
 'use client';
 
-import { useActivityStore } from '@/lib/stores/activity';
+import { useMemo, memo } from 'react';
+import { useActivityStore, ActivityEntry } from '@/lib/stores/activity';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -79,11 +80,33 @@ function formatTime(timestamp: string): string {
   });
 }
 
+// Memoized activity entry row to prevent re-renders
+const ActivityRow = memo(function ActivityRow({ entry }: { entry: ActivityEntry }) {
+  return (
+    <div className="flex items-start gap-3 text-sm py-2 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors">
+      <span className="text-base flex-shrink-0">
+        {eventIcons[entry.eventType] || '📋'}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className={cn('text-zinc-300 truncate', eventColors[entry.eventType])}>
+          {formatEventMessage(entry.eventType, entry.eventData)}
+        </p>
+      </div>
+      <span className="text-zinc-500 text-xs flex-shrink-0">
+        {formatTime(entry.timestamp)}
+      </span>
+    </div>
+  );
+});
+
 export function ActivityLog() {
   const entries = useActivityStore((state) => state.entries);
 
-  // Filter out price updates for display (too noisy)
-  const displayEntries = entries.filter((e) => e.eventType !== 'price:update');
+  // Memoize filtered entries to prevent recalculation
+  const displayEntries = useMemo(
+    () => entries.filter((e) => e.eventType !== 'price:update'),
+    [entries]
+  );
 
   return (
     <Card className="bg-zinc-900/50 border-zinc-800">
@@ -98,27 +121,7 @@ export function ActivityLog() {
             </p>
           ) : (
             displayEntries.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex items-start gap-3 text-sm py-2 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
-              >
-                <span className="text-base flex-shrink-0">
-                  {eventIcons[entry.eventType] || '📋'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={cn(
-                      'text-zinc-300 truncate',
-                      eventColors[entry.eventType]
-                    )}
-                  >
-                    {formatEventMessage(entry.eventType, entry.eventData)}
-                  </p>
-                </div>
-                <span className="text-zinc-500 text-xs flex-shrink-0">
-                  {formatTime(entry.timestamp)}
-                </span>
-              </div>
+              <ActivityRow key={entry.id} entry={entry} />
             ))
           )}
         </div>

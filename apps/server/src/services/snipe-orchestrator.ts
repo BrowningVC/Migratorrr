@@ -116,21 +116,35 @@ export class SnipeOrchestrator {
 
     // Filter and dispatch jobs
     let matched = 0;
+    const filteredSniperIds: string[] = [];
+
     for (const sniper of activeSnipers) {
       const meetsFilter = await this.matchesCriteria(sniper.config, migration);
       if (meetsFilter) {
         matched++;
         await this.dispatchSnipeJob(sniper, migration);
+      } else {
+        // Track that this sniper filtered out this migration
+        filteredSniperIds.push(sniper.id);
       }
     }
 
     console.log(`Dispatched ${matched} snipe jobs for ${migration.tokenSymbol || migration.tokenMint}`);
+    console.log(`Filtered ${filteredSniperIds.length} snipers for ${migration.tokenSymbol || migration.tokenMint}`);
 
     // Update migration event with snipe count
     await prisma.migrationEvent.updateMany({
       where: { tokenMint: migration.tokenMint },
       data: { totalSnipesAttempted: { increment: matched } },
     });
+
+    // Update tokensFiltered counter for each sniper that filtered this migration
+    if (filteredSniperIds.length > 0) {
+      await prisma.sniperConfig.updateMany({
+        where: { id: { in: filteredSniperIds } },
+        data: { tokensFiltered: { increment: 1 } },
+      });
+    }
   }
 
   /**
@@ -225,6 +239,18 @@ export class SnipeOrchestrator {
       if (!tokenInfoService.meetsVolumeCriteria(volumeData, config.minVolumeUsd)) {
         console.log(
           `Skipping ${migration.tokenSymbol}: volume $${volumeData?.volumeUsdTotal || 0} below min $${config.minVolumeUsd}`
+        );
+        return false;
+      }
+    }
+
+    // Check max market cap filter
+    if (config.maxMarketCapUsd) {
+      const marketData = await tokenInfoService.getTokenMarketData(migration.tokenMint);
+
+      if (!tokenInfoService.meetsMarketCapCriteria(marketData, config.maxMarketCapUsd)) {
+        console.log(
+          `Skipping ${migration.tokenSymbol}: market cap $${marketData?.marketCapUsd || 0} exceeds max $${config.maxMarketCapUsd}`
         );
         return false;
       }
