@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Share2 } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface StatsCardsProps {
   stats: {
@@ -28,7 +30,8 @@ interface StatsCardsProps {
   onShare?: () => void;
 }
 
-export function StatsCards({ stats, onShare }: StatsCardsProps) {
+export function StatsCards({ stats }: StatsCardsProps) {
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const {
     totalPnlSol,
     totalPnlPct,
@@ -184,16 +187,60 @@ export function StatsCards({ stats, onShare }: StatsCardsProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800 hover:border-green-800/50 transition-colors cursor-pointer group" onClick={onShare}>
+        <Card
+          className="bg-zinc-900/50 border-zinc-800 hover:border-green-800/50 transition-colors cursor-pointer group"
+          onClick={() => setShowComingSoon(true)}
+        >
           <CardContent className="p-4 flex flex-col items-center justify-center h-full">
-            <div className="w-10 h-10 rounded-full bg-green-900/30 flex items-center justify-center mb-2 group-hover:bg-green-900/50 transition-colors">
-              <Share2 className="w-5 h-5 text-green-400" />
+            <div className="w-10 h-10 rounded-full bg-green-900/30 flex items-center justify-center mb-2 group-hover:bg-green-900/50 transition-colors overflow-hidden">
+              <Image
+                src="/share-icon.svg"
+                alt="Share"
+                width={24}
+                height={24}
+                className="object-contain"
+              />
             </div>
             <p className="text-sm font-medium text-green-400">Share Results</p>
             <p className="text-zinc-500 text-xs">Show off your gains</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Coming Soon Modal */}
+      {showComingSoon && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowComingSoon(false)}>
+          <Card className="bg-zinc-900 border-zinc-700 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <CardContent className="p-6 text-center">
+              <button
+                onClick={() => setShowComingSoon(false)}
+                className="absolute top-3 right-3 text-zinc-500 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="w-16 h-16 rounded-full bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+                <Image
+                  src="/share-icon.svg"
+                  alt="Share"
+                  width={32}
+                  height={32}
+                  className="object-contain"
+                />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Coming Soon</h3>
+              <p className="text-zinc-400 text-sm">
+                Share your trading results with a beautiful card image. This feature is under development.
+              </p>
+              <Button
+                className="mt-4 bg-green-600 hover:bg-green-700"
+                onClick={() => setShowComingSoon(false)}
+              >
+                Got it
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

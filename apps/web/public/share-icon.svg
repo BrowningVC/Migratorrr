@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Share icon with upward arrow and connection nodes -->
+  <circle cx="36" cy="12" r="6" fill="#22C55E"/>
+  <circle cx="36" cy="36" r="6" fill="#22C55E"/>
+  <circle cx="12" cy="24" r="6" fill="#22C55E"/>
+  <line x1="17" y1="21" x2="31" y2="15" stroke="#22C55E" stroke-width="3" stroke-linecap="round"/>
+  <line x1="17" y1="27" x2="31" y2="33" stroke="#22C55E" stroke-width="3" stroke-linecap="round"/>
+</svg>

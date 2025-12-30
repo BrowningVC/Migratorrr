@@ -275,31 +275,6 @@ export default function DashboardPage() {
     }
   }, [token]);
 
-  const handleShareResults = useCallback(() => {
-    const shareText = `My Migratorrr Stats 🎯
-
-📊 Total P&L: ${stats.totalPnlSol >= 0 ? '+' : ''}${stats.totalPnlSol.toFixed(4)} SOL (${stats.totalPnlPct >= 0 ? '+' : ''}${stats.totalPnlPct.toFixed(1)}%)
-✅ Tokens Caught: ${stats.tokensCaught}
-🎯 Success Rate: ${stats.successRate}%
-${stats.bestTradeSol > 0 ? `🏆 Best Trade: +${stats.bestTradeSol.toFixed(2)} SOL (+${stats.bestTradePct.toFixed(0)}%)` : ''}
-
-Catch PumpFun migrations at migratorrr.xyz`;
-
-    if (navigator.share) {
-      navigator.share({
-        title: 'My Migratorrr Stats',
-        text: shareText,
-      }).catch(() => {
-        // User cancelled or share failed, copy to clipboard instead
-        navigator.clipboard.writeText(shareText);
-        toast.success('Stats copied to clipboard!');
-      });
-    } else {
-      navigator.clipboard.writeText(shareText);
-      toast.success('Stats copied to clipboard!');
-    }
-  }, [stats]);
-
   // Show skeleton until mounted to prevent hydration mismatch
   if (!mounted || isLoading) {
     return <DashboardSkeleton />;
@@ -421,7 +396,6 @@ Catch PumpFun migrations at migratorrr.xyz`;
             openPositions: openPositions.length,
             activeSnipers: activeSnipers.length,
           }}
-          onShare={handleShareResults}
         />
 
         {/* Main Grid */}
