@@ -368,126 +368,105 @@ export function CreateSniperModal({
 
           {/* Step 4: Filters */}
           {step === 'filters' && (
-            <div className="space-y-5">
-              {/* Token Type - Always enabled */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Token Type</Label>
-                <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
-                  <input
-                    type="checkbox"
-                    checked={true}
-                    disabled={true}
-                    className="w-4 h-4 rounded bg-green-600 border-green-600 text-green-600 cursor-not-allowed"
-                  />
-                  <div>
-                    <span className="text-sm font-medium">Newly Migrated Tokens</span>
-                    <p className="text-xs text-zinc-500">Only tokens that just migrated from PumpFun to Raydium</p>
-                  </div>
-                </div>
+            <div className="space-y-6">
+              {/* Token Type Badge */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded-full w-fit">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-sm font-medium text-green-400">Newly Migrated Tokens</span>
               </div>
 
-              {/* Migration Time Filter */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Migration Speed</Label>
-                <p className="text-xs text-zinc-500 mb-2">
-                  Time from token creation to migration (select one)
-                </p>
-                <div className="space-y-2">
+              {/* Migration Speed Filter */}
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Migration Speed</Label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    How fast did the token migrate after creation?
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: 5, label: 'Migrated in less than 5 minutes' },
-                    { value: 15, label: 'Migrated in less than 15 minutes' },
-                    { value: 60, label: 'Migrated in less than 1 hour' },
-                    { value: 360, label: 'Migrated in less than 6 hours' },
+                    { value: 5, label: '< 5 min', description: 'Ultra fast' },
+                    { value: 15, label: '< 15 min', description: 'Fast' },
+                    { value: 60, label: '< 1 hour', description: 'Normal' },
+                    { value: 360, label: '< 6 hours', description: 'Slow' },
                   ].map((option) => (
-                    <label
+                    <button
                       key={option.value}
+                      type="button"
+                      onClick={() => updateConfig({ maxMigrationTimeMinutes: option.value })}
                       className={cn(
-                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        'flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all',
                         config.maxMigrationTimeMinutes === option.value
-                          ? 'bg-green-900/20 border-green-700'
-                          : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                          ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                          : 'bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="migrationTime"
-                        checked={config.maxMigrationTimeMinutes === option.value}
-                        onChange={() => updateConfig({ maxMigrationTimeMinutes: option.value })}
-                        className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
-                      />
-                      <span className="text-sm">{option.label}</span>
-                    </label>
+                      <span className={cn(
+                        'text-lg font-bold',
+                        config.maxMigrationTimeMinutes === option.value ? 'text-green-400' : 'text-white'
+                      )}>
+                        {option.label}
+                      </span>
+                      <span className="text-xs text-zinc-500">{option.description}</span>
+                    </button>
                   ))}
-                  <label
-                    className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                      !config.maxMigrationTimeMinutes
-                        ? 'bg-green-900/20 border-green-700'
-                        : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="migrationTime"
-                      checked={!config.maxMigrationTimeMinutes}
-                      onChange={() => updateConfig({ maxMigrationTimeMinutes: undefined })}
-                      className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
-                    />
-                    <span className="text-sm text-zinc-400">No time restriction</span>
-                  </label>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => updateConfig({ maxMigrationTimeMinutes: undefined })}
+                  className={cn(
+                    'w-full py-2 px-3 rounded-lg text-sm transition-all',
+                    !config.maxMigrationTimeMinutes
+                      ? 'bg-zinc-700 text-white'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  )}
+                >
+                  Any migration speed
+                </button>
               </div>
 
               {/* Volume Filter */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Minimum Volume</Label>
-                <p className="text-xs text-zinc-500 mb-2">
-                  Total trading volume since token deployment (select one)
-                </p>
-                <div className="space-y-2">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Minimum Volume</Label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Total trading volume since token deployment
+                  </p>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
                   {[
-                    { value: 10000, label: 'Over $10k in Volume' },
-                    { value: 25000, label: 'Over $25k in Volume' },
-                    { value: 50000, label: 'Over $50k in Volume' },
-                    { value: 100000, label: 'Over $100k in Volume' },
+                    { value: 10000, label: '$10k+' },
+                    { value: 25000, label: '$25k+' },
+                    { value: 50000, label: '$50k+' },
+                    { value: 100000, label: '$100k+' },
                   ].map((option) => (
-                    <label
+                    <button
                       key={option.value}
+                      type="button"
+                      onClick={() => updateConfig({ minVolumeUsd: option.value })}
                       className={cn(
-                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        'py-2.5 px-2 rounded-xl border-2 text-sm font-semibold transition-all',
                         config.minVolumeUsd === option.value
-                          ? 'bg-green-900/20 border-green-700'
-                          : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                          ? 'bg-green-900/30 border-green-600 text-green-400 shadow-lg shadow-green-900/20'
+                          : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="volumeFilter"
-                        checked={config.minVolumeUsd === option.value}
-                        onChange={() => updateConfig({ minVolumeUsd: option.value })}
-                        className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
-                      />
-                      <span className="text-sm">{option.label}</span>
-                    </label>
+                      {option.label}
+                    </button>
                   ))}
-                  <label
-                    className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                      !config.minVolumeUsd
-                        ? 'bg-green-900/20 border-green-700'
-                        : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="volumeFilter"
-                      checked={!config.minVolumeUsd}
-                      onChange={() => updateConfig({ minVolumeUsd: undefined })}
-                      className="w-4 h-4 text-green-600 bg-zinc-800 border-zinc-600"
-                    />
-                    <span className="text-sm text-zinc-400">No volume restriction</span>
-                  </label>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => updateConfig({ minVolumeUsd: undefined })}
+                  className={cn(
+                    'w-full py-2 px-3 rounded-lg text-sm transition-all',
+                    !config.minVolumeUsd
+                      ? 'bg-zinc-700 text-white'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  )}
+                >
+                  Any volume
+                </button>
               </div>
             </div>
           )}
