@@ -60,5 +60,11 @@ export interface SocketEventData {
   maxAttempts?: number;
   path?: string;
   timestamp?: string;
+  // Migration event fields
+  poolAddress?: string;
+  latencyMs?: number;
+  detectionLatencyMs?: number;
+  detectedBy?: string;
+  source?: string;
   [key: string]: unknown;
 }

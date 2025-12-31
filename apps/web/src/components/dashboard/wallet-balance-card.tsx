@@ -1,12 +1,18 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Copy, Check, RefreshCw, Wallet, ExternalLink } from 'lucide-react';
+import { Copy, Check, RefreshCw, Wallet, ExternalLink, Info, Bot } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useWalletsStore } from '@/lib/stores/wallets';
 import { walletApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import toast from 'react-hot-toast';
 
 interface WalletBalance {
@@ -129,8 +135,21 @@ export function WalletBalanceCard() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-green-400" />
+            <Bot className="h-5 w-5 text-green-400" />
             Trading Wallets
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-zinc-500 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs bg-zinc-800 border-zinc-700">
+                  <p className="text-xs text-zinc-300">
+                    <span className="font-semibold text-green-400">Server-controlled wallet</span> for automated trading.
+                    Fund this wallet with SOL — the server uses it to execute snipes automatically when migrations are detected.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </CardTitle>
           <Button
             variant="ghost"

@@ -8,8 +8,10 @@ export interface Position {
   entrySol: number;
   entryPrice: number;
   entryTokenAmount: number;
+  entryMarketCap?: number | null;
   currentTokenAmount: number;
   currentPrice?: number;
+  currentMarketCap?: number | null;
   pnlPct?: number;
   pnlSol?: number;
   takeProfitPrice?: number;
@@ -65,9 +67,16 @@ export const usePositionsStore = create<PositionsState>((set) => ({
 
       const pnlPct = ((price - p.entryPrice) / p.entryPrice) * 100;
       const pnlSol = (price - p.entryPrice) * p.currentTokenAmount;
+
+      // Calculate current market cap based on price change ratio from entry
+      const currentMarketCap = p.entryMarketCap && p.entryPrice > 0
+        ? p.entryMarketCap * (price / p.entryPrice)
+        : null;
+
       const updated = {
         ...p,
         currentPrice: price,
+        currentMarketCap,
         pnlPct,
         pnlSol,
         highestPrice: Math.max(p.highestPrice || price, price),

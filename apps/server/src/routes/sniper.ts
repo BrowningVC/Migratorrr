@@ -385,4 +385,112 @@ export const sniperRoutes: FastifyPluginAsync = async (fastify) => {
       },
     };
   });
+
+  /**
+   * Get recent activity for the user's snipers
+   * Returns activity log entries and recent transactions
+   */
+  fastify.get('/activity', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const limit = Math.min(parseInt((request.query as any).limit || '50', 10), 100);
+
+    try {
+      // Fetch both activity log entries and recent transactions in parallel
+      const [activityLogs, recentTransactions] = await Promise.all([
+        // Activity log entries (sniper events)
+        prisma.activityLog.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          select: {
+            id: true,
+            eventType: true,
+            eventData: true,
+            createdAt: true,
+          },
+        }),
+        // Recent transactions (actual trades)
+        prisma.transaction.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          select: {
+            id: true,
+            signature: true,
+            txType: true,
+            tokenMint: true,
+            solAmount: true,
+            tokenAmount: true,
+            pricePerToken: true,
+            status: true,
+            createdAt: true,
+            position: {
+              select: {
+                tokenSymbol: true,
+                tokenName: true,
+                sniper: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      // Convert to unified activity format
+      const activities = [
+        // Activity log entries
+        ...activityLogs.map((log) => ({
+          id: log.id,
+          eventType: log.eventType,
+          eventData: log.eventData as Record<string, unknown>,
+          timestamp: log.createdAt.toISOString(),
+        })),
+        // Transactions as activity entries
+        ...recentTransactions.map((tx) => ({
+          id: `tx-${tx.id}`,
+          eventType: tx.txType === 'buy' ? 'snipe:success' : `position:${tx.txType}`,
+          eventData: {
+            signature: tx.signature,
+            tokenMint: tx.tokenMint,
+            tokenSymbol: tx.position?.tokenSymbol,
+            tokenName: tx.position?.tokenName,
+            solAmount: tx.solAmount,
+            tokenAmount: tx.tokenAmount,
+            pricePerToken: tx.pricePerToken,
+            status: tx.status,
+            sniperId: tx.position?.sniper?.id,
+            sniperName: tx.position?.sniper?.name,
+          },
+          timestamp: tx.createdAt.toISOString(),
+        })),
+      ]
+        // Sort by timestamp descending
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        // Remove duplicates (same eventType within 1 second)
+        .filter((item, index, arr) => {
+          if (index === 0) return true;
+          const prev = arr[index - 1];
+          const timeDiff = Math.abs(
+            new Date(prev.timestamp).getTime() - new Date(item.timestamp).getTime()
+          );
+          return !(prev.eventType === item.eventType && timeDiff < 1000);
+        })
+        .slice(0, limit);
+
+      return {
+        success: true,
+        data: activities,
+      };
+    } catch (error) {
+      console.error('Failed to fetch activity:', error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to fetch activity',
+      });
+    }
+  });
 };

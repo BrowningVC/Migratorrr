@@ -4,6 +4,7 @@ import { useEffect, useCallback } from 'react';
 import { getSocket, connectSocket, disconnectSocket, SocketEventType, SocketEventData } from '../socket';
 import { useActivityStore } from '../stores/activity';
 import { usePositionsStore } from '../stores/positions';
+import { useMigrationsStore } from '../stores/migrations';
 import toast from 'react-hot-toast';
 
 const toastConfig = {
@@ -15,6 +16,8 @@ export function useSocket(token: string | null) {
   const addActivity = useActivityStore((state) => state.addEntry);
   const updatePosition = usePositionsStore((state) => state.updatePosition);
   const updatePrice = usePositionsStore((state) => state.updatePrice);
+  const addMigration = useMigrationsStore((state) => state.addMigration);
+  const updateMigrationSnipeStatus = useMigrationsStore((state) => state.updateMigrationSnipeStatus);
 
   const handleEvent = useCallback(
     (eventType: SocketEventType, data: SocketEventData) => {
@@ -52,6 +55,18 @@ export function useSocket(token: string | null) {
           break;
 
         case 'migration:detected':
+          // Add to migrations store for tracking
+          if (data.tokenMint) {
+            addMigration({
+              tokenMint: data.tokenMint,
+              tokenSymbol: data.tokenSymbol || null,
+              tokenName: data.tokenName || null,
+              poolAddress: data.poolAddress,
+              detectionLatencyMs: data.latencyMs || data.detectionLatencyMs,
+              source: data.detectedBy || data.source || 'unknown',
+              timestamp: data.timestamp || new Date().toISOString(),
+            });
+          }
           toast(`New migration: $${data.tokenSymbol || data.tokenMint?.slice(0, 8)}`, {
             ...toastConfig,
             id: `migration-${data.tokenMint}`,
@@ -60,6 +75,14 @@ export function useSocket(token: string | null) {
           break;
 
         case 'migration:matched':
+          // Update migration with matched sniper info
+          if (data.tokenMint) {
+            updateMigrationSnipeStatus(data.tokenMint, {
+              sniped: true,
+              sniperId: data.sniperId,
+              sniperName: data.sniperName,
+            });
+          }
           toast(`Migration matches sniper "${data.sniperName}"`, {
             ...toastConfig,
             id: `match-${data.tokenMint}`,
@@ -82,6 +105,13 @@ export function useSocket(token: string | null) {
           break;
 
         case 'snipe:success':
+          // Update migration with success status
+          if (data.tokenMint) {
+            updateMigrationSnipeStatus(data.tokenMint, {
+              sniped: true,
+              snipeSuccess: true,
+            });
+          }
           toast.success(
             `Bought ${data.tokenAmount?.toLocaleString()} $${data.tokenSymbol} for ${data.solSpent} SOL`,
             {
@@ -93,6 +123,14 @@ export function useSocket(token: string | null) {
           break;
 
         case 'snipe:failed':
+          // Update migration with failure status
+          if (data.tokenMint) {
+            updateMigrationSnipeStatus(data.tokenMint, {
+              sniped: true,
+              snipeSuccess: false,
+              snipeError: data.error,
+            });
+          }
           toast.error(`Snipe failed: ${data.error}`, {
             ...toastConfig,
             id: toastId,
@@ -151,7 +189,7 @@ export function useSocket(token: string | null) {
           break;
       }
     },
-    [addActivity, updatePosition, updatePrice]
+    [addActivity, updatePosition, updatePrice, addMigration, updateMigrationSnipeStatus]
   );
 
   useEffect(() => {

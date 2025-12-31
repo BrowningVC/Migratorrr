@@ -111,25 +111,37 @@ export class SnipeWorker {
     const { sniperId, userId, walletId, sniperName, config, migration } =
       job.data;
 
-    console.log(
-      `Processing snipe for ${migration.tokenSymbol || migration.tokenMint} via sniper "${sniperName}"`
-    );
+    const timestamp = new Date().toISOString();
+    const tokenLabel = migration.tokenSymbol || migration.tokenMint.slice(0, 8);
+
+    console.log(`\n🎯 [${timestamp}] SNIPE WORKER: Processing job ${job.id}`);
+    console.log(`   Token: ${tokenLabel} (${migration.tokenMint})`);
+    console.log(`   Sniper: "${sniperName}" (${sniperId.slice(0, 8)}...)`);
+    console.log(`   Config: ${config.snipeAmountSol} SOL, ${config.slippageBps}bps slippage, ${config.priorityFeeSol} SOL tip`);
 
     // Calculate job latency
     const latencyMs = Date.now() - migration.detectedAt;
-    console.log(`Migration latency: ${latencyMs}ms`);
+    console.log(`   Latency from detection: ${latencyMs}ms`);
 
     // Update job progress
     await job.updateProgress(10);
 
     try {
-      // Check if sniper is still active
-      const sniper = await prisma.sniperConfig.findUnique({
-        where: { id: sniperId },
-      });
+      console.log(`   🔍 Step 1: Validating sniper and wallet...`);
+
+      // Check if sniper is still active and wallet still valid
+      const [sniper, wallet] = await Promise.all([
+        prisma.sniperConfig.findUnique({
+          where: { id: sniperId },
+        }),
+        prisma.wallet.findUnique({
+          where: { id: walletId },
+          select: { id: true, userId: true, publicKey: true, walletType: true },
+        }),
+      ]);
 
       if (!sniper || !sniper.isActive) {
-        console.log(`Sniper ${sniperName} is no longer active, skipping`);
+        console.log(`   ❌ ABORT: Sniper "${sniperName}" is no longer active`);
         await emitToUser(userId, 'snipe:skipped', {
           sniperId,
           sniperName,
@@ -139,17 +151,65 @@ export class SnipeWorker {
         });
         return;
       }
+      console.log(`   ✓ Sniper is active`);
+
+      // CRITICAL: Verify wallet exists, belongs to user, and is a generated wallet
+      if (!wallet) {
+        console.log(`   ❌ ABORT: Wallet ${walletId} not found`);
+        await emitToUser(userId, 'snipe:failed', {
+          sniperId,
+          sniperName,
+          tokenMint: migration.tokenMint,
+          tokenSymbol: migration.tokenSymbol,
+          error: 'Trading wallet not found',
+        });
+        return;
+      }
+
+      if (wallet.userId !== userId) {
+        console.log(`   ❌ ABORT: Wallet ownership mismatch! Expected ${userId}, got ${wallet.userId}`);
+        await emitToUser(userId, 'snipe:failed', {
+          sniperId,
+          sniperName,
+          tokenMint: migration.tokenMint,
+          tokenSymbol: migration.tokenSymbol,
+          error: 'Wallet authorization failed',
+        });
+        return;
+      }
+
+      if (wallet.walletType !== 'generated') {
+        console.log(`   ❌ ABORT: Wallet is not a generated wallet (type: ${wallet.walletType})`);
+        await emitToUser(userId, 'snipe:failed', {
+          sniperId,
+          sniperName,
+          tokenMint: migration.tokenMint,
+          tokenSymbol: migration.tokenSymbol,
+          error: 'Only server-generated wallets can execute snipes',
+        });
+        return;
+      }
+      console.log(`   ✓ Wallet validated (${wallet.publicKey.slice(0, 8)}...)`);
 
       await job.updateProgress(20);
 
+      console.log(`   🔍 Step 2: Checking wallet balance...`);
       // Check wallet balance using the public key from the job data
+      // Required: snipe amount + priority fee (Jito tip) + platform fee (1%) + network fees buffer
+      const platformFeeBps = parseInt(process.env.PLATFORM_FEE_BPS || '100'); // Default 1%
+      const platformFee = config.snipeAmountSol * (platformFeeBps / 10000);
+      const networkFeeBuffer = 0.001; // ~5000 lamports for tx fees
+      const requiredBalance = config.snipeAmountSol + config.priorityFeeSol + platformFee + networkFeeBuffer;
+
+      console.log(`   Required: ${requiredBalance.toFixed(4)} SOL (snipe: ${config.snipeAmountSol}, tip: ${config.priorityFeeSol}, fee: ${platformFee.toFixed(4)}, buffer: ${networkFeeBuffer})`);
+
       const hasBalance = await this.checkWalletBalance(
         job.data.walletPublicKey,
-        config.snipeAmountSol + config.priorityFeeSol + 0.002 // Extra for network fees + platform fee
+        requiredBalance
       );
 
       if (!hasBalance) {
-        console.log(`Insufficient balance for snipe`);
+        console.log(`   ❌ ABORT: Insufficient balance for snipe`);
         await emitToUser(userId, 'snipe:failed', {
           sniperId,
           sniperName,
@@ -167,14 +227,17 @@ export class SnipeWorker {
               tokenMint: migration.tokenMint,
               tokenSymbol: migration.tokenSymbol,
               error: 'Insufficient wallet balance',
+              requiredSol: requiredBalance,
             },
           },
         });
         return;
       }
+      console.log(`   ✓ Balance sufficient`);
 
       await job.updateProgress(30);
 
+      console.log(`   🔍 Step 3: Checking for duplicate positions...`);
       // CRITICAL: Final check - verify no existing position for this token + wallet
       // This is a last-resort safeguard against duplicate snipes
       const existingPosition = await prisma.position.findFirst({
@@ -186,10 +249,7 @@ export class SnipeWorker {
       });
 
       if (existingPosition) {
-        console.log(
-          `Duplicate snipe blocked at worker level: position ${existingPosition.id} ` +
-          `already exists for ${migration.tokenSymbol || migration.tokenMint}`
-        );
+        console.log(`   ❌ ABORT: Duplicate position exists (${existingPosition.id})`);
         await emitToUser(userId, 'snipe:skipped', {
           sniperId,
           sniperName,
@@ -199,8 +259,12 @@ export class SnipeWorker {
         });
         return;
       }
+      console.log(`   ✓ No duplicate positions`);
 
       await job.updateProgress(40);
+
+      console.log(`   🚀 Step 4: Executing snipe transaction...`);
+      const txStartTime = Date.now();
 
       // Execute the snipe
       const result = await transactionExecutor.executeSnipe({
@@ -216,9 +280,17 @@ export class SnipeWorker {
         mevProtection: config.mevProtection ?? true, // Default to enabled
       });
 
+      const txDuration = Date.now() - txStartTime;
       await job.updateProgress(80);
 
       if (result.success) {
+        console.log(`   ✅ SNIPE SUCCESS!`);
+        console.log(`      Signature: ${result.signature}`);
+        console.log(`      Tokens received: ${result.tokenAmount?.toFixed(4) || 'unknown'}`);
+        console.log(`      SOL spent: ${result.solSpent?.toFixed(4) || config.snipeAmountSol} SOL`);
+        console.log(`      Transaction time: ${txDuration}ms`);
+        console.log(`      Total latency: ${Date.now() - migration.detectedAt}ms`);
+
         // Update the position with TP/SL settings
         if (result.signature) {
           await this.updatePositionWithAutomation({
@@ -238,10 +310,13 @@ export class SnipeWorker {
           },
         });
 
-        console.log(
-          `Snipe successful: ${result.signature} for ${migration.tokenSymbol}`
-        );
+        // Invalidate balance cache after successful snipe
+        await SnipeWorker.invalidateBalanceCache(job.data.walletPublicKey);
       } else {
+        console.log(`   ❌ SNIPE FAILED!`);
+        console.log(`      Error: ${result.error}`);
+        console.log(`      Transaction time: ${txDuration}ms`);
+
         // Update sniper stats for failure
         await prisma.sniperConfig.update({
           where: { id: sniperId },
@@ -250,16 +325,13 @@ export class SnipeWorker {
             failedSnipes: { increment: 1 },
           },
         });
-
-        console.error(`Snipe failed: ${result.error}`);
       }
 
       await job.updateProgress(100);
     } catch (error) {
-      console.error('Error processing snipe job:', error);
-
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`   💥 SNIPE ERROR: ${errorMessage}`);
+      console.error('   Full error:', error);
 
       await emitToUser(userId, 'snipe:failed', {
         sniperId,

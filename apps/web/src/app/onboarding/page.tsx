@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Copy, Check, Wallet, ArrowRight } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 
 // Dynamic import to prevent hydration mismatch with wallet button
 const WalletMultiButton = dynamic(
@@ -33,30 +33,14 @@ export default function OnboardingPage() {
   const { setAuth, token, completeOnboarding, hasCompletedOnboarding } = useAuthStore();
   const { setWallets, addWallet, wallets } = useWalletsStore();
   const { addSniper } = useSnipersStore();
-  const { pendingSniper, clearPendingSniper, hasPendingSniper, setPendingSniper } = usePendingSniperStore();
+  const { pendingSniper, clearPendingSniper, hasPendingSniper } = usePendingSniperStore();
 
   const [step, setStep] = useState<OnboardingStep>('connect');
   const [isLoading, setIsLoading] = useState(false);
   const [walletLabel, setWalletLabel] = useState('');
   const [mounted, setMounted] = useState(false);
   const [createdSniperId, setCreatedSniperId] = useState<string | null>(null);
-  const [copiedAddress, setCopiedAddress] = useState(false);
   const [isCreatingForExistingUser, setIsCreatingForExistingUser] = useState(false);
-
-  // Get generated wallet address from pending sniper
-  const generatedWalletAddress = pendingSniper?.generatedWallet?.publicKey;
-
-  const copyAddress = async () => {
-    if (!generatedWalletAddress) return;
-    try {
-      await navigator.clipboard.writeText(generatedWalletAddress);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
-      toast.success('Address copied!');
-    } catch {
-      toast.error('Failed to copy');
-    }
-  };
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -159,29 +143,12 @@ export default function OnboardingPage() {
       }
 
       // Connect the current wallet if not already connected
-      const connectRes = await walletApi.connect(authToken, publicKey.toBase58(), true);
+      await walletApi.connect(authToken, publicKey.toBase58(), true);
 
-      // Check if the connected wallet matches the pre-generated wallet from the modal
-      const connectedWalletAddress = publicKey.toBase58();
-      const preGeneratedWalletAddress = pendingSniper?.generatedWallet?.publicKey;
-
-      // IMPORTANT: For snipers to work, we need a SERVER-SIDE generated wallet.
-      // - "generated" wallets: Server stores the private key and can sign transactions
-      // - "connected" wallets: User controls the key, server CANNOT sign for them
-      //
-      // Only skip wallet-setup if:
-      // 1. User already has a generated wallet on the server, OR
-      // 2. User connected with the exact wallet they generated in the modal
-      //    (they imported the generated wallet into Phantom)
-      //
-      // If user just "connected" with Phantom (pendingSniper.connectedWallet),
-      // they STILL need a server-side generated wallet.
-
-      const userHasGeneratedWalletOnServer = hasGeneratedWallet;
-      const userConnectedWithTheirGeneratedWallet =
-        preGeneratedWalletAddress && connectedWalletAddress === preGeneratedWalletAddress;
-
-      if (userHasGeneratedWalletOnServer) {
+      // Simple flow:
+      // - If user already has a server-generated wallet, use it and skip wallet-setup
+      // - Otherwise, go to wallet-setup to generate one
+      if (hasGeneratedWallet) {
         // User has an existing generated wallet on server - use it
         const existingGeneratedWallet = walletsRes.data?.find(
           (w: any) => w.walletType === 'generated'
@@ -191,39 +158,8 @@ export default function OnboardingPage() {
           await createPendingSniper(authToken, existingGeneratedWallet.id);
         }
         setStep('complete');
-      } else if (userConnectedWithTheirGeneratedWallet) {
-        // User imported their modal-generated wallet into Phantom and connected with it
-        // This is a special case - we need to create a server-side generated wallet
-        // that matches this address. But since we can't import private keys to server,
-        // we need to go to wallet-setup to generate a NEW server wallet.
-        // The user will need to use the server-generated wallet for trading.
-        toast(
-          'For security, we\'ll generate a separate trading wallet on our servers.',
-          { duration: 5000, icon: 'ℹ️' }
-        );
-        setStep('wallet-setup');
       } else {
-        // User connected with a different wallet than expected
-        // If they generated a wallet in the modal but connected with a different one,
-        // warn them and proceed to wallet-setup where they'll get a NEW server-side wallet
-        if (preGeneratedWalletAddress && connectedWalletAddress !== preGeneratedWalletAddress) {
-          toast.error(
-            'You connected with a different wallet than the one you generated. ' +
-            'We\'ll generate a new trading wallet for you.',
-            { duration: 6000 }
-          );
-          // Clear the useless generated wallet reference
-          clearPendingSniper();
-          // Re-save without the generated wallet
-          if (pendingSniper) {
-            setPendingSniper({
-              name: pendingSniper.name,
-              config: pendingSniper.config,
-              createdAt: Date.now(),
-              connectedWallet: { publicKey: connectedWalletAddress },
-            });
-          }
-        }
+        // User needs a server-side generated wallet for trading
         setStep('wallet-setup');
       }
     } catch (error) {
@@ -249,6 +185,15 @@ export default function OnboardingPage() {
       const res = await walletApi.generate(token, walletLabel || 'Trading Wallet');
 
       if (!res.success || !res.data) {
+        // Check if session expired (user not found in DB - stale token)
+        if (res.error?.includes('Session expired') || res.error?.includes('reconnect')) {
+          toast.error('Session expired. Please reconnect your wallet.');
+          // Clear auth and restart
+          const { clearAuth } = useAuthStore.getState();
+          clearAuth();
+          setStep('connect');
+          return;
+        }
         throw new Error(res.error || 'Failed to generate wallet');
       }
 
@@ -432,43 +377,6 @@ export default function OnboardingPage() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-5 pt-2">
-                {/* Show generated wallet info if available */}
-                {generatedWalletAddress && (
-                  <div className="bg-green-900/20 border border-green-600/50 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-5 h-5 text-green-400" />
-                      <span className="text-green-400 font-medium text-sm">Your Trading Wallet</span>
-                    </div>
-
-                    <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-700">
-                      <p className="text-xs text-zinc-500 mb-1">Wallet Address</p>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 text-sm text-white font-mono truncate">
-                          {generatedWalletAddress}
-                        </code>
-                        <button
-                          onClick={copyAddress}
-                          className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
-                          title="Copy address"
-                        >
-                          {copiedAddress ? (
-                            <Check className="w-4 h-4 text-green-400" />
-                          ) : (
-                            <Copy className="w-4 h-4 text-zinc-400" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-sm">
-                      <ArrowRight className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
-                      <p className="text-green-300/80">
-                        <strong>Import this wallet</strong> into Phantom or Solflare using your private key, then connect below.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 {/* Sniper info if available */}
                 {hasPendingSniper() && pendingSniper && (
                   <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
@@ -482,23 +390,14 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
-                {/* Instructions if no generated wallet */}
-                {!generatedWalletAddress && (
-                  <p className="text-zinc-400 text-sm text-center">
-                    Connect your Solana wallet to get started. We support Phantom,
-                    Solflare, and other major wallets.
-                  </p>
-                )}
+                <p className="text-zinc-400 text-sm text-center">
+                  Connect your Solana wallet to get started. We support Phantom,
+                  Solflare, and other major wallets.
+                </p>
 
                 <div className="flex justify-center pt-2">
                   <WalletMultiButton />
                 </div>
-
-                {generatedWalletAddress && (
-                  <p className="text-xs text-zinc-500 text-center">
-                    Make sure to connect with the wallet address shown above for security
-                  </p>
-                )}
               </CardContent>
             </>
           )}

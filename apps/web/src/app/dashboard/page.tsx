@@ -24,12 +24,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo, LogoText } from '@/components/logo';
 import { Copy, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 // Wallet balance type for tracking
 interface WalletBalance {
   walletId: string;
   publicKey: string;
   balanceSol: number;
+  walletType: 'connected' | 'generated';
 }
 
 // Dynamic import to prevent hydration mismatch with wallet button
@@ -59,6 +62,12 @@ export default function DashboardPage() {
     requiredAmount: number;
     currentBalance: number;
   } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    sniperId: string;
+    sniperName: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -75,6 +84,7 @@ export default function DashboardPage() {
   const setSnipers = useSnipersStore((state) => state.setSnipers);
   const setPositions = usePositionsStore((state) => state.setPositions);
   const toggleSniper = useSnipersStore((state) => state.toggleSniper);
+  const removeSniper = useSnipersStore((state) => state.removeSniper);
   const walletsHydrated = useWalletsStore((state) => state._hasHydrated);
 
   // Memoized stats calculations - prevents recalculation on every render
@@ -88,12 +98,13 @@ export default function DashboardPage() {
     [snipers]
   );
 
-  // Primary wallet - all snipers use ONE wallet for deposits
-  const primaryWallet = useMemo(() => {
+  // Trading wallet - the server-generated wallet used for sniping transactions
+  // This is NOT the connected/auth wallet - snipers can only use generated wallets
+  const tradingWallet = useMemo(() => {
     if (walletBalances.length === 0) return null;
-    // Find primary wallet (isPrimary flag from backend) or fall back to first generated wallet
-    const primary = walletBalances.find(b => b.walletId && b.publicKey);
-    return primary || walletBalances[0];
+    // Find the generated wallet (server-controlled) - this is the ONLY wallet snipers can use
+    const generated = walletBalances.find(b => b.walletType === 'generated');
+    return generated || null;
   }, [walletBalances]);
 
   const stats = useMemo(() => {
@@ -245,6 +256,7 @@ export default function DashboardPage() {
             walletId: b.walletId,
             publicKey: b.publicKey,
             balanceSol: b.balanceSol,
+            walletType: b.walletType as 'connected' | 'generated',
           })));
         }
 
@@ -319,12 +331,12 @@ export default function DashboardPage() {
 
       setDepositModalData({
         isOpen: true,
-        walletAddress: primaryWallet?.publicKey || '',
-        walletId: primaryWallet?.walletId || sniper.walletId,
+        walletAddress: tradingWallet?.publicKey || '',
+        walletId: tradingWallet?.walletId || sniper.walletId,
         sniperName: sniper.name,
         sniperId: sniperId,
         requiredAmount,
-        currentBalance: primaryWallet?.balanceSol || 0,
+        currentBalance: tradingWallet?.balanceSol || 0,
       });
       return;
     }
@@ -343,7 +355,7 @@ export default function DashboardPage() {
     } catch {
       toast.error('Failed to toggle sniper');
     }
-  }, [token, snipers, primaryWallet, toggleSniper]);
+  }, [token, snipers, tradingWallet, toggleSniper]);
 
   const handleSellPosition = useCallback(async (positionId: string) => {
     if (!token) return;
@@ -360,6 +372,42 @@ export default function DashboardPage() {
       toast.error('Failed to sell position');
     }
   }, [token]);
+
+  // Open delete confirmation dialog
+  const handleDeleteSniper = useCallback((sniperId: string) => {
+    const sniper = snipers.find((s) => s.id === sniperId);
+    if (!sniper) return;
+
+    setDeleteDialog({
+      isOpen: true,
+      sniperId,
+      sniperName: sniper.name,
+    });
+  }, [snipers]);
+
+  // Confirm deletion
+  const confirmDeleteSniper = useCallback(async () => {
+    if (!token || !deleteDialog) return;
+
+    setIsDeleting(true);
+
+    try {
+      const res = await sniperApi.delete(token, deleteDialog.sniperId);
+
+      if (res.success) {
+        removeSniper(deleteDialog.sniperId);
+        toast.success(`Sniper "${deleteDialog.sniperName}" deleted`);
+        setDeleteDialog(null);
+      } else {
+        throw new Error(res.error);
+      }
+    } catch (error) {
+      toast.error('Failed to delete sniper');
+      console.error('Delete sniper error:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [token, deleteDialog, removeSniper]);
 
   // Show skeleton until all stores are hydrated
   // IMPORTANT: No preview mode - dashboard requires authentication
@@ -453,6 +501,16 @@ export default function DashboardPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            {/* Auth indicator - shows which wallet you're signed in with */}
+            {connected && publicKey && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-xs text-zinc-400">Signed in:</span>
+                <code className="text-xs text-zinc-300 font-mono">
+                  {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
+                </code>
+              </div>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -492,69 +550,138 @@ export default function DashboardPage() {
               <CardContent>
                 {openPositions.length === 0 ? (
                   <div className="space-y-4">
-                    {/* Example Position Table - Binance Style */}
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center justify-center z-10 bg-zinc-900/60 rounded-lg backdrop-blur-[1px]">
-                        <span className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-full text-sm text-zinc-300">
-                          Example Position
-                        </span>
+                    {/* Empty State Table with Column Headers */}
+                    <div className="border border-zinc-800 rounded-lg overflow-hidden">
+                      {/* Table Header */}
+                      <div className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-3 text-xs font-medium text-zinc-400 bg-zinc-800/50 border-b border-zinc-800">
+                        <div>Token</div>
+                        <div className="text-right">Amount (SOL)</div>
+                        <div className="text-right">Entry MCAP</div>
+                        <div className="text-right">Current MCAP</div>
+                        <div className="text-right">P&L (%)</div>
+                        <div className="text-right">Entry Time</div>
+                        <div className="text-right">Action</div>
                       </div>
-                      <div className="opacity-70 pointer-events-none">
-                        {/* Table Header */}
-                        <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.9fr_0.9fr_0.8fr_auto] gap-2 px-3 py-2 text-xs text-zinc-500 border-b border-zinc-800">
-                          <div>Symbol</div>
-                          <div className="text-right">Size</div>
-                          <div className="text-right">Entry</div>
-                          <div className="text-right">PnL (SOL)</div>
-                          <div className="text-right">ROE%</div>
-                          <div className="text-right">Value</div>
-                          <div className="text-right">Action</div>
+                      {/* Single Empty Placeholder Row */}
+                      <div className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-4 items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-zinc-800 border border-dashed border-zinc-700" />
+                          <div className="space-y-1">
+                            <div className="h-3.5 w-16 bg-zinc-800 rounded border border-dashed border-zinc-700" />
+                            <div className="h-2.5 w-12 bg-zinc-800/50 rounded border border-dashed border-zinc-700/50" />
+                          </div>
                         </div>
-                        {/* Table Row */}
-                        <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.9fr_0.9fr_0.8fr_auto] gap-2 px-3 py-3 items-center text-sm hover:bg-zinc-800/30 transition-colors border-b border-zinc-800/50">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-[10px] font-bold text-black">P</div>
-                            <div>
-                              <p className="font-medium">$PEPE</p>
-                              <p className="text-[10px] text-zinc-500 font-mono">7GCi...pump</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">4.08M</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">0.10</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-green-400">+0.1245</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-green-400">+124.50%</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">0.2245</p>
-                          </div>
-                          <div className="text-right">
-                            <Button variant="outline" size="sm" className="h-7 px-3 text-xs" disabled>
-                              Sell
-                            </Button>
-                          </div>
+                        <div className="flex justify-end">
+                          <div className="h-3.5 w-10 bg-zinc-800 rounded border border-dashed border-zinc-700" />
+                        </div>
+                        <div className="flex justify-end">
+                          <div className="h-3.5 w-12 bg-zinc-800 rounded border border-dashed border-zinc-700" />
+                        </div>
+                        <div className="flex justify-end">
+                          <div className="h-3.5 w-12 bg-zinc-800 rounded border border-dashed border-zinc-700" />
+                        </div>
+                        <div className="flex justify-end">
+                          <div className="h-3.5 w-10 bg-zinc-800 rounded border border-dashed border-zinc-700" />
+                        </div>
+                        <div className="flex justify-end">
+                          <div className="h-3.5 w-14 bg-zinc-800 rounded border border-dashed border-zinc-700" />
+                        </div>
+                        <div className="flex justify-end">
+                          <div className="h-7 w-16 bg-zinc-800 rounded border border-dashed border-zinc-700" />
                         </div>
                       </div>
                     </div>
                     <p className="text-zinc-500 text-center text-sm">
-                      Your snipers will create positions like this when they detect matching migrations.
+                      Positions will appear here when your snipers catch migrations.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {openPositions.map((position) => (
-                      <PositionCard
-                        key={position.id}
-                        position={position}
-                        onSell={handleSellPosition}
-                      />
-                    ))}
+                  <div className="border border-zinc-800 rounded-lg overflow-hidden">
+                    {/* Table Header */}
+                    <div className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-3 text-xs font-medium text-zinc-400 bg-zinc-800/50 border-b border-zinc-800">
+                      <div>Token</div>
+                      <div className="text-right">Amount (SOL)</div>
+                      <div className="text-right">Entry MCAP</div>
+                      <div className="text-right">Current MCAP</div>
+                      <div className="text-right">P&L (%)</div>
+                      <div className="text-right">Entry Time</div>
+                      <div className="text-right">Action</div>
+                    </div>
+                    {/* Scrollable positions - max 4 visible */}
+                    <div className="max-h-[280px] overflow-y-auto">
+                      {openPositions.map((position) => {
+                        const pnlPct = position.pnlPct ?? 0;
+                        const isProfitable = pnlPct > 0;
+                        const isLoss = pnlPct < 0;
+
+                        // Format market cap display
+                        const formatMcap = (mcap: number | null | undefined) => {
+                          if (!mcap) return '—';
+                          if (mcap >= 1_000_000) return `$${(mcap / 1_000_000).toFixed(1)}M`;
+                          if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(1)}K`;
+                          return `$${mcap.toFixed(0)}`;
+                        };
+
+                        return (
+                          <div
+                            key={position.id}
+                            className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-3 items-center text-sm border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
+                                {position.tokenSymbol?.charAt(0) || '?'}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-white truncate">{position.tokenSymbol || 'Unknown'}</p>
+                                <p className="text-[10px] text-zinc-500 font-mono">
+                                  {position.tokenMint?.slice(0, 4)}...{position.tokenMint?.slice(-4)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-white">{position.entrySol?.toFixed(3) || '0.00'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-zinc-300">
+                                {formatMcap(position.entryMarketCap)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-zinc-300">
+                                {formatMcap(position.currentMarketCap)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className={cn(
+                                'font-bold',
+                                isProfitable && 'text-green-400',
+                                isLoss && 'text-red-400',
+                                !isProfitable && !isLoss && 'text-zinc-400'
+                              )}>
+                                {position.pnlPct !== undefined ? (
+                                  `${isProfitable ? '+' : ''}${pnlPct.toFixed(1)}%`
+                                ) : '—'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-zinc-400 text-xs">
+                                {position.createdAt ? new Date(position.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-3 text-xs border-red-800 text-red-400 hover:bg-red-900/30 hover:text-red-300"
+                                onClick={() => handleSellPosition(position.id)}
+                              >
+                                Sell All
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -594,9 +721,10 @@ export default function DashboardPage() {
                       <SniperCard
                         key={sniper.id}
                         sniper={sniper}
-                        walletBalance={primaryWallet?.balanceSol}
-                        walletAddress={primaryWallet?.publicKey}
+                        walletBalance={tradingWallet?.balanceSol}
+                        walletAddress={tradingWallet?.publicKey}
                         onToggle={handleToggleSniper}
+                        onDelete={handleDeleteSniper}
                       />
                     ))}
                   </div>
@@ -709,6 +837,19 @@ export default function DashboardPage() {
           </Card>
         </div>
       )}
+
+      {/* Delete Sniper Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog?.isOpen ?? false}
+        onClose={() => setDeleteDialog(null)}
+        onConfirm={confirmDeleteSniper}
+        title={`Delete "${deleteDialog?.sniperName}"?`}
+        description="This will permanently remove this sniper and all its settings. Any open positions will remain but won't be automatically managed."
+        confirmText="Delete Sniper"
+        cancelText="Keep It"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

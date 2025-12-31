@@ -237,17 +237,26 @@ export class TransactionExecutor {
     } = params;
 
     const startTime = Date.now();
+    const tokenLabel = tokenSymbol || tokenMint.slice(0, 8);
+
+    console.log(`\n💰 [TX EXECUTOR] Starting BUY transaction`);
+    console.log(`   Token: ${tokenLabel} (${tokenMint})`);
+    console.log(`   Amount: ${amountSol} SOL, Slippage: ${slippageBps}bps, Tip: ${priorityFeeSol} SOL`);
+    console.log(`   MEV Protection: ${mevProtection ? 'ON' : 'OFF'}`);
 
     // Notify user immediately
     await emitToUser(userId, 'snipe:started', {
       sniperId,
       tokenMint,
-      tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+      tokenSymbol: tokenLabel,
       amountSol,
       timestamp: startTime,
     });
 
     try {
+      console.log(`   📡 Fetching wallet keypair and Raydium quote...`);
+      const quoteStartTime = Date.now();
+
       // 1. Get wallet keypair (parallel with quote fetch for speed)
       const [wallet, quote] = await Promise.all([
         this.getWalletKeypair(userId, walletId),
@@ -260,27 +269,41 @@ export class TransactionExecutor {
         }),
       ]);
 
+      const quoteDuration = Date.now() - quoteStartTime;
+
       if (!wallet) {
+        console.log(`   ❌ Wallet decryption failed`);
         throw new Error('Wallet not found or decryption failed');
       }
+      console.log(`   ✓ Wallet decrypted (${wallet.publicKey.toBase58().slice(0, 8)}...)`);
 
       if (!quote) {
+        console.log(`   ❌ Raydium quote failed - no liquidity?`);
         throw new Error('Failed to get Raydium quote - token may not have liquidity');
       }
+
+      const expectedTokens = parseInt(quote.outputAmount) / 1e9;
+      console.log(`   ✓ Quote received in ${quoteDuration}ms`);
+      console.log(`      Expected tokens: ${expectedTokens.toFixed(4)}`);
+      console.log(`      Price impact: ${quote.priceImpactPct}%`);
 
       // Notify quote received
       await emitToUser(userId, 'snipe:quote', {
         sniperId,
-        tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
-        expectedTokens: parseInt(quote.outputAmount) / 1e9,
+        tokenSymbol: tokenLabel,
+        expectedTokens,
         priceImpact: quote.priceImpactPct,
         latencyMs: Date.now() - startTime,
       });
 
       // 2. Calculate fees
       const platformFee = amountSol * (this.platformFeeBps / 10000);
+      console.log(`   Platform fee: ${platformFee.toFixed(6)} SOL (${this.platformFeeBps}bps)`);
 
       // 3. Build and sign transaction
+      console.log(`   🔨 Building transaction...`);
+      const buildStartTime = Date.now();
+
       const swapContext: SwapContext = {
         quote,
         wallet,
@@ -294,8 +317,12 @@ export class TransactionExecutor {
       };
 
       const transaction = await this.buildSwapTransaction(swapContext, priorityFeeSol);
+      console.log(`   ✓ Transaction built in ${Date.now() - buildStartTime}ms`);
 
       // 4. Submit with MEV protection
+      console.log(`   📤 Submitting transaction...`);
+      const submitStartTime = Date.now();
+
       const result = await this.submitWithFailsafe({
         transaction,
         swapContext,
@@ -303,8 +330,16 @@ export class TransactionExecutor {
         mevProtection,
       });
 
+      const submitDuration = Date.now() - submitStartTime;
+
       if (result.success && result.signature) {
         const tokenAmount = parseInt(quote.outputAmount) / 1e9;
+        const totalDuration = Date.now() - startTime;
+
+        console.log(`   ✅ TRANSACTION CONFIRMED!`);
+        console.log(`      Signature: ${result.signature}`);
+        console.log(`      Submit time: ${submitDuration}ms`);
+        console.log(`      Total time: ${totalDuration}ms`);
 
         // 5. Record transaction (don't await - do in background for speed)
         this.recordTransaction({
@@ -326,10 +361,10 @@ export class TransactionExecutor {
           sniperId,
           signature: result.signature,
           tokenMint,
-          tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+          tokenSymbol: tokenLabel,
           tokenAmount,
           solSpent: amountSol,
-          totalLatencyMs: Date.now() - startTime,
+          totalLatencyMs: totalDuration,
         });
 
         return {
@@ -344,18 +379,23 @@ export class TransactionExecutor {
           },
         };
       } else {
+        console.log(`   ❌ Transaction failed after all retries: ${result.error}`);
         throw new Error(result.error || 'Transaction failed after all retries');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const totalDuration = Date.now() - startTime;
+
+      console.log(`   💥 TRANSACTION FAILED: ${errorMessage}`);
+      console.log(`      Duration: ${totalDuration}ms`);
 
       // Notify failure
       await emitToUser(userId, 'snipe:failed', {
         sniperId,
         tokenMint,
-        tokenSymbol: tokenSymbol || tokenMint.slice(0, 8),
+        tokenSymbol: tokenLabel,
         error: errorMessage,
-        totalLatencyMs: Date.now() - startTime,
+        totalLatencyMs: totalDuration,
       });
 
       // Log failure (background)
@@ -747,21 +787,27 @@ export class TransactionExecutor {
           { path: 'direct', tipMultiplier: 2 },
         ];
 
+    console.log(`   🔄 Submission strategy: ${attempts.map(a => a.path).join(' → ')}`);
+
     for (let i = 0; i < attempts.length; i++) {
       const attempt = attempts[i];
+      const attemptTip = initialTip * attempt.tipMultiplier;
+
+      console.log(`   📤 Attempt ${i + 1}/${attempts.length}: ${attempt.path} (tip: ${attemptTip.toFixed(4)} SOL)`);
 
       // Rebuild transaction with new tip if not first attempt
       if (i > 0) {
+        console.log(`      Rebuilding transaction with higher tip...`);
         await emitToUser(userId, 'snipe:retrying', {
           sniperId,
           tokenSymbol,
           attempt: i + 1,
           maxAttempts: attempts.length,
           path: attempt.path,
-          newTip: initialTip * attempt.tipMultiplier,
+          newTip: attemptTip,
         });
 
-        transaction = await this.rebuildWithNewTip(swapContext, initialTip * attempt.tipMultiplier);
+        transaction = await this.rebuildWithNewTip(swapContext, attemptTip);
       }
 
       try {
@@ -773,6 +819,7 @@ export class TransactionExecutor {
         });
 
         let signature: string | null = null;
+        const submitStart = Date.now();
 
         if (attempt.path === 'jito-parallel') {
           signature = await this.submitToJitoParallel(transaction);
@@ -782,21 +829,36 @@ export class TransactionExecutor {
           signature = await this.submitDirect(transaction);
         }
 
+        const submitDuration = Date.now() - submitStart;
+
         if (signature) {
+          console.log(`      ✓ Submitted in ${submitDuration}ms, signature: ${signature.slice(0, 16)}...`);
+          console.log(`      ⏳ Waiting for confirmation...`);
+
           // Confirm transaction
+          const confirmStart = Date.now();
           const confirmed = await this.confirmTransactionFast(signature);
+          const confirmDuration = Date.now() - confirmStart;
 
           if (confirmed) {
+            console.log(`      ✅ Confirmed in ${confirmDuration}ms`);
             return { success: true, signature };
+          } else {
+            console.log(`      ❌ Confirmation failed/timed out after ${confirmDuration}ms`);
           }
+        } else {
+          console.log(`      ❌ No signature returned after ${submitDuration}ms`);
         }
       } catch (error) {
-        console.error(`Attempt ${i + 1} (${attempt.path}) failed:`, error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        console.log(`      ❌ Error: ${errorMsg}`);
       }
 
       // Brief delay before retry (exponential backoff but capped)
       if (i < attempts.length - 1) {
-        await this.sleep(Math.min(50 * (i + 1), 150));
+        const delay = Math.min(50 * (i + 1), 150);
+        console.log(`      ⏸️  Waiting ${delay}ms before retry...`);
+        await this.sleep(delay);
       }
     }
 

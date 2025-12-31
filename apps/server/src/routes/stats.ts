@@ -212,4 +212,59 @@ export const statsRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
   });
+
+  /**
+   * Get PumpFun migrations for dashboard
+   * Public endpoint - returns recent PumpFun migrations with full token mints
+   * Used by dashboard Activity Log to show live migrations
+   */
+  fastify.get('/pumpfun-migrations', async (request, reply) => {
+    try {
+      const limit = Math.min(parseInt((request.query as any).limit || '50', 10), 100);
+
+      const migrations = await prisma.migrationEvent.findMany({
+        where: {
+          // PumpFun tokens end with 'pump' in their mint address
+          tokenMint: {
+            endsWith: 'pump',
+          },
+        },
+        orderBy: { detectedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          tokenMint: true,
+          tokenSymbol: true,
+          tokenName: true,
+          poolAddress: true,
+          detectionLatencyMs: true,
+          source: true,
+          detectedAt: true,
+          totalSnipesSuccessful: true,
+        },
+      });
+
+      return {
+        success: true,
+        data: migrations.map((m) => ({
+          id: m.id,
+          tokenMint: m.tokenMint,
+          tokenSymbol: m.tokenSymbol,
+          tokenName: m.tokenName,
+          poolAddress: m.poolAddress,
+          detectionLatencyMs: m.detectionLatencyMs,
+          source: m.source,
+          timestamp: m.detectedAt.toISOString(),
+          sniped: (m.totalSnipesSuccessful || 0) > 0,
+          snipeSuccess: (m.totalSnipesSuccessful || 0) > 0 ? true : undefined,
+        })),
+      };
+    } catch (error) {
+      console.error('Failed to fetch PumpFun migrations:', error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to fetch PumpFun migrations',
+      });
+    }
+  });
 };

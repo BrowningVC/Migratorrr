@@ -82,6 +82,29 @@ async function main() {
   // Validate environment before starting
   validateEnvironment();
 
+  // Verify database connectivity before starting services
+  console.log('\n🔍 Checking database connectivity...');
+
+  try {
+    // Test PostgreSQL connection
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✅ PostgreSQL connected');
+  } catch (error) {
+    console.error('❌ PostgreSQL connection failed:', error);
+    process.exit(1);
+  }
+
+  try {
+    // Test Redis connection
+    await redis.ping();
+    console.log('✅ Redis connected');
+  } catch (error) {
+    console.error('❌ Redis connection failed:', error);
+    process.exit(1);
+  }
+
+  console.log('');
+
   // Create Fastify instance
   const fastify = Fastify({
     logger: {

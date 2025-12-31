@@ -112,6 +112,7 @@ model Position {
   entryPrice       Float    @map("entry_price")
   entryTokenAmount Float    @map("entry_token_amount") // Token amount
   entrySol         Float    @map("entry_sol")    // SOL spent
+  entryMarketCap   Float?   @map("entry_market_cap")   // Market cap at entry (USD)
 
   // Current state
   currentTokenAmount Float  @map("current_token_amount")

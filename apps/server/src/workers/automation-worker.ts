@@ -264,11 +264,38 @@ export class AutomationWorker {
       return;
     }
 
-    // Mark position as selling to prevent duplicate triggers
-    await prisma.position.update({
-      where: { id },
+    // CRITICAL: Verify wallet exists and belongs to user before executing
+    const wallet = await prisma.wallet.findUnique({
+      where: { id: sniper.walletId },
+      select: { id: true, userId: true, walletType: true },
+    });
+
+    if (!wallet) {
+      console.error(`Automation sell blocked: wallet ${sniper.walletId} not found for position ${id}`);
+      return;
+    }
+
+    if (wallet.userId !== userId) {
+      console.error(`Automation sell blocked: wallet ${sniper.walletId} ownership mismatch for position ${id}`);
+      return;
+    }
+
+    if (wallet.walletType !== 'generated') {
+      console.error(`Automation sell blocked: wallet ${sniper.walletId} is not a generated wallet for position ${id}`);
+      return;
+    }
+
+    // Atomically mark position as selling to prevent duplicate triggers (race condition safe)
+    const updateResult = await prisma.position.updateMany({
+      where: { id, status: 'open' },
       data: { status: 'selling' },
     });
+
+    if (updateResult.count === 0) {
+      // Position was already being processed or closed
+      console.log(`Position ${id} already being processed, skipping ${reason} trigger`);
+      return;
+    }
 
     // Notify user
     const reasonLabels = {

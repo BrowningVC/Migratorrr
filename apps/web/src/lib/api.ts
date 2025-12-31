@@ -40,9 +40,13 @@ async function fetchApi<T>(
   retryCount = 0
 ): Promise<ApiResponse<T>> {
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
     ...options.headers,
   };
+
+  // Only set Content-Type for requests with a body
+  if (options.body) {
+    (headers as Record<string, string>)['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
@@ -272,6 +276,14 @@ export const sniperApi = {
 
   getStats: (token: string, sniperId: string) =>
     fetchApi<{ data: unknown }>(`/api/sniper/${sniperId}/stats`, {}, token),
+
+  getActivity: (token: string, limit = 50) =>
+    fetchApi<Array<{
+      id: string;
+      eventType: string;
+      eventData: Record<string, unknown>;
+      timestamp: string;
+    }>>(`/api/sniper/activity?limit=${limit}`, {}, token),
 };
 
 // Position API
@@ -285,6 +297,7 @@ export const positionApi = {
       entryPrice: number;
       entryTokenAmount: number;
       entrySol: number;
+      entryMarketCap: number | null;
       currentTokenAmount: number;
       status: string;
       takeProfitPrice: number | null;

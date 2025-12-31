@@ -232,6 +232,21 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = (request as any).userId;
     const body = generateWalletSchema.parse(request.body);
 
+    // Verify user exists in database (handles stale tokens from DB resets)
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!userExists) {
+      fastify.log.warn(`Wallet generation failed: User ${userId} not found in database (stale token)`);
+      return reply.status(401).send({
+        success: false,
+        error: 'Session expired. Please reconnect your wallet.',
+        code: 'USER_NOT_FOUND',
+      });
+    }
+
     // Generate keypair
     const keypair = Keypair.generate();
     const publicKey = keypair.publicKey.toBase58();

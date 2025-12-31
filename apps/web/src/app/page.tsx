@@ -1,19 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { Crosshair, Zap, Shield, TrendingUp, Activity, ArrowRight, Radio, BookOpen, Wallet, DollarSign, Check, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo, LogoText } from '@/components/logo';
 import { PreAuthSniperModal } from '@/components/sniper/pre-auth-sniper-modal';
+import { useAuthStore } from '@/lib/stores/auth';
 import { cn } from '@/lib/utils';
-
-// Dynamic import to prevent hydration mismatch with wallet button
-const WalletMultiButton = dynamic(
-  () => import('@solana/wallet-adapter-react-ui').then((mod) => mod.WalletMultiButton),
-  { ssr: false }
-);
 
 // Workflow steps for animated diagram
 const WORKFLOW_STEPS = [
@@ -24,13 +19,24 @@ const WORKFLOW_STEPS = [
 ];
 
 export default function LandingPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isSniperModalOpen, setIsSniperModalOpen] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+  const { isAuthenticated, hasCompletedOnboarding } = useAuthStore();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Handle Dashboard click - go to dashboard if authenticated, otherwise open sniper modal
+  const handleDashboardClick = () => {
+    if (isAuthenticated && hasCompletedOnboarding) {
+      router.push('/dashboard');
+    } else {
+      setIsSniperModalOpen(true);
+    }
+  };
 
   // Animated workflow progression
   useEffect(() => {
@@ -43,9 +49,6 @@ export default function LandingPage() {
     return () => clearInterval(interval);
   }, [mounted]);
 
-  // Show placeholder until mounted to prevent hydration mismatch
-  const WalletButton = mounted ? <WalletMultiButton /> : <div className="h-10 w-32 bg-zinc-800 rounded animate-pulse" />;
-
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -56,16 +59,15 @@ export default function LandingPage() {
             <LogoText size="md" />
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
-            </Link>
+            <Button variant="ghost" onClick={handleDashboardClick}>
+              Dashboard
+            </Button>
             <Link href="/migrator">
               <Button variant="ghost">$MIGRATOR</Button>
             </Link>
             <Link href="/how-it-works">
               <Button variant="ghost">How it Works</Button>
             </Link>
-            {WalletButton}
           </div>
         </div>
       </nav>
@@ -149,13 +151,16 @@ export default function LandingPage() {
 
                     return (
                       <div key={step.id} className="relative">
-                        {/* Connector line */}
+                        {/* Connector line - sleek design */}
                         {index < WORKFLOW_STEPS.length - 1 && (
-                          <div className="absolute left-6 top-14 w-0.5 h-8 bg-zinc-800">
+                          <div className="absolute left-6 top-14 w-px h-8 bg-zinc-800/50">
+                            {/* Animated fill with glow */}
                             <div
                               className={cn(
-                                "w-full bg-green-500 transition-all duration-500",
-                                isActive ? "h-full" : "h-0"
+                                "w-full transition-all duration-700 ease-out rounded-full",
+                                isActive
+                                  ? "h-full bg-gradient-to-b from-green-400 to-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+                                  : "h-0 bg-green-500"
                               )}
                             />
                           </div>

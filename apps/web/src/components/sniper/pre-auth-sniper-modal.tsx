@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Keypair } from '@solana/web3.js';
-import bs58 from 'bs58';
 import toast from 'react-hot-toast';
 import { usePendingSniperStore } from '@/lib/stores/pending-sniper';
 import { useAuthStore } from '@/lib/stores/auth';
@@ -15,19 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { Copy, Check, Eye, EyeOff, Wallet, AlertTriangle, Shield, Crosshair } from 'lucide-react';
+import { Check, Wallet, Shield, Crosshair, ArrowRight } from 'lucide-react';
 
 interface PreAuthSniperModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type Step = 'basics' | 'buying' | 'selling' | 'filters' | 'review' | 'wallet';
-
-interface GeneratedWallet {
-  publicKey: string;
-  privateKey: string;
-}
+// Simplified steps - no wallet generation here (server handles that during onboarding)
+type Step = 'basics' | 'buying' | 'selling' | 'filters' | 'review';
 
 const DEFAULT_CONFIG: SniperConfig = {
   snipeAmountSol: 0.1,
@@ -63,14 +57,6 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   const existingGeneratedWallet = wallets.find(w => w.walletType === 'generated');
   const hasExistingWallet = storesHydrated && isAuthenticated && token && !!existingGeneratedWallet;
 
-  // Wallet generation state (for new wallets created in this modal)
-  const [generatedWallet, setGeneratedWallet] = useState<GeneratedWallet | null>(null);
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
-  const [copiedPublic, setCopiedPublic] = useState(false);
-  const [copiedPrivate, setCopiedPrivate] = useState(false);
-  const [hasBackedUp, setHasBackedUp] = useState(false);
-
-
   // Validation errors for buy settings
   const [validationErrors, setValidationErrors] = useState<{
     snipeAmountSol?: boolean;
@@ -78,7 +64,8 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
     priorityFeeSol?: boolean;
   }>({});
 
-  const steps: Step[] = ['basics', 'buying', 'selling', 'filters', 'review', 'wallet'];
+  // Simplified steps - wallet generation happens server-side during onboarding
+  const steps: Step[] = ['basics', 'buying', 'selling', 'filters', 'review'];
   const stepIndex = steps.indexOf(step);
 
   const stepLabels: Record<Step, string> = {
@@ -86,8 +73,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
     buying: 'Buy Settings',
     selling: 'Exit Strategy',
     filters: 'Token Filters',
-    review: 'Review Config',
-    wallet: 'Your Wallet',
+    review: 'Review & Continue',
   };
 
   const updateConfig = (updates: Partial<SniperConfig>) => {
@@ -192,48 +178,14 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
     }
   };
 
-  const handleGenerateWallet = () => {
-    // Generate a new Solana keypair
-    const keypair = Keypair.generate();
-    const publicKey = keypair.publicKey.toBase58();
-    const privateKey = bs58.encode(keypair.secretKey);
-
-    setGeneratedWallet({ publicKey, privateKey });
-    setStep('wallet');
-  };
-
-  const copyToClipboard = async (text: string, type: 'public' | 'private') => {
-    try {
-      await navigator.clipboard.writeText(text);
-      if (type === 'public') {
-        setCopiedPublic(true);
-        setTimeout(() => setCopiedPublic(false), 2000);
-      } else {
-        setCopiedPrivate(true);
-        setTimeout(() => setCopiedPrivate(false), 2000);
-      }
-      toast.success(type === 'public' ? 'Address copied!' : 'Private key copied!');
-    } catch {
-      toast.error('Failed to copy');
-    }
-  };
-
-  const handleContinueToSignup = () => {
-    // SECURITY: Only pass public key to the store
-    // The private key exists only in this component's memory and is never persisted
-    // The store will strip any private key if accidentally passed
+  // Continue to onboarding where wallet will be generated server-side
+  const handleContinueToOnboarding = () => {
+    // Store sniper config for creation after onboarding
     setPendingSniper({
       name,
       config,
       createdAt: Date.now(),
-      generatedWallet: generatedWallet
-        ? { publicKey: generatedWallet.publicKey }
-        : undefined,
     });
-
-    // Clear sensitive data from component state
-    setGeneratedWallet(null);
-    setShowPrivateKey(false);
 
     // Navigate to onboarding
     router.push('/onboarding');
@@ -241,23 +193,10 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   };
 
   const handleClose = () => {
-    // SECURITY: Warn user if they're closing without backing up
-    if (step === 'wallet' && generatedWallet && !hasBackedUp) {
-      const confirmed = window.confirm(
-        'WARNING: You have not confirmed backing up your private key. ' +
-        'If you close now, you will LOSE ACCESS to this wallet forever. ' +
-        'Are you sure you want to close?'
-      );
-      if (!confirmed) return;
-    }
-
-    // Clear all state including sensitive wallet data
+    // Reset all state
     setStep('basics');
     setName('My First Sniper');
     setConfig(DEFAULT_CONFIG);
-    setGeneratedWallet(null);
-    setShowPrivateKey(false);
-    setHasBackedUp(false);
     onClose();
   };
 
@@ -1043,149 +982,21 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   </p>
                 </div>
               ) : (
-                // Show wallet generation prompt - all snipers need a server-generated wallet
-                <div className="bg-green-900/20 border-2 border-green-700/60 rounded-xl p-4 mt-2">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <Wallet className="w-5 h-5 text-green-400" />
-                    <p className="text-green-400 font-medium text-sm">Next: Generate Trading Wallet</p>
+                // New user flow - explain what happens next
+                <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 mt-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-900/30 rounded-full flex items-center justify-center shrink-0">
+                      <ArrowRight className="w-5 h-5 text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium text-sm">Next: Quick Setup</p>
+                      <p className="text-zinc-400 text-xs mt-0.5">
+                        Connect wallet → Get secure trading wallet → Done!
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-green-400/70 text-xs text-center">
-                    We'll generate a secure trading wallet for your sniper
-                  </p>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Step 6: Wallet Generation */}
-          {step === 'wallet' && generatedWallet && (
-            <div className="space-y-3">
-              {/* Critical Security Warning - Compact */}
-              <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-2">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                  <p className="text-red-400 text-xs font-medium">
-                    ONE-TIME DISPLAY — Copy your private key now, it won't be shown again!
-                  </p>
-                </div>
-              </div>
-
-              {/* Success Header - Compact */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-900/30 rounded-full flex items-center justify-center shrink-0">
-                  <Wallet className="w-5 h-5 text-green-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Wallet Generated</h3>
-                  <p className="text-xs text-zinc-400">Deposit SOL to fund your sniper</p>
-                </div>
-              </div>
-
-              {/* Public Key */}
-              <div className="space-y-1">
-                <Label className="text-xs text-zinc-500">Wallet Address</Label>
-                <div className="flex items-center gap-2 bg-zinc-800 rounded-lg p-2 border border-zinc-700">
-                  <code className="flex-1 text-xs text-zinc-200 font-mono break-all">
-                    {generatedWallet.publicKey}
-                  </code>
-                  <button
-                    onClick={() => copyToClipboard(generatedWallet.publicKey, 'public')}
-                    className="p-1.5 hover:bg-zinc-700 rounded transition-colors shrink-0"
-                    title="Copy address"
-                  >
-                    {copiedPublic ? (
-                      <Check className="w-3.5 h-3.5 text-green-400" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Private Key */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-red-400 font-medium">Private Key (Secret)</Label>
-                  <span className="text-xs text-red-400/70">Never share!</span>
-                </div>
-                <div className="bg-zinc-800 rounded-lg border border-red-800/50 overflow-hidden">
-                  <div className="flex items-center gap-2 p-2">
-                    <code className="flex-1 text-xs font-mono break-all select-all">
-                      {showPrivateKey ? (
-                        <span className="text-zinc-200">{generatedWallet.privateKey}</span>
-                      ) : (
-                        <span className="text-zinc-500">Click eye to reveal ➜</span>
-                      )}
-                    </code>
-                    <button
-                      onClick={() => setShowPrivateKey(!showPrivateKey)}
-                      className="p-1.5 hover:bg-zinc-700 rounded transition-colors shrink-0"
-                      title={showPrivateKey ? 'Hide key' : 'Show key'}
-                    >
-                      {showPrivateKey ? (
-                        <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
-                      ) : (
-                        <Eye className="w-3.5 h-3.5 text-zinc-400" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => copyToClipboard(generatedWallet.privateKey, 'private')}
-                      className="p-1.5 hover:bg-zinc-700 rounded transition-colors shrink-0"
-                      title="Copy private key"
-                    >
-                      {copiedPrivate ? (
-                        <Check className="w-3.5 h-3.5 text-green-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Security Tips - Compact */}
-              <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-2">
-                <div className="flex gap-2">
-                  <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
-                  <p className="text-yellow-400/80 text-xs">
-                    Store your key securely (password manager). We don't have access to it.
-                  </p>
-                </div>
-              </div>
-
-              {/* Deposit Info - Compact */}
-              <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-white">Minimum Deposit</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">Covers snipe amount + fees</p>
-                  </div>
-                  <span className="text-sm font-semibold text-green-400">{(config.snipeAmountSol + 0.01).toFixed(2)} SOL</span>
-                </div>
-              </div>
-
-              {/* Backup Confirmation */}
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={hasBackedUp}
-                    onChange={(e) => setHasBackedUp(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={cn(
-                    'w-4 h-4 rounded border-2 transition-colors flex items-center justify-center',
-                    hasBackedUp
-                      ? 'bg-green-600 border-green-600'
-                      : 'border-zinc-600 group-hover:border-zinc-500'
-                  )}>
-                    {hasBackedUp && <Check className="w-2.5 h-2.5 text-white" />}
-                  </div>
-                </div>
-                <span className="text-xs text-zinc-300">
-                  I have securely backed up my private key
-                </span>
-              </label>
             </div>
           )}
 
@@ -1193,16 +1004,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
 
         {/* Navigation - Fixed at bottom */}
         <div className="flex gap-3 p-4 border-t border-zinc-800 shrink-0">
-          {step === 'wallet' ? (
-            <Button
-              className="flex-1 bg-green-600 hover:bg-green-700"
-              onClick={handleContinueToSignup}
-              disabled={!hasBackedUp}
-            >
-              <Wallet className="w-4 h-4 mr-2" />
-              Continue to Setup
-            </Button>
-          ) : step === 'review' ? (
+          {step === 'review' ? (
             <>
               <Button
                 variant="outline"
@@ -1212,7 +1014,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 Back
               </Button>
               {hasExistingWallet ? (
-                // User has a generated wallet - show single Create button
+                // User has a generated wallet - create sniper directly
                 <Button
                   className="flex-1 bg-green-600 hover:bg-green-700"
                   onClick={handleCreateSniperDirect}
@@ -1222,14 +1024,14 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   {isCreatingSniper ? 'Creating...' : 'Create Sniper'}
                 </Button>
               ) : (
-                // User needs to generate a wallet first
+                // New user - continue to onboarding for wallet setup
                 <Button
                   className="flex-1 bg-green-600 hover:bg-green-700"
-                  onClick={handleGenerateWallet}
+                  onClick={handleContinueToOnboarding}
                   disabled={!name}
                 >
-                  <Wallet className="w-4 h-4 mr-2" />
-                  Generate Wallet
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Continue to Setup
                 </Button>
               )}
             </>

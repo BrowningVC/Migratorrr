@@ -27,8 +27,12 @@ export const SniperCard = memo(function SniperCard({
 }: SniperCardProps) {
   const { id, name, isActive, config, stats } = sniper;
 
-  // Calculate minimum required balance (snipe amount + priority fee + buffer for tx fees)
-  const minRequiredBalance = config.snipeAmountSol + config.priorityFeeSol + 0.002;
+  // Calculate minimum required balance:
+  // snipe amount + priority fee (Jito tip) + platform fee (1%) + network fees buffer
+  const platformFeePct = 0.01; // 1% platform fee (100 bps)
+  const platformFee = config.snipeAmountSol * platformFeePct;
+  const networkFeeBuffer = 0.001; // ~5000 lamports for tx fees
+  const minRequiredBalance = config.snipeAmountSol + config.priorityFeeSol + platformFee + networkFeeBuffer;
   // Treat undefined balance as 0 (wallet not funded yet)
   const effectiveBalance = walletBalance ?? 0;
   const hasInsufficientFunds = effectiveBalance < minRequiredBalance;

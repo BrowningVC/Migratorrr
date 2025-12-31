@@ -524,68 +524,135 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Live PumpFun Migrations - Real-time feed */}
+        {/* PumpFun Migrations - From Database (Persisted) */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Radio className="w-5 h-5 text-red-400 animate-pulse" />
-              Live PumpFun Migrations
+              <Radio className="w-5 h-5 text-green-400" />
+              PumpFun Migrations
               <span className="flex items-center gap-2 ml-2">
                 {wsConnected ? (
                   <span className="flex items-center gap-1 text-xs text-green-400">
                     <Wifi className="w-3 h-3" />
-                    Connected
+                    Live
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-xs text-red-400">
+                  <span className="flex items-center gap-1 text-xs text-yellow-400">
                     <WifiOff className="w-3 h-3" />
-                    Disconnected
+                    Offline
                   </span>
                 )}
               </span>
-              <span className="text-sm font-normal text-zinc-500">
-                ({liveMigrations.length} since page load)
-              </span>
-              {liveMigrations.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setLiveMigrations([])}
-                  className="ml-auto text-xs text-zinc-400 hover:text-white"
-                >
-                  Clear
-                </Button>
+              {migrations && (
+                <span className="text-sm font-normal text-zinc-500">
+                  ({migrations.total} total • {migrations.avgLatencyMs}ms avg latency)
+                </span>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchAllData}
+                disabled={isLoading}
+                className="ml-auto text-xs text-zinc-400 hover:text-white"
+              >
+                <RefreshCw className={cn('w-3 h-3 mr-1', isLoading && 'animate-spin')} />
+                Refresh
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {liveMigrations.length === 0 ? (
+            {!migrations || migrations.recent.length === 0 ? (
               <div className="text-center py-12 text-zinc-500">
                 <Radio className="w-8 h-8 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Waiting for new PumpFun migrations...</p>
-                <p className="text-xs mt-1">New migrations will appear here in real-time</p>
+                <p className="text-sm">No PumpFun migrations recorded yet</p>
+                <p className="text-xs mt-1">Migrations will be saved here as they&apos;re detected</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-800 text-zinc-500">
-                      <th className="text-left py-2 px-2">Token Address</th>
+                      <th className="text-left py-2 px-2">Token</th>
                       <th className="text-left py-2 px-2">Pool</th>
                       <th className="text-right py-2 px-2">Liquidity</th>
                       <th className="text-right py-2 px-2">Latency</th>
                       <th className="text-left py-2 px-2">Source</th>
-                      <th className="text-left py-2 px-2">Time</th>
+                      <th className="text-left py-2 px-2">Detected</th>
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Show new live migrations at the top with highlight */}
                     {liveMigrations.map((m, index) => (
                       <tr
                         key={m.id}
                         className={cn(
                           'border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-all',
-                          index === 0 && 'bg-green-900/20 animate-pulse'
+                          index === 0 ? 'bg-green-900/30 animate-pulse' : 'bg-green-900/10'
                         )}
+                      >
+                        <td className="py-2 px-2">
+                          <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="New" />
+                            <code className="text-xs bg-zinc-800 px-1 py-0.5 rounded">
+                              {m.tokenSymbol || m.tokenMint.slice(0, 8)}...{m.tokenMint.slice(-4)}
+                            </code>
+                            <button
+                              onClick={() => copyToClipboard(m.tokenMint, `token-${m.id}`)}
+                              className="p-1 hover:bg-zinc-700 rounded"
+                              title="Copy token address"
+                            >
+                              {copiedId === `token-${m.id}` ? (
+                                <Check className="w-3 h-3 text-green-400" />
+                              ) : (
+                                <Copy className="w-3 h-3 text-zinc-400" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-2 px-2">
+                          <div className="flex items-center gap-1">
+                            <code className="text-xs text-zinc-400">
+                              {m.poolAddress?.slice(0, 8)}...
+                            </code>
+                            {m.poolAddress && (
+                              <button
+                                onClick={() => copyToClipboard(m.poolAddress, `pool-${m.id}`)}
+                                className="p-1 hover:bg-zinc-700 rounded"
+                                title="Copy pool address"
+                              >
+                                {copiedId === `pool-${m.id}` ? (
+                                  <Check className="w-3 h-3 text-green-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3 text-zinc-400" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono">
+                          {m.initialLiquiditySol?.toFixed(2) || '0.00'} SOL
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-zinc-400">
+                          {m.detectionLatencyMs}ms
+                        </td>
+                        <td className="py-2 px-2">
+                          <span className={cn(
+                            'px-1.5 py-0.5 rounded text-xs',
+                            m.source === 'pumpportal' ? 'bg-blue-900/50 text-blue-400' : 'bg-purple-900/50 text-purple-400'
+                          )}>
+                            {m.source}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2 text-green-400 text-xs font-medium">
+                          Just now
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Show persisted migrations from database */}
+                    {migrations.recent.map((m) => (
+                      <tr
+                        key={m.id}
+                        className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
                       >
                         <td className="py-2 px-2">
                           <div className="flex items-center gap-1">
@@ -640,7 +707,7 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="py-2 px-2 text-zinc-500 text-xs">
-                          {new Date(m.detectedAt).toLocaleTimeString()}
+                          {new Date(m.detectedAt).toLocaleString()}
                         </td>
                       </tr>
                     ))}

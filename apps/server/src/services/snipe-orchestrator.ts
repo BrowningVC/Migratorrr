@@ -118,17 +118,21 @@ export class SnipeOrchestrator {
    * Handle a new migration event
    */
   private async handleMigration(migration: MigrationEvent & { detectedBy: string; detectedAt: number }): Promise<void> {
-    console.log(`Processing migration for snipers: ${migration.tokenSymbol || migration.tokenMint}`);
+    const timestamp = new Date().toISOString();
+    console.log(`\n📥 [${timestamp}] ORCHESTRATOR: Processing migration`);
+    console.log(`   Token: ${migration.tokenSymbol || 'Unknown'} (${migration.tokenMint})`);
+    console.log(`   Pool: ${migration.poolAddress}`);
+    console.log(`   Liquidity: ${migration.initialLiquiditySol} SOL`);
 
     // Get all active snipers with their wallet info
     const activeSnipers = await this.getActiveSnipers();
 
     if (activeSnipers.length === 0) {
-      console.log('No active snipers found');
+      console.log(`   ⚠️  No active snipers found - migration will not be sniped`);
       return;
     }
 
-    console.log(`Found ${activeSnipers.length} active snipers`);
+    console.log(`   Found ${activeSnipers.length} active sniper(s)`);
 
     // Filter and dispatch jobs
     let matched = 0;
@@ -136,22 +140,27 @@ export class SnipeOrchestrator {
     const filteredSniperIds: string[] = [];
 
     for (const sniper of activeSnipers) {
+      console.log(`\n   🔍 Evaluating sniper: "${sniper.name}" (${sniper.id.slice(0, 8)}...)`);
       const meetsFilter = await this.matchesCriteria(sniper.config, migration);
       if (meetsFilter) {
         matched++;
+        console.log(`   ✅ Sniper "${sniper.name}" PASSED all filters`);
         // dispatchSnipeJob returns false if token was already sniped (duplicate blocked)
         const wasDispatched = await this.dispatchSnipeJob(sniper, migration);
         if (wasDispatched) {
           dispatched++;
+          console.log(`   📤 Snipe job DISPATCHED for "${sniper.name}"`);
+        } else {
+          console.log(`   ⏭️  Snipe job SKIPPED (duplicate) for "${sniper.name}"`);
         }
       } else {
         // Track that this sniper filtered out this migration
         filteredSniperIds.push(sniper.id);
+        console.log(`   ❌ Sniper "${sniper.name}" FILTERED OUT (see filter logs above)`);
       }
     }
 
-    console.log(`Dispatched ${dispatched}/${matched} snipe jobs for ${migration.tokenSymbol || migration.tokenMint}`);
-    console.log(`Filtered ${filteredSniperIds.length} snipers for ${migration.tokenSymbol || migration.tokenMint}`);
+    console.log(`\n   📊 SUMMARY: ${dispatched}/${matched} jobs dispatched, ${filteredSniperIds.length} snipers filtered`);
 
     // Update migration event with snipe count (only count actually dispatched)
     if (dispatched > 0) {
@@ -172,6 +181,7 @@ export class SnipeOrchestrator {
 
   /**
    * Get all active snipers with wallet information
+   * CRITICAL: Only returns snipers with valid generated wallets that belong to the user
    */
   private async getActiveSnipers(): Promise<ActiveSniper[]> {
     const snipers = await prisma.sniperConfig.findMany({
@@ -181,12 +191,37 @@ export class SnipeOrchestrator {
           select: {
             id: true,
             publicKey: true,
+            walletType: true,
+            userId: true,
           },
         },
       },
     });
 
-    return snipers.map((s: typeof snipers[number]) => ({
+    // Filter out snipers with invalid wallet configurations
+    const validSnipers = snipers.filter((s: typeof snipers[number]) => {
+      // Wallet must exist
+      if (!s.wallet) {
+        console.error(`Sniper ${s.id} (${s.name}) has no associated wallet - skipping`);
+        return false;
+      }
+
+      // Wallet must be a generated wallet (server-controlled)
+      if (s.wallet.walletType !== 'generated') {
+        console.error(`Sniper ${s.id} (${s.name}) wallet is not a generated wallet - skipping`);
+        return false;
+      }
+
+      // Wallet must belong to the sniper's user
+      if (s.wallet.userId !== s.userId) {
+        console.error(`Sniper ${s.id} (${s.name}) wallet ownership mismatch - skipping`);
+        return false;
+      }
+
+      return true;
+    });
+
+    return validSnipers.map((s: typeof snipers[number]) => ({
       id: s.id,
       userId: s.userId,
       walletId: s.walletId,
@@ -203,6 +238,8 @@ export class SnipeOrchestrator {
     config: SniperConfig,
     migration: MigrationEvent & { detectedAt: number }
   ): Promise<boolean> {
+    const tokenLabel = migration.tokenSymbol || migration.tokenMint.slice(0, 8);
+
     // CRITICAL: Reject stale migrations - only snipe real-time events
     // This prevents sniping historical tokens on startup or reconnection
     const MAX_MIGRATION_AGE_MS = 30_000; // 30 seconds max age
@@ -210,15 +247,21 @@ export class SnipeOrchestrator {
 
     if (migrationAge > MAX_MIGRATION_AGE_MS) {
       console.log(
-        `Rejecting stale migration: ${migration.tokenSymbol || migration.tokenMint} ` +
-        `(age: ${Math.round(migrationAge / 1000)}s, max: ${MAX_MIGRATION_AGE_MS / 1000}s)`
+        `      ⏱️  FILTER FAIL: Stale migration (age: ${Math.round(migrationAge / 1000)}s > max ${MAX_MIGRATION_AGE_MS / 1000}s)`
       );
       return false;
     }
+    console.log(`      ✓ Migration age OK (${Math.round(migrationAge / 1000)}s)`);
 
     // Check minimum liquidity
-    if (config.minLiquiditySol && migration.initialLiquiditySol < config.minLiquiditySol) {
-      return false;
+    if (config.minLiquiditySol) {
+      if (migration.initialLiquiditySol < config.minLiquiditySol) {
+        console.log(
+          `      ⏱️  FILTER FAIL: Liquidity ${migration.initialLiquiditySol} SOL < min ${config.minLiquiditySol} SOL`
+        );
+        return false;
+      }
+      console.log(`      ✓ Liquidity OK (${migration.initialLiquiditySol} SOL >= ${config.minLiquiditySol} SOL)`);
     }
 
     // Check name patterns (if any match, include)
@@ -232,8 +275,12 @@ export class SnipeOrchestrator {
       });
 
       if (!matches) {
+        console.log(
+          `      ⏱️  FILTER FAIL: Name/symbol doesn't match patterns [${config.namePatterns.join(', ')}]`
+        );
         return false;
       }
+      console.log(`      ✓ Name pattern matched`);
     }
 
     // Check excluded patterns (if any match, exclude)
@@ -247,8 +294,12 @@ export class SnipeOrchestrator {
       });
 
       if (excluded) {
+        console.log(
+          `      ⏱️  FILTER FAIL: Name/symbol matches excluded pattern`
+        );
         return false;
       }
+      console.log(`      ✓ Not in excluded patterns`);
     }
 
     // Check migration time filter
@@ -262,34 +313,39 @@ export class SnipeOrchestrator {
 
       if (migrationTimeMinutes > config.maxMigrationTimeMinutes) {
         console.log(
-          `Skipping ${migration.tokenSymbol}: migration time ${migrationTimeMinutes}m exceeds max ${config.maxMigrationTimeMinutes}m`
+          `      ⏱️  FILTER FAIL: Migration time ${migrationTimeMinutes.toFixed(1)}m > max ${config.maxMigrationTimeMinutes}m`
         );
         return false;
       }
+      console.log(`      ✓ Migration time OK (${migrationTimeMinutes.toFixed(1)}m <= ${config.maxMigrationTimeMinutes}m)`);
     }
 
     // Check volume filter
     if (config.minVolumeUsd) {
+      console.log(`      🔄 Fetching volume data...`);
       const volumeData = await tokenInfoService.getTokenVolume(migration.tokenMint);
 
       if (!tokenInfoService.meetsVolumeCriteria(volumeData, config.minVolumeUsd)) {
         console.log(
-          `Skipping ${migration.tokenSymbol}: volume $${volumeData?.volumeUsdTotal || 0} below min $${config.minVolumeUsd}`
+          `      ⏱️  FILTER FAIL: Volume $${volumeData?.volumeUsdTotal?.toFixed(0) || 0} < min $${config.minVolumeUsd}`
         );
         return false;
       }
+      console.log(`      ✓ Volume OK ($${volumeData?.volumeUsdTotal?.toFixed(0) || 0} >= $${config.minVolumeUsd})`);
     }
 
     // Check max market cap filter
     if (config.maxMarketCapUsd) {
+      console.log(`      🔄 Fetching market cap data...`);
       const marketData = await tokenInfoService.getTokenMarketData(migration.tokenMint);
 
       if (!tokenInfoService.meetsMarketCapCriteria(marketData, config.maxMarketCapUsd)) {
         console.log(
-          `Skipping ${migration.tokenSymbol}: market cap $${marketData?.marketCapUsd || 0} exceeds max $${config.maxMarketCapUsd}`
+          `      ⏱️  FILTER FAIL: Market cap $${marketData?.marketCapUsd?.toFixed(0) || 0} > max $${config.maxMarketCapUsd}`
         );
         return false;
       }
+      console.log(`      ✓ Market cap OK ($${marketData?.marketCapUsd?.toFixed(0) || 0} <= $${config.maxMarketCapUsd})`);
     }
 
     // Check holder count, dev holdings, top 10 concentration, and social filters
@@ -302,36 +358,40 @@ export class SnipeOrchestrator {
       config.requireWebsite;
 
     if (needsTokenAnalysis) {
+      console.log(`      🔄 Fetching token analysis...`);
       const tokenAnalysis = await tokenAnalysisService.getTokenAnalysis(migration.tokenMint);
 
       // Check minimum holder count
       if (config.minHolderCount) {
         if (!tokenAnalysisService.meetsHolderCountCriteria(tokenAnalysis, config.minHolderCount)) {
           console.log(
-            `Skipping ${migration.tokenSymbol}: holder count ${tokenAnalysis?.holderCount || 0} below min ${config.minHolderCount}`
+            `      ⏱️  FILTER FAIL: Holder count ${tokenAnalysis?.holderCount || 0} < min ${config.minHolderCount}`
           );
           return false;
         }
+        console.log(`      ✓ Holder count OK (${tokenAnalysis?.holderCount || 0} >= ${config.minHolderCount})`);
       }
 
       // Check max dev wallet holdings
       if (config.maxDevHoldingsPct) {
         if (!tokenAnalysisService.meetsDevHoldingsCriteria(tokenAnalysis, config.maxDevHoldingsPct)) {
           console.log(
-            `Skipping ${migration.tokenSymbol}: dev holdings ${tokenAnalysis?.devHoldingsPct || 0}% exceeds max ${config.maxDevHoldingsPct}%`
+            `      ⏱️  FILTER FAIL: Dev holdings ${tokenAnalysis?.devHoldingsPct?.toFixed(1) || 0}% > max ${config.maxDevHoldingsPct}%`
           );
           return false;
         }
+        console.log(`      ✓ Dev holdings OK (${tokenAnalysis?.devHoldingsPct?.toFixed(1) || 0}% <= ${config.maxDevHoldingsPct}%)`);
       }
 
       // Check max top 10 wallet concentration
       if (config.maxTop10HoldingsPct) {
         if (!tokenAnalysisService.meetsTop10Criteria(tokenAnalysis, config.maxTop10HoldingsPct)) {
           console.log(
-            `Skipping ${migration.tokenSymbol}: top 10 holdings ${tokenAnalysis?.top10HoldingsPct || 0}% exceeds max ${config.maxTop10HoldingsPct}%`
+            `      ⏱️  FILTER FAIL: Top 10 holdings ${tokenAnalysis?.top10HoldingsPct?.toFixed(1) || 0}% > max ${config.maxTop10HoldingsPct}%`
           );
           return false;
         }
+        console.log(`      ✓ Top 10 holdings OK (${tokenAnalysis?.top10HoldingsPct?.toFixed(1) || 0}% <= ${config.maxTop10HoldingsPct}%)`);
       }
 
       // Check social presence requirements
@@ -349,14 +409,16 @@ export class SnipeOrchestrator {
           if (config.requireTelegram && !tokenAnalysis?.socials.telegram) missing.push('Telegram');
           if (config.requireWebsite && !tokenAnalysis?.socials.website) missing.push('Website');
           console.log(
-            `Skipping ${migration.tokenSymbol}: missing required socials: ${missing.join(', ')}`
+            `      ⏱️  FILTER FAIL: Missing required socials: ${missing.join(', ')}`
           );
           return false;
         }
+        console.log(`      ✓ Social requirements met`);
       }
     }
 
     // All criteria passed
+    console.log(`      ✅ ALL FILTERS PASSED`);
     return true;
   }
 
