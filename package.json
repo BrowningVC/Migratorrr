@@ -14,6 +14,8 @@
     "build": "npm run build:web && npm run build:server",
     "build:web": "npm -w @migratorrr/web run build",
     "build:server": "npm -w @migratorrr/server run build",
+    "start": "npm run db:push && npm -w @migratorrr/server run start",
+    "start:server": "npm -w @migratorrr/server run start",
     "lint": "npm run lint --workspaces",
     "clean": "npm run clean --workspaces",
     "db:generate": "npm -w @migratorrr/server run db:generate",

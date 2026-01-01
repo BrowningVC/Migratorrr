@@ -8,4 +8,4 @@ cmds = ["npm install --ignore-scripts", "npm rebuild"]
 cmds = ["npm run db:generate", "npm run build:server"]
 
 [start]
-cmd = "npm run db:push && npm -w @migratorrr/server run start"
+cmd = "npm run db:push && cd apps/server && npm run start"
