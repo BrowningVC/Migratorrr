@@ -4,7 +4,7 @@ import { useMemo, memo, useState, useEffect, useRef, useCallback } from 'react';
 import { useActivityStore, ActivityEntry } from '@/lib/stores/activity';
 import { useMigrationsStore, Migration } from '@/lib/stores/migrations';
 import { useAuthStore } from '@/lib/stores/auth';
-import { sniperApi } from '@/lib/api';
+import { sniperApi, statsApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Check, X, Copy, ExternalLink, Radio, Crosshair } from 'lucide-react';
@@ -257,12 +257,14 @@ export function ActivityLog() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [newMigrationIds, setNewMigrationIds] = useState<Set<string>>(new Set());
   const [hasFetchedActivity, setHasFetchedActivity] = useState(false);
+  const [hasFetchedMigrations, setHasFetchedMigrations] = useState(false);
 
   const token = useAuthStore((state) => state.token);
   const entries = useActivityStore((state) => state.entries);
   const mergeEntries = useActivityStore((state) => state.mergeEntries);
   const activityHydrated = useActivityStore((state) => state._hasHydrated);
   const migrations = useMigrationsStore((state) => state.migrations);
+  const setMigrations = useMigrationsStore((state) => state.setMigrations);
   const updateMigrationMetadata = useMigrationsStore((state) => state.updateMigrationMetadata);
   const migrationsHydrated = useMigrationsStore((state) => state._hasHydrated);
 
@@ -315,6 +317,47 @@ export function ActivityLog() {
         console.error('Failed to fetch activity:', err);
       });
   }, [activityHydrated, token, mergeEntries, hasFetchedActivity]);
+
+  // Fetch recent PumpFun migrations from API on mount
+  // This ensures users see migrations that happened while they were away
+  useEffect(() => {
+    if (!migrationsHydrated || hasFetchedMigrations) return;
+    setHasFetchedMigrations(true);
+
+    statsApi.getPumpFunMigrations(50)
+      .then((res) => {
+        if (res.success && res.data && Array.isArray(res.data)) {
+          // Convert API response to Migration format and merge with existing
+          const apiMigrations: Migration[] = res.data.map((m) => ({
+            id: m.id,
+            tokenMint: m.tokenMint,
+            tokenSymbol: m.tokenSymbol,
+            tokenName: m.tokenName,
+            poolAddress: m.poolAddress || undefined,
+            detectionLatencyMs: m.detectionLatencyMs || undefined,
+            source: m.source,
+            timestamp: m.timestamp,
+            sniped: m.sniped,
+            snipeSuccess: m.snipeSuccess,
+          }));
+
+          // Merge with existing migrations (API data as base, preserve local updates)
+          const existingMints = new Set(migrations.map((m) => m.tokenMint));
+          const newMigrations = apiMigrations.filter((m) => !existingMints.has(m.tokenMint));
+
+          if (newMigrations.length > 0) {
+            // Combine existing (which may have newer WebSocket updates) with new from API
+            const combined = [...migrations, ...newMigrations]
+              .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+              .slice(0, 100);
+            setMigrations(combined);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch migrations:', err);
+      });
+  }, [migrationsHydrated, hasFetchedMigrations, migrations, setMigrations]);
 
   // Track new migrations for highlighting
   useEffect(() => {

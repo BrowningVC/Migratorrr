@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_22", "npm-9_x", "python3", "gcc", "pkg-config", "libudev-zero"]
+
+[phases.install]
+cmds = ["npm install --ignore-scripts", "npm rebuild"]
+
+[phases.build]
+cmds = ["npm run db:generate", "npm run build:server"]
+
+[start]
+cmd = "npm run db:push && npm -w @migratorrr/server run start"

@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500">
+  <!-- Twitter cover dimensions: 1500x500 -->
+  <defs>
+    <!-- Import Space Grotesk font -->
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;display=swap');
+    </style>
+    <!-- Background gradient - dark with subtle blue tint -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0d14"/>
+      <stop offset="50%" stop-color="#0f1318"/>
+      <stop offset="100%" stop-color="#0a0d14"/>
+    </linearGradient>
+
+    <!-- Green glow gradient -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22C55E" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Text glow filter -->
+    <filter id="textGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="500" fill="url(#bgGrad)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03">
+    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#22C55E" stroke-width="1"/>
+    </pattern>
+    <rect width="1500" height="500" fill="url(#grid)"/>
+  </g>
+
+  <!-- Animated-looking decorative elements - trading/chart vibes -->
+  <g opacity="0.15">
+    <!-- Rising line chart pattern on left -->
+    <polyline points="50,400 150,350 250,380 350,280 450,320 550,200"
+              stroke="#22C55E" stroke-width="2" fill="none"/>
+    <!-- Rising line chart pattern on right -->
+    <polyline points="950,380 1050,300 1150,340 1250,240 1350,280 1450,150"
+              stroke="#22C55E" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- Central glow effect -->
+  <ellipse cx="750" cy="250" rx="450" ry="220" fill="url(#glowGrad)"/>
+
+  <!-- Logo arrow icon + Brand name -->
+  <g filter="url(#textGlow)">
+    <!-- Arrow logo to the left of text -->
+    <g transform="translate(430, 120)">
+      <path d="M30 70 L50 20 L70 70 L50 55 Z" fill="#22C55E"/>
+    </g>
+    <text x="780" y="200"
+          font-family="'Space Grotesk', system-ui, sans-serif"
+          font-size="90"
+          font-weight="700"
+          fill="white"
+          text-anchor="middle"
+          letter-spacing="-2">
+      Migratorrr
+    </text>
+  </g>
+
+  <!-- Main tagline - emphasizing migration sniping -->
+  <text x="750" y="270"
+        font-family="'Space Grotesk', system-ui, sans-serif"
+        font-size="28"
+        font-weight="600"
+        fill="#22C55E"
+        text-anchor="middle">
+    Fully Automated Newly Migrated Token Sniping
+  </text>
+
+  <!-- Feature highlights -->
+  <g font-family="'Space Grotesk', system-ui, sans-serif"
+     font-size="18"
+     font-weight="500"
+     fill="#9ca3af">
+    <!-- Feature 1 -->
+    <g transform="translate(380, 340)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Custom Filters</text>
+    </g>
+    <!-- Feature 2 -->
+    <g transform="translate(580, 340)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Auto TP/SL</text>
+    </g>
+    <!-- Feature 3 -->
+    <g transform="translate(760, 340)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Trailing Stop</text>
+    </g>
+    <!-- Feature 4 -->
+    <g transform="translate(940, 340)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Multi-Sniper</text>
+    </g>
+  </g>
+
+  <!-- Beta badge - top right area -->
+  <g transform="translate(1380, 30)">
+    <rect x="0" y="0" width="70" height="28" rx="4" fill="#22C55E" opacity="0.2"/>
+    <rect x="0" y="0" width="70" height="28" rx="4" fill="none" stroke="#22C55E" stroke-width="1"/>
+    <text x="35" y="19"
+          font-family="'Space Grotesk', system-ui, sans-serif"
+          font-size="14"
+          font-weight="600"
+          fill="#22C55E"
+          text-anchor="middle">
+      Beta
+    </text>
+  </g>
+
+  <!-- Bottom accent bar -->
+  <rect x="0" y="495" width="1500" height="5" fill="#22C55E" opacity="0.6"/>
+
+  <!-- Decorative dots pattern -->
+  <g opacity="0.1">
+    <circle cx="100" cy="100" r="3" fill="#22C55E"/>
+    <circle cx="150" cy="80" r="2" fill="#22C55E"/>
+    <circle cx="200" cy="120" r="2.5" fill="#22C55E"/>
+    <circle cx="1300" cy="100" r="3" fill="#22C55E"/>
+    <circle cx="1350" cy="130" r="2" fill="#22C55E"/>
+    <circle cx="1400" cy="90" r="2.5" fill="#22C55E"/>
+  </g>
+</svg>

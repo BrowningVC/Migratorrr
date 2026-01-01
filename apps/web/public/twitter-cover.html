@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: #0a0d14;
+    }
+    .cover {
+      width: 1500px;
+      height: 500px;
+      background: linear-gradient(135deg, #0a0d14 0%, #0f1318 50%, #0a0d14 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image:
+        linear-gradient(rgba(34, 197, 94, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 197, 94, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+    .glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 900px;
+      height: 440px;
+      background: radial-gradient(ellipse, rgba(34, 197, 94, 0.25) 0%, transparent 70%);
+    }
+    .content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding-top: 20px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    .logo {
+      width: 60px;
+      height: 60px;
+    }
+    .logo svg {
+      filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.5));
+    }
+    .title {
+      font-size: 90px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: -2px;
+      text-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
+    }
+    .tagline {
+      font-size: 28px;
+      font-weight: 600;
+      color: #22C55E;
+      margin-bottom: 50px;
+    }
+    .features {
+      display: flex;
+      gap: 40px;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 500;
+      color: #9ca3af;
+    }
+    .feature-dot {
+      width: 8px;
+      height: 8px;
+      background: #22C55E;
+      border-radius: 50%;
+    }
+    .beta {
+      position: absolute;
+      top: 30px;
+      right: 50px;
+      padding: 6px 16px;
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid #22C55E;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #22C55E;
+    }
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background: #22C55E;
+      opacity: 0.6;
+    }
+    /* Chart lines */
+    .chart-left, .chart-right {
+      position: absolute;
+      bottom: 100px;
+      stroke: #22C55E;
+      stroke-width: 2;
+      fill: none;
+      opacity: 0.15;
+    }
+    .chart-left { left: 50px; }
+    .chart-right { right: 50px; }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <div class="grid"></div>
+    <div class="glow"></div>
+
+    <svg class="chart-left" width="500" height="200" viewBox="0 0 500 200">
+      <polyline points="0,150 100,100 200,130 300,30 400,70 500,0" />
+    </svg>
+    <svg class="chart-right" width="500" height="200" viewBox="0 0 500 200">
+      <polyline points="0,130 100,50 200,90 300,0 400,40 500,0" />
+    </svg>
+
+    <div class="content">
+      <div class="brand">
+        <div class="logo">
+          <svg viewBox="0 0 48 48" fill="none">
+            <path d="M8 38 L24 10 L40 38 L24 28 Z" fill="#22C55E"/>
+          </svg>
+        </div>
+        <span class="title">Migratorrr</span>
+      </div>
+      <div class="tagline">Fully Automated Newly Migrated Token Sniping</div>
+      <div class="features">
+        <div class="feature"><div class="feature-dot"></div>Custom Filters</div>
+        <div class="feature"><div class="feature-dot"></div>Auto TP/SL</div>
+        <div class="feature"><div class="feature-dot"></div>Trailing Stop</div>
+        <div class="feature"><div class="feature-dot"></div>Multi-Sniper</div>
+      </div>
+    </div>
+
+    <div class="beta">Beta</div>
+    <div class="bottom-bar"></div>
+  </div>
+</body>
+</html>

@@ -18,16 +18,38 @@ const WORKFLOW_STEPS = [
   { id: 4, label: 'Take Profit', sublabel: 'Sniper executes sell transaction based on user profit settings', icon: 'profit' },
 ];
 
+const TAGLINE = 'Exploiting PumpFun Profitability';
+
 export default function LandingPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isSniperModalOpen, setIsSniperModalOpen] = useState(false);
   const [activeStep, setActiveStep] = useState(1); // Start at 1 so first box is green on load
+  const [taglineIndex, setTaglineIndex] = useState(0);
   const { isAuthenticated, hasCompletedOnboarding, _hasHydrated: authHydrated } = useAuthStore();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Typewriter effect for tagline
+  useEffect(() => {
+    if (!mounted) return;
+
+    // If finished typing, wait 3 seconds then reset
+    if (taglineIndex >= TAGLINE.length) {
+      const resetTimeout = setTimeout(() => {
+        setTaglineIndex(0);
+      }, 3000); // 3 second pause before restarting
+      return () => clearTimeout(resetTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      setTaglineIndex(prev => prev + 1);
+    }, 50); // 50ms per character
+
+    return () => clearTimeout(timeout);
+  }, [mounted, taglineIndex]);
 
   // Handle Dashboard click - go to dashboard if authenticated with sniper, otherwise open modal
   const handleDashboardClick = () => {
@@ -74,6 +96,10 @@ export default function LandingPage() {
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Logo size="md" />
             <LogoText size="md" />
+            <span className="hidden sm:inline-block text-xs text-green-500/70 border-l border-green-800/50 pl-2 ml-1 font-mono">
+              {TAGLINE.slice(0, taglineIndex)}
+              <span className="animate-pulse">|</span>
+            </span>
           </Link>
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={handleDashboardClick}>
@@ -102,7 +128,8 @@ export default function LandingPage() {
               {/* Main heading with code styling */}
               <div className="space-y-2">
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-                  <span className="text-zinc-100">Snipe </span>
+                  <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">Automated Sniping</span>
+                  <span className="text-zinc-100"> on </span>
                   <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">Migrations</span>
                   <span className="text-zinc-100"> With</span>
                 </h1>
@@ -262,7 +289,7 @@ export default function LandingPage() {
                 <div className="mt-4 p-4 rounded-xl border border-zinc-800 bg-zinc-900/50">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-zinc-100">$MIGRATE</span>
+                      <span className="text-sm font-semibold text-zinc-100">$MIGRATOR</span>
                       <span className="px-2 py-0.5 text-xs font-medium bg-yellow-500/20 text-yellow-400 rounded">
                         Coming Soon
                       </span>

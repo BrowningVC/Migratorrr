@@ -396,4 +396,19 @@ export const statsApi = {
       snipedCount: number;
       migrationTime: string;
     }>>('/api/stats/recent-migrations'),
+
+  // Get PumpFun migrations for dashboard Activity Log
+  getPumpFunMigrations: (limit = 50) =>
+    fetchApi<Array<{
+      id: string;
+      tokenMint: string;
+      tokenSymbol: string | null;
+      tokenName: string | null;
+      poolAddress: string | null;
+      detectionLatencyMs: number | null;
+      source: string;
+      timestamp: string;
+      sniped: boolean;
+      snipeSuccess?: boolean;
+    }>>(`/api/stats/pumpfun-migrations?limit=${limit}`),
 };

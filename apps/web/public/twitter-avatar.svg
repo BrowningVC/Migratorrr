@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <!-- Background - dark with subtle gradient -->
+  <defs>
+    <radialGradient id="bgGradient" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1a1f2e"/>
+      <stop offset="100%" stop-color="#0a0d14"/>
+    </radialGradient>
+    <!-- Glow effect for logo -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Full background rectangle -->
+  <rect x="0" y="0" width="400" height="400" fill="url(#bgGradient)"/>
+
+  <!-- Subtle grid pattern for tech feel -->
+  <g opacity="0.05">
+    <line x1="100" y1="0" x2="100" y2="400" stroke="#22C55E" stroke-width="1"/>
+    <line x1="200" y1="0" x2="200" y2="400" stroke="#22C55E" stroke-width="1"/>
+    <line x1="300" y1="0" x2="300" y2="400" stroke="#22C55E" stroke-width="1"/>
+    <line x1="0" y1="100" x2="400" y2="100" stroke="#22C55E" stroke-width="1"/>
+    <line x1="0" y1="200" x2="400" y2="200" stroke="#22C55E" stroke-width="1"/>
+    <line x1="0" y1="300" x2="400" y2="300" stroke="#22C55E" stroke-width="1"/>
+  </g>
+
+  <!-- Main logo - scaled up arrow mark with glow -->
+  <g filter="url(#glow)">
+    <path
+      d="M80 300 L200 80 L320 300 L200 220 Z"
+      fill="#22C55E"
+    />
+  </g>
+
+  <!-- Subtle accent line at bottom -->
+  <line x1="120" y1="340" x2="280" y2="340" stroke="#22C55E" stroke-width="3" opacity="0.4"/>
+</svg>
