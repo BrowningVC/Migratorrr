@@ -1963,7 +1963,7 @@ export class TransactionExecutor {
 
     // Fetch token metadata from DexScreener/Jupiter (for symbol/name if not provided)
     // Only fetch if we don't have the data from migration event
-    let tokenMetadata = null;
+    let tokenMetadata: { symbol?: string; name?: string } | null = null;
     if (!tokenSymbol || !tokenName) {
       tokenMetadata = await tokenInfoService.getTokenMetadata(tokenMint).catch(() => null);
     }
