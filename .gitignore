@@ -36,3 +36,10 @@ coverage
 # Misc
 *.pem
 .turbo
+
+# Debug/test scripts (development only)
+apps/server/*.mjs
+apps/server/scripts/
+
+# Temp build artifacts
+*.tsbuildinfo
