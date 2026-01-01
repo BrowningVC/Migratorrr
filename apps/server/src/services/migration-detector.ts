@@ -187,6 +187,16 @@ export class MigrationDetector extends EventEmitter {
           this.lastMessageTime = Date.now();
           try {
             const message = JSON.parse(data.toString());
+            // Debug: Log all incoming messages to see what we're receiving
+            if (message.method === 'logsNotification') {
+              const logs = message.params?.result?.value?.logs || [];
+              const hasMigrate = logs.some((log: string) => log === 'Program log: Instruction: Migrate');
+              console.log(`[WS] logsNotification received (${logs.length} logs, migrate: ${hasMigrate})`);
+            } else if (message.result !== undefined) {
+              console.log(`[WS] Subscription confirmed: ${message.result}`);
+            } else {
+              console.log(`[WS] Other message: ${JSON.stringify(message).slice(0, 100)}`);
+            }
             this.handleHeliusMessage(message);
           } catch (error) {
             console.error('Failed to parse Helius message:', error);
