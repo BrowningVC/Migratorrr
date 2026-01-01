@@ -81,8 +81,8 @@ export default function HowItWorksPage() {
             <Link href="/dashboard">
               <Button variant="ghost">Dashboard</Button>
             </Link>
-            <Link href="/migrator">
-              <Button variant="ghost">$MIGRATOR</Button>
+            <Link href="/buybacks">
+              <Button variant="ghost">$MIGRATOR Buybacks</Button>
             </Link>
             <Link href="/how-it-works">
               <Button variant="ghost" className="text-primary">How it Works</Button>
@@ -663,8 +663,8 @@ export default function HowItWorksPage() {
               <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Dashboard
               </Link>
-              <Link href="/migrator" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                $MIGRATOR
+              <Link href="/buybacks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                $MIGRATOR Buybacks
               </Link>
               <Link href="/how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 How it Works

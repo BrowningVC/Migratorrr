@@ -32,14 +32,17 @@ export type SocketEventType =
   | 'sniper:paused'
   | 'migration:detected'
   | 'migration:matched'
+  | 'migration:update'
   | 'snipe:started'
   | 'snipe:submitted'
   | 'snipe:success'
   | 'snipe:failed'
   | 'snipe:retrying'
+  | 'position:opened'
   | 'position:take_profit'
   | 'position:stop_loss'
   | 'position:trailing_stop'
+  | 'position:manual_sell'
   | 'position:closed'
   | 'price:update';
 
@@ -66,5 +69,13 @@ export interface SocketEventData {
   detectionLatencyMs?: number;
   detectedBy?: string;
   source?: string;
+  // Position event fields
+  id?: string;
+  positionId?: string;
+  entrySol?: number;
+  entryTokenAmount?: number;
+  currentTokenAmount?: number;
+  entryMarketCap?: number | null;
+  createdAt?: string;
   [key: string]: unknown;
 }

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
 import { useAuthStore } from '@/lib/stores/auth';
-import { useWalletsStore } from '@/lib/stores/wallets';
+import { useWalletsStore, Wallet as WalletType } from '@/lib/stores/wallets';
 import { useSnipersStore, Sniper, SniperConfig } from '@/lib/stores/snipers';
 import { sniperApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,6 @@ const DEFAULT_CONFIG: SniperConfig = {
   takeProfitPct: 100, // 2x
   stopLossPct: 50,
   trailingStopPct: undefined,
-  minLiquiditySol: 5,
   mevProtection: true, // Enabled by default
 };
 
@@ -39,7 +38,7 @@ export function CreateSniperModal({
   onCreated,
 }: CreateSniperModalProps) {
   const { token } = useAuthStore();
-  const { wallets } = useWalletsStore();
+  const { wallets, _hasHydrated: walletsHydrated } = useWalletsStore();
   const { addSniper } = useSnipersStore();
 
   const [step, setStep] = useState<Step>('basics');
@@ -48,17 +47,35 @@ export function CreateSniperModal({
 
   // Form state
   const [name, setName] = useState('');
-  const [selectedWalletId, setSelectedWalletId] = useState(
-    wallets.find((w) => w.walletType === 'generated')?.id || wallets[0]?.id || ''
-  );
+  const [selectedWalletId, setSelectedWalletId] = useState('');
   const [config, setConfig] = useState<SniperConfig>(DEFAULT_CONFIG);
 
-  // Validation errors for buy settings
+  // Update selectedWalletId when wallets load/hydrate
+  useEffect(() => {
+    if (walletsHydrated && wallets.length > 0 && !selectedWalletId) {
+      const defaultWallet = wallets.find((w) => w.walletType === 'generated') || wallets[0];
+      if (defaultWallet) {
+        setSelectedWalletId(defaultWallet.id);
+      }
+    }
+  }, [walletsHydrated, wallets, selectedWalletId]);
+
+  // Validation errors for buy settings and exit strategy
   const [validationErrors, setValidationErrors] = useState<{
     snipeAmountSol?: boolean;
     slippageBps?: boolean;
     priorityFeeSol?: boolean;
+    takeProfitPct?: boolean;
+    stopLossPct?: boolean;
   }>({});
+
+  // String input states for better UX (allows typing any value)
+  const [snipeAmountInput, setSnipeAmountInput] = useState(String(DEFAULT_CONFIG.snipeAmountSol));
+  const [slippageInput, setSlippageInput] = useState(String(DEFAULT_CONFIG.slippageBps / 100));
+  const [priorityFeeInput, setPriorityFeeInput] = useState(String(DEFAULT_CONFIG.priorityFeeSol));
+  const [takeProfitInput, setTakeProfitInput] = useState(String(DEFAULT_CONFIG.takeProfitPct));
+  const [stopLossInput, setStopLossInput] = useState(String(DEFAULT_CONFIG.stopLossPct));
+  const [trailingStopInput, setTrailingStopInput] = useState('');
 
   const steps: Step[] = ['basics', 'buying', 'selling', 'filters', 'review'];
   const stepIndex = steps.indexOf(step);
@@ -79,16 +96,60 @@ export function CreateSniperModal({
   const handleNext = () => {
     // Validate buy settings before proceeding
     if (step === 'buying') {
+      // Parse the string inputs to get final values
+      const snipeAmount = parseFloat(snipeAmountInput) || 0;
+      const slippagePct = parseFloat(slippageInput) || 0;
+      const priorityFee = parseFloat(priorityFeeInput) || 0;
+
+      // Update config with parsed values
+      updateConfig({
+        snipeAmountSol: snipeAmount,
+        slippageBps: Math.round(slippagePct * 100),
+        priorityFeeSol: priorityFee,
+      });
+
       const errors: typeof validationErrors = {};
 
-      if (config.snipeAmountSol < 0.1) {
+      if (snipeAmount < 0.1) {
         errors.snipeAmountSol = true;
       }
-      if (config.slippageBps < 1000) { // 10% minimum
+      if (slippagePct < 10) { // 10% minimum
         errors.slippageBps = true;
       }
-      if (config.priorityFeeSol < 0.003) {
+      if (priorityFee < 0.003) {
         errors.priorityFeeSol = true;
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        toast.error('Please fix the highlighted fields');
+        return;
+      }
+
+      setValidationErrors({});
+    }
+
+    // Validate exit strategy settings before proceeding
+    if (step === 'selling') {
+      // Parse the string inputs to get final values
+      const takeProfit = parseFloat(takeProfitInput) || 0;
+      const stopLoss = parseFloat(stopLossInput) || 0;
+      const trailingStop = trailingStopInput ? parseFloat(trailingStopInput) : undefined;
+
+      // Update config with parsed values
+      updateConfig({
+        takeProfitPct: takeProfit,
+        stopLossPct: stopLoss,
+        trailingStopPct: trailingStop,
+      });
+
+      const errors: typeof validationErrors = {};
+
+      if (takeProfit < 10 || takeProfit > 10000) {
+        errors.takeProfitPct = true;
+      }
+      if (stopLoss < 5 || stopLoss > 95) {
+        errors.stopLossPct = true;
       }
 
       if (Object.keys(errors).length > 0) {
@@ -179,12 +240,23 @@ export function CreateSniperModal({
     setName('');
     setConfig(DEFAULT_CONFIG);
     setCreatedSniper(null);
+    setValidationErrors({});
+    // Reset string inputs
+    setSnipeAmountInput(String(DEFAULT_CONFIG.snipeAmountSol));
+    setSlippageInput(String(DEFAULT_CONFIG.slippageBps / 100));
+    setPriorityFeeInput(String(DEFAULT_CONFIG.priorityFeeSol));
+    setTakeProfitInput(String(DEFAULT_CONFIG.takeProfitPct));
+    setStopLossInput(String(DEFAULT_CONFIG.stopLossPct));
+    setTrailingStopInput('');
     onClose();
   };
 
   if (!isOpen) return null;
 
-  const generatedWallets = wallets.filter((w) => w.walletType === 'generated');
+  // Only access wallets after store has hydrated
+  const generatedWallets = walletsHydrated
+    ? wallets.filter((w) => w.walletType === 'generated')
+    : [];
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -245,7 +317,12 @@ export function CreateSniperModal({
 
               <div className="space-y-2">
                 <Label>Trading Wallet</Label>
-                {generatedWallets.length === 0 ? (
+                {!walletsHydrated ? (
+                  <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3 animate-pulse">
+                    <div className="h-4 bg-zinc-700 rounded w-24 mb-2"></div>
+                    <div className="h-3 bg-zinc-700/50 rounded w-32"></div>
+                  </div>
+                ) : generatedWallets.length === 0 ? (
                   <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-lg p-3">
                     <p className="text-yellow-400 text-sm">
                       You need to generate a trading wallet first. Go to Settings to create one.
@@ -296,20 +373,29 @@ export function CreateSniperModal({
                 </Label>
                 <Input
                   id="takeProfit"
-                  type="number"
-                  step="10"
-                  min="10"
-                  max="10000"
-                  value={config.takeProfitPct}
-                  onChange={(e) =>
-                    updateConfig({
-                      takeProfitPct: Math.max(10, parseFloat(e.target.value) || 100),
-                    })
-                  }
-                  className="bg-zinc-800 border-zinc-700"
+                  type="text"
+                  inputMode="decimal"
+                  value={takeProfitInput}
+                  onChange={(e) => {
+                    // Allow free typing - validation happens on Next
+                    setTakeProfitInput(e.target.value);
+                    // Clear error when user starts typing
+                    if (validationErrors.takeProfitPct) {
+                      setValidationErrors(prev => ({ ...prev, takeProfitPct: false }));
+                    }
+                  }}
+                  className={cn(
+                    "bg-zinc-800 border-zinc-700",
+                    validationErrors.takeProfitPct && "border-red-500 focus:border-red-500 focus:ring-red-500"
+                  )}
                 />
-                <p className="text-xs text-zinc-500">
-                  Automatically sell when profit reaches this % (100% = 2x, 200% = 3x)
+                <p className={cn(
+                  "text-xs",
+                  validationErrors.takeProfitPct ? "text-red-400" : "text-zinc-500"
+                )}>
+                  {validationErrors.takeProfitPct
+                    ? "Take profit must be between 10% and 10000%"
+                    : "Automatically sell when profit reaches this % (100% = 2x, 200% = 3x)"}
                 </p>
               </div>
 
@@ -346,20 +432,29 @@ export function CreateSniperModal({
                 </Label>
                 <Input
                   id="stopLoss"
-                  type="number"
-                  step="5"
-                  min="5"
-                  max="95"
-                  value={config.stopLossPct}
-                  onChange={(e) =>
-                    updateConfig({
-                      stopLossPct: Math.min(95, Math.max(5, parseFloat(e.target.value) || 50)),
-                    })
-                  }
-                  className="bg-zinc-800 border-zinc-700"
+                  type="text"
+                  inputMode="decimal"
+                  value={stopLossInput}
+                  onChange={(e) => {
+                    // Allow free typing - validation happens on Next
+                    setStopLossInput(e.target.value);
+                    // Clear error when user starts typing
+                    if (validationErrors.stopLossPct) {
+                      setValidationErrors(prev => ({ ...prev, stopLossPct: false }));
+                    }
+                  }}
+                  className={cn(
+                    "bg-zinc-800 border-zinc-700",
+                    validationErrors.stopLossPct && "border-red-500 focus:border-red-500 focus:ring-red-500"
+                  )}
                 />
-                <p className="text-xs text-zinc-500">
-                  Sell when market cap drops this % from your entry (e.g., 50% = sell at half the MCAP you bought at)
+                <p className={cn(
+                  "text-xs",
+                  validationErrors.stopLossPct ? "text-red-400" : "text-zinc-500"
+                )}>
+                  {validationErrors.stopLossPct
+                    ? "Stop loss must be between 5% and 95%"
+                    : "Sell when market cap drops this % from your entry (e.g., 50% = sell at half the MCAP you bought at)"}
                 </p>
               </div>
 
@@ -370,16 +465,13 @@ export function CreateSniperModal({
                 </Label>
                 <Input
                   id="trailingStop"
-                  type="number"
-                  step="5"
-                  min="5"
-                  max="50"
-                  value={config.trailingStopPct || ''}
-                  onChange={(e) =>
-                    updateConfig({
-                      trailingStopPct: e.target.value ? parseFloat(e.target.value) : undefined,
-                    })
-                  }
+                  type="text"
+                  inputMode="decimal"
+                  value={trailingStopInput}
+                  onChange={(e) => {
+                    // Allow free typing - validation happens on Next
+                    setTrailingStopInput(e.target.value);
+                  }}
                   placeholder="Leave empty to disable"
                   className="bg-zinc-800 border-zinc-700"
                 />
@@ -432,20 +524,13 @@ export function CreateSniperModal({
                   id="snipeAmount"
                   type="text"
                   inputMode="decimal"
-                  value={config.snipeAmountSol}
+                  value={snipeAmountInput}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || val === '.') {
-                      updateConfig({ snipeAmountSol: 0 });
-                      return;
-                    }
-                    const parsed = parseFloat(val);
-                    if (!isNaN(parsed)) {
-                      updateConfig({ snipeAmountSol: parsed });
-                      // Clear error when user starts typing
-                      if (validationErrors.snipeAmountSol) {
-                        setValidationErrors(prev => ({ ...prev, snipeAmountSol: false }));
-                      }
+                    // Allow free typing - validation happens on Next
+                    setSnipeAmountInput(e.target.value);
+                    // Clear error when user starts typing
+                    if (validationErrors.snipeAmountSol) {
+                      setValidationErrors(prev => ({ ...prev, snipeAmountSol: false }));
                     }
                   }}
                   className={cn(
@@ -471,20 +556,13 @@ export function CreateSniperModal({
                   id="slippage"
                   type="text"
                   inputMode="decimal"
-                  value={config.slippageBps / 100}
+                  value={slippageInput}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || val === '.') {
-                      updateConfig({ slippageBps: 0 });
-                      return;
-                    }
-                    const parsed = parseFloat(val);
-                    if (!isNaN(parsed)) {
-                      updateConfig({ slippageBps: Math.round(parsed * 100) });
-                      // Clear error when user starts typing
-                      if (validationErrors.slippageBps) {
-                        setValidationErrors(prev => ({ ...prev, slippageBps: false }));
-                      }
+                    // Allow free typing - validation happens on Next
+                    setSlippageInput(e.target.value);
+                    // Clear error when user starts typing
+                    if (validationErrors.slippageBps) {
+                      setValidationErrors(prev => ({ ...prev, slippageBps: false }));
                     }
                   }}
                   className={cn(
@@ -510,20 +588,13 @@ export function CreateSniperModal({
                   id="priorityFee"
                   type="text"
                   inputMode="decimal"
-                  value={config.priorityFeeSol}
+                  value={priorityFeeInput}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || val === '.' || val === '0.' || val === '0.0' || val === '0.00') {
-                      updateConfig({ priorityFeeSol: parseFloat(val) || 0 });
-                      return;
-                    }
-                    const parsed = parseFloat(val);
-                    if (!isNaN(parsed)) {
-                      updateConfig({ priorityFeeSol: parsed });
-                      // Clear error when user starts typing
-                      if (validationErrors.priorityFeeSol) {
-                        setValidationErrors(prev => ({ ...prev, priorityFeeSol: false }));
-                      }
+                    // Allow free typing - validation happens on Next
+                    setPriorityFeeInput(e.target.value);
+                    // Clear error when user starts typing
+                    if (validationErrors.priorityFeeSol) {
+                      setValidationErrors(prev => ({ ...prev, priorityFeeSol: false }));
                     }
                   }}
                   placeholder="0.003"

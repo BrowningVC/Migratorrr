@@ -30,7 +30,6 @@ const DEFAULT_CONFIG: SniperConfig = {
   takeProfitPct: 100, // 2x
   stopLossPct: 50,
   trailingStopPct: undefined,
-  minLiquiditySol: 5,
   mevProtection: true, // Enabled by default
 };
 
@@ -50,11 +49,20 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   const [name, setName] = useState('My First Sniper');
   const [config, setConfig] = useState<SniperConfig>(DEFAULT_CONFIG);
 
+  // String input states for better UX (allows typing decimals freely)
+  const [snipeAmountInput, setSnipeAmountInput] = useState(String(DEFAULT_CONFIG.snipeAmountSol));
+  const [slippageInput, setSlippageInput] = useState(String(DEFAULT_CONFIG.slippageBps / 100));
+  const [priorityFeeInput, setPriorityFeeInput] = useState(String(DEFAULT_CONFIG.priorityFeeSol));
+  const [takeProfitInput, setTakeProfitInput] = useState(String(DEFAULT_CONFIG.takeProfitPct));
+  const [stopLossInput, setStopLossInput] = useState(String(DEFAULT_CONFIG.stopLossPct));
+  const [trailingStopInput, setTrailingStopInput] = useState('');
+
   // Check if user is authenticated with a GENERATED wallet (server can sign)
   // Connected wallets don't work for sniping - server needs signing authority
   // Only check after stores have hydrated from localStorage
   const storesHydrated = authHydrated && walletsHydrated;
-  const existingGeneratedWallet = wallets.find(w => w.walletType === 'generated');
+  // Only look for wallet after stores have hydrated
+  const existingGeneratedWallet = storesHydrated ? wallets.find(w => w.walletType === 'generated') : undefined;
   const hasExistingWallet = storesHydrated && isAuthenticated && token && !!existingGeneratedWallet;
 
   // Validation errors for buy settings
@@ -144,15 +152,27 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   const handleNext = () => {
     // Validate buy settings before proceeding
     if (step === 'buying') {
+      // Parse string inputs
+      const snipeAmount = parseFloat(snipeAmountInput) || 0;
+      const slippagePct = parseFloat(slippageInput) || 0;
+      const priorityFee = parseFloat(priorityFeeInput) || 0;
+
+      // Update config with parsed values
+      updateConfig({
+        snipeAmountSol: snipeAmount,
+        slippageBps: Math.round(slippagePct * 100),
+        priorityFeeSol: priorityFee,
+      });
+
       const errors: typeof validationErrors = {};
 
-      if (config.snipeAmountSol < 0.1) {
+      if (snipeAmount < 0.1) {
         errors.snipeAmountSol = true;
       }
-      if (config.slippageBps < 1000) { // 10% minimum
+      if (slippagePct < 10) { // 10% minimum
         errors.slippageBps = true;
       }
-      if (config.priorityFeeSol < 0.003) {
+      if (priorityFee < 0.003) {
         errors.priorityFeeSol = true;
       }
 
@@ -163,6 +183,20 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
       }
 
       setValidationErrors({});
+    }
+
+    // Validate exit strategy before proceeding
+    if (step === 'selling') {
+      const takeProfit = parseFloat(takeProfitInput) || 0;
+      const stopLoss = parseFloat(stopLossInput) || 0;
+      const trailingStop = trailingStopInput ? parseFloat(trailingStopInput) : undefined;
+
+      // Update config with parsed values
+      updateConfig({
+        takeProfitPct: takeProfit,
+        stopLossPct: stopLoss,
+        trailingStopPct: trailingStop,
+      });
     }
 
     const currentIndex = steps.indexOf(step);
@@ -197,6 +231,14 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
     setStep('basics');
     setName('My First Sniper');
     setConfig(DEFAULT_CONFIG);
+    setValidationErrors({});
+    // Reset string inputs
+    setSnipeAmountInput(String(DEFAULT_CONFIG.snipeAmountSol));
+    setSlippageInput(String(DEFAULT_CONFIG.slippageBps / 100));
+    setPriorityFeeInput(String(DEFAULT_CONFIG.priorityFeeSol));
+    setTakeProfitInput(String(DEFAULT_CONFIG.takeProfitPct));
+    setStopLossInput(String(DEFAULT_CONFIG.stopLossPct));
+    setTrailingStopInput('');
     onClose();
   };
 
@@ -276,16 +318,13 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 </Label>
                 <Input
                   id="takeProfit"
-                  type="number"
-                  step="10"
-                  min="10"
-                  max="10000"
-                  value={config.takeProfitPct}
-                  onChange={(e) =>
-                    updateConfig({
-                      takeProfitPct: Math.max(10, parseFloat(e.target.value) || 100),
-                    })
-                  }
+                  type="text"
+                  inputMode="decimal"
+                  value={takeProfitInput}
+                  onChange={(e) => {
+                    // Allow free typing - validation happens on Next
+                    setTakeProfitInput(e.target.value);
+                  }}
                   className="bg-zinc-800 border-zinc-700"
                 />
                 <p className="text-xs text-zinc-500">
@@ -326,16 +365,13 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 </Label>
                 <Input
                   id="stopLoss"
-                  type="number"
-                  step="5"
-                  min="5"
-                  max="95"
-                  value={config.stopLossPct}
-                  onChange={(e) =>
-                    updateConfig({
-                      stopLossPct: Math.min(95, Math.max(5, parseFloat(e.target.value) || 50)),
-                    })
-                  }
+                  type="text"
+                  inputMode="decimal"
+                  value={stopLossInput}
+                  onChange={(e) => {
+                    // Allow free typing - validation happens on Next
+                    setStopLossInput(e.target.value);
+                  }}
                   className="bg-zinc-800 border-zinc-700"
                 />
                 <p className="text-xs text-zinc-500">
@@ -350,16 +386,13 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 </Label>
                 <Input
                   id="trailingStop"
-                  type="number"
-                  step="5"
-                  min="5"
-                  max="50"
-                  value={config.trailingStopPct || ''}
-                  onChange={(e) =>
-                    updateConfig({
-                      trailingStopPct: e.target.value ? parseFloat(e.target.value) : undefined,
-                    })
-                  }
+                  type="text"
+                  inputMode="decimal"
+                  value={trailingStopInput}
+                  onChange={(e) => {
+                    // Allow free typing - validation happens on Next
+                    setTrailingStopInput(e.target.value);
+                  }}
                   placeholder="Leave empty to disable"
                   className="bg-zinc-800 border-zinc-700"
                 />
@@ -412,20 +445,12 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   id="snipeAmount"
                   type="text"
                   inputMode="decimal"
-                  value={config.snipeAmountSol}
+                  value={snipeAmountInput}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || val === '.') {
-                      updateConfig({ snipeAmountSol: 0 });
-                      return;
-                    }
-                    const parsed = parseFloat(val);
-                    if (!isNaN(parsed)) {
-                      updateConfig({ snipeAmountSol: parsed });
-                      // Clear error when user starts typing
-                      if (validationErrors.snipeAmountSol) {
-                        setValidationErrors(prev => ({ ...prev, snipeAmountSol: false }));
-                      }
+                    // Allow free typing - validation happens on Next
+                    setSnipeAmountInput(e.target.value);
+                    if (validationErrors.snipeAmountSol) {
+                      setValidationErrors(prev => ({ ...prev, snipeAmountSol: false }));
                     }
                   }}
                   className={cn(
@@ -451,20 +476,12 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   id="slippage"
                   type="text"
                   inputMode="decimal"
-                  value={config.slippageBps / 100}
+                  value={slippageInput}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || val === '.') {
-                      updateConfig({ slippageBps: 0 });
-                      return;
-                    }
-                    const parsed = parseFloat(val);
-                    if (!isNaN(parsed)) {
-                      updateConfig({ slippageBps: Math.round(parsed * 100) });
-                      // Clear error when user starts typing
-                      if (validationErrors.slippageBps) {
-                        setValidationErrors(prev => ({ ...prev, slippageBps: false }));
-                      }
+                    // Allow free typing - validation happens on Next
+                    setSlippageInput(e.target.value);
+                    if (validationErrors.slippageBps) {
+                      setValidationErrors(prev => ({ ...prev, slippageBps: false }));
                     }
                   }}
                   className={cn(
@@ -490,20 +507,12 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   id="priorityFee"
                   type="text"
                   inputMode="decimal"
-                  value={config.priorityFeeSol}
+                  value={priorityFeeInput}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || val === '.' || val === '0.' || val === '0.0' || val === '0.00') {
-                      updateConfig({ priorityFeeSol: parseFloat(val) || 0 });
-                      return;
-                    }
-                    const parsed = parseFloat(val);
-                    if (!isNaN(parsed)) {
-                      updateConfig({ priorityFeeSol: parsed });
-                      // Clear error when user starts typing
-                      if (validationErrors.priorityFeeSol) {
-                        setValidationErrors(prev => ({ ...prev, priorityFeeSol: false }));
-                      }
+                    // Allow free typing - validation happens on Next
+                    setPriorityFeeInput(e.target.value);
+                    if (validationErrors.priorityFeeSol) {
+                      setValidationErrors(prev => ({ ...prev, priorityFeeSol: false }));
                     }
                   }}
                   placeholder="0.003"

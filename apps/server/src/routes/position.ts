@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../db/client.js';
 import { authenticate } from '../middleware/auth.js';
 import { transactionExecutor } from '../services/transaction-executor.js';
+import { emitToUser } from '../websocket/handlers.js';
 
 export const positionRoutes: FastifyPluginAsync = async (fastify) => {
   // Get all positions for user
@@ -91,6 +92,63 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // Update position metadata (token symbol, market cap, etc.)
+  fastify.patch('/:positionId/metadata', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const { positionId } = request.params as { positionId: string };
+
+    const body = z
+      .object({
+        tokenSymbol: z.string().optional(),
+        tokenName: z.string().optional(),
+        entryMarketCap: z.number().optional(),
+      })
+      .parse(request.body);
+
+    // First verify the position belongs to this user
+    const position = await prisma.position.findFirst({
+      where: { id: positionId, userId },
+    });
+
+    if (!position) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Position not found',
+      });
+    }
+
+    // Only update fields that are currently null/empty and new values are provided
+    const updates: Record<string, unknown> = {};
+
+    if (body.tokenSymbol && !position.tokenSymbol) {
+      updates.tokenSymbol = body.tokenSymbol;
+    }
+    if (body.tokenName && !position.tokenName) {
+      updates.tokenName = body.tokenName;
+    }
+    if (body.entryMarketCap && !position.entryMarketCap) {
+      updates.entryMarketCap = body.entryMarketCap;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return {
+        success: true,
+        data: position,
+        message: 'No updates needed',
+      };
+    }
+
+    const updated = await prisma.position.update({
+      where: { id: positionId },
+      data: updates,
+    });
+
+    return {
+      success: true,
+      data: updated,
+    };
+  });
+
   // Get portfolio summary
   fastify.get('/portfolio/summary', { preHandler: authenticate }, async (request, reply) => {
     const userId = (request as any).userId;
@@ -104,7 +162,7 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
           tokenSymbol: true,
           entryPrice: true,
           entrySol: true,
-          currentAmount: true,
+          currentTokenAmount: true,
         },
       }),
       prisma.position.findMany({
@@ -227,6 +285,7 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
         sniper: {
           select: {
             id: true,
+            name: true,
             walletId: true,
             config: true,
           },
@@ -264,7 +323,7 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Get sniper config for slippage/priority settings
     const config = (position.sniper?.config as Record<string, unknown>) || {};
-    const slippageBps = (config.slippageBps as number) || 1000; // 10% default for manual sells
+    const slippageBps = (config.slippageBps as number) || 2000; // 20% default for manual sells (volatile meme tokens)
     const priorityFeeSol = (config.priorityFeeSol as number) || 0.001;
 
     // Determine wallet ID - use sniper's wallet or fall back to finding user's generated wallet
@@ -309,8 +368,8 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: positionId },
           data: {
             status: 'closed',
-            exitPrice: result.amountOut ? result.amountOut / position.currentTokenAmount : null,
-            exitSol: result.amountOut || null,
+            exitPrice: result.solReceived ? result.solReceived / position.currentTokenAmount : null,
+            exitSol: result.solReceived || null,
             closedAt: new Date(),
           },
         });
@@ -319,16 +378,36 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
         await prisma.activityLog.create({
           data: {
             userId,
-            type: 'position_closed',
-            message: `Manually closed ${position.tokenSymbol || 'position'} for ${result.amountOut?.toFixed(4) || '?'} SOL`,
-            metadata: {
+            eventType: 'position:closed',
+            eventData: {
               positionId,
               tokenMint: position.tokenMint,
               tokenSymbol: position.tokenSymbol,
-              exitSol: result.amountOut,
+              exitSol: result.solReceived,
               signature: result.signature,
             },
           },
+        });
+
+        // Emit socket event so frontend can update in real-time
+        // Emit manual_sell event first (for activity log to show "Manual Sell")
+        await emitToUser(userId, 'position:manual_sell', {
+          positionId,
+          tokenMint: position.tokenMint,
+          tokenSymbol: position.tokenSymbol,
+          sniperName: position.sniper?.name || 'Manual',
+          exitSol: result.solReceived,
+          signature: result.signature,
+        });
+
+        // Then emit closed event for position state update
+        await emitToUser(userId, 'position:closed', {
+          positionId,
+          tokenMint: position.tokenMint,
+          tokenSymbol: position.tokenSymbol,
+          reason: 'manual',
+          exitSol: result.solReceived,
+          signature: result.signature,
         });
 
         fastify.log.info(`Manual close successful for position ${positionId}, signature: ${result.signature}`);
@@ -338,7 +417,7 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
           data: {
             message: 'Position closed successfully',
             positionId,
-            exitSol: result.amountOut,
+            exitSol: result.solReceived,
             signature: result.signature,
           },
         };
@@ -363,7 +442,7 @@ export const positionRoutes: FastifyPluginAsync = async (fastify) => {
         data: { status: 'open' },
       });
 
-      fastify.log.error(`Manual close error for position ${positionId}:`, error);
+      fastify.log.error(`Manual close error for position ${positionId}: ${error instanceof Error ? error.message : String(error)}`);
 
       return reply.status(500).send({
         success: false,

@@ -14,19 +14,24 @@ const toastConfig = {
 
 export function useSocket(token: string | null) {
   const addActivity = useActivityStore((state) => state.addEntry);
+  const addPosition = usePositionsStore((state) => state.addPosition);
   const updatePosition = usePositionsStore((state) => state.updatePosition);
+  const removePosition = usePositionsStore((state) => state.removePosition);
   const updatePrice = usePositionsStore((state) => state.updatePrice);
   const addMigration = useMigrationsStore((state) => state.addMigration);
   const updateMigrationSnipeStatus = useMigrationsStore((state) => state.updateMigrationSnipeStatus);
+  const updateMigrationMetadata = useMigrationsStore((state) => state.updateMigrationMetadata);
 
   const handleEvent = useCallback(
     (eventType: SocketEventType, data: SocketEventData) => {
-      // Add to activity log
-      addActivity({
-        eventType,
-        eventData: data,
-        timestamp: data.timestamp || new Date().toISOString(),
-      });
+      // Add to activity log (but NOT price updates - they're too frequent)
+      if (eventType !== 'price:update') {
+        addActivity({
+          eventType,
+          eventData: data,
+          timestamp: data.timestamp || new Date().toISOString(),
+        });
+      }
 
       // Show toast based on event type
       const toastId = data.sniperId || eventType;
@@ -88,6 +93,16 @@ export function useSocket(token: string | null) {
             id: `match-${data.tokenMint}`,
             icon: '🎯',
           });
+          break;
+
+        case 'migration:update':
+          // Update migration metadata (token symbol/name fetched asynchronously)
+          if (data.tokenMint && (data.tokenSymbol || data.tokenName)) {
+            updateMigrationMetadata(data.tokenMint, {
+              tokenSymbol: data.tokenSymbol as string | undefined,
+              tokenName: data.tokenName as string | undefined,
+            });
+          }
           break;
 
         case 'snipe:started':
@@ -171,13 +186,48 @@ export function useSocket(token: string | null) {
           });
           break;
 
-        case 'position:closed':
-          toast.success(`Position closed: $${data.tokenSymbol}`, {
+        case 'position:opened':
+          // Add new position to store when a snipe succeeds
+          if (data.id && data.tokenMint) {
+            addPosition({
+              id: data.id as string,
+              tokenMint: data.tokenMint,
+              tokenSymbol: data.tokenSymbol || null,
+              tokenName: data.tokenName as string | undefined,
+              entrySol: data.entrySol as number,
+              entryPrice: data.entryPrice as number,
+              entryMarketCap: data.entryMarketCap as number | null | undefined,
+              entryTokenAmount: data.entryTokenAmount as number,
+              currentTokenAmount: data.currentTokenAmount as number,
+              status: 'open',
+              createdAt: data.createdAt as string || new Date().toISOString(),
+            });
+            toast.success(`Position opened: $${data.tokenSymbol || data.tokenMint.slice(0, 8)}`, {
+              ...toastConfig,
+              id: `opened-${data.tokenMint}`,
+            });
+          }
+          break;
+
+        case 'position:manual_sell':
+          toast.success(`Manually sold $${data.tokenSymbol}`, {
             ...toastConfig,
-            id: `closed-${data.tokenMint}`,
+            id: `manual-${data.tokenMint}`,
+            duration: 6000,
           });
+          break;
+
+        case 'position:closed':
+          // Only show toast if not manual (manual_sell already shows a toast)
+          if (data.reason !== 'manual') {
+            toast.success(`Position closed: $${data.tokenSymbol}`, {
+              ...toastConfig,
+              id: `closed-${data.tokenMint}`,
+            });
+          }
           if (data.positionId) {
-            updatePosition(data.positionId as string, { status: 'closed' });
+            // Remove the position from the store when it's closed
+            removePosition(data.positionId as string);
           }
           break;
 
@@ -189,7 +239,7 @@ export function useSocket(token: string | null) {
           break;
       }
     },
-    [addActivity, updatePosition, updatePrice, addMigration, updateMigrationSnipeStatus]
+    [addActivity, addPosition, removePosition, updatePosition, updatePrice, addMigration, updateMigrationSnipeStatus, updateMigrationMetadata]
   );
 
   useEffect(() => {
@@ -205,14 +255,17 @@ export function useSocket(token: string | null) {
       'sniper:paused',
       'migration:detected',
       'migration:matched',
+      'migration:update',
       'snipe:started',
       'snipe:submitted',
       'snipe:success',
       'snipe:failed',
       'snipe:retrying',
+      'position:opened',
       'position:take_profit',
       'position:stop_loss',
       'position:trailing_stop',
+      'position:manual_sell',
       'position:closed',
       'price:update',
     ];

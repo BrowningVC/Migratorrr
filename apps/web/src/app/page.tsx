@@ -22,18 +22,35 @@ export default function LandingPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isSniperModalOpen, setIsSniperModalOpen] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
-  const { isAuthenticated, hasCompletedOnboarding } = useAuthStore();
+  const [activeStep, setActiveStep] = useState(1); // Start at 1 so first box is green on load
+  const { isAuthenticated, hasCompletedOnboarding, _hasHydrated: authHydrated } = useAuthStore();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Handle Dashboard click - go to dashboard if authenticated, otherwise open sniper modal
+  // Handle Dashboard click - go to dashboard if authenticated with sniper, otherwise open modal
   const handleDashboardClick = () => {
+    // Wait for auth store to hydrate before checking auth state
+    if (!authHydrated) {
+      // Store hasn't hydrated yet - wait a moment and try again
+      setTimeout(() => {
+        const state = useAuthStore.getState();
+        if (state._hasHydrated && state.isAuthenticated && state.hasCompletedOnboarding) {
+          router.push('/dashboard');
+        } else {
+          setIsSniperModalOpen(true);
+        }
+      }, 100);
+      return;
+    }
+
+    // If authenticated with completed onboarding, go to dashboard
+    // (Dashboard will show existing snipers or prompt to create one)
     if (isAuthenticated && hasCompletedOnboarding) {
       router.push('/dashboard');
     } else {
+      // Not authenticated - open sniper modal to start the flow
       setIsSniperModalOpen(true);
     }
   };
@@ -62,8 +79,8 @@ export default function LandingPage() {
             <Button variant="ghost" onClick={handleDashboardClick}>
               Dashboard
             </Button>
-            <Link href="/migrator">
-              <Button variant="ghost">$MIGRATOR</Button>
+            <Link href="/buybacks">
+              <Button variant="ghost">$MIGRATOR Buybacks</Button>
             </Link>
             <Link href="/how-it-works">
               <Button variant="ghost">How it Works</Button>
@@ -86,17 +103,18 @@ export default function LandingPage() {
               <div className="space-y-2">
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
                   <span className="text-zinc-100">Snipe </span>
-                  <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">migrations</span>
+                  <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">Migrations</span>
+                  <span className="text-zinc-100"> With</span>
                 </h1>
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-zinc-100">
-                  in <span className="font-mono text-green-400">&lt;100ms</span>
+                  Custom Filters in <span className="font-mono text-green-400">&lt;100ms</span>
                 </h1>
               </div>
 
               {/* Technical description */}
               <p className="text-lg text-zinc-400 max-w-lg leading-relaxed">
-                Automated execution engine for PumpFun → Raydium migrations.
-                WebSocket-based detection, Jito MEV protection, configurable take-profit automation.
+                Automated trading engine for PumpFun migrations. WebSocket-based detection,
+                Jito MEV protection, configurable hands-free trading with full customisation of your own trading signals.
               </p>
 
               {/* Stats row */}
@@ -349,8 +367,8 @@ export default function LandingPage() {
               <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Dashboard
               </Link>
-              <Link href="/migrator" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                $MIGRATOR
+              <Link href="/buybacks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                $MIGRATOR Buybacks
               </Link>
               <Link href="/how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 How it Works
