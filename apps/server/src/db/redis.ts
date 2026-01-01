@@ -2,6 +2,7 @@ import Redis from 'ioredis';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
+// Main Redis client for general operations
 export const redis = new Redis(REDIS_URL, {
   maxRetriesPerRequest: 3,
   retryStrategy: (times) => {
@@ -29,4 +30,17 @@ redisSub.on('connect', () => {
 
 redisSub.on('error', (err) => {
   console.error('Redis subscriber error:', err);
+});
+
+// BullMQ requires maxRetriesPerRequest: null for blocking operations
+export const redisBullMQ = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: null,
+});
+
+redisBullMQ.on('connect', () => {
+  console.log('Redis BullMQ client connected');
+});
+
+redisBullMQ.on('error', (err) => {
+  console.error('Redis BullMQ error:', err);
 });

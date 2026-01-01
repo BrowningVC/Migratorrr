@@ -3,7 +3,7 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { transactionExecutor } from '../services/transaction-executor.js';
 import { prisma } from '../db/client.js';
 import { emitToUser } from '../websocket/handlers.js';
-import { redis } from '../db/redis.js';
+import { redis, redisBullMQ } from '../db/redis.js';
 
 // Initialize Solana connection
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
@@ -76,7 +76,7 @@ export class SnipeWorker {
       'snipe-queue',
       async (job) => this.processSnipeJob(job),
       {
-        connection: redis,
+        connection: redisBullMQ,
         concurrency: WORKER_CONCURRENCY, // Process up to 25 snipes concurrently (configurable via env)
         limiter: {
           max: RATE_LIMIT_PER_MINUTE, // Max 200 jobs per minute (configurable via env)

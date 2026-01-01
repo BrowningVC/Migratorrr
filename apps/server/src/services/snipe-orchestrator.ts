@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq';
-import { redis } from '../db/redis.js';
+import { redis, redisBullMQ } from '../db/redis.js';
 import { prisma } from '../db/client.js';
 import { migrationDetector, type MigrationEvent } from './migration-detector.js';
 import { tokenInfoService } from './token-info.js';
@@ -76,7 +76,7 @@ export class SnipeOrchestrator {
 
   constructor() {
     this.snipeQueue = new Queue('snipe-queue', {
-      connection: redis,
+      connection: redisBullMQ,
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 500,
