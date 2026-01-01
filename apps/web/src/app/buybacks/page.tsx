@@ -28,7 +28,7 @@ export default function BuybacksPage() {
               <Button variant="ghost">Home</Button>
             </Link>
             <Link href="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
+              <Button variant="ghost">Sniper Dashboard</Button>
             </Link>
           </div>
         </div>

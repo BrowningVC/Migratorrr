@@ -77,7 +77,7 @@ export default function LandingPage() {
           </Link>
           <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={handleDashboardClick}>
-              Dashboard
+              Sniper Dashboard
             </Button>
             <Link href="/buybacks">
               <Button variant="ghost">$MIGRATOR Buybacks</Button>
@@ -365,7 +365,7 @@ export default function LandingPage() {
             </Link>
             <div className="flex items-center gap-6">
               <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Dashboard
+                Sniper Dashboard
               </Link>
               <Link href="/buybacks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 $MIGRATOR Buybacks
