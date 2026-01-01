@@ -72,12 +72,11 @@ export class SnipeWorker {
     const WORKER_CONCURRENCY = parseInt(process.env.SNIPE_WORKER_CONCURRENCY || '25');
     const RATE_LIMIT_PER_MINUTE = parseInt(process.env.SNIPE_RATE_LIMIT || '200');
 
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     this.worker = new Worker<SnipeJob>(
       'snipe-queue',
       async (job) => this.processSnipeJob(job),
       {
-        connection: redisUrl,
+        connection: redis,
         concurrency: WORKER_CONCURRENCY, // Process up to 25 snipes concurrently (configurable via env)
         limiter: {
           max: RATE_LIMIT_PER_MINUTE, // Max 200 jobs per minute (configurable via env)

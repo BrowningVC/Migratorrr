@@ -75,9 +75,8 @@ export class SnipeOrchestrator {
   private readonly SNIPE_LOCK_TTL_SECONDS = 86400; // 24 hours
 
   constructor() {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     this.snipeQueue = new Queue('snipe-queue', {
-      connection: redisUrl,
+      connection: redis,
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 500,
