@@ -289,7 +289,7 @@ export const sniperApi = {
 // Position API
 export const positionApi = {
   getAll: (token: string, status?: 'open' | 'closed' | 'all') =>
-    fetchApi<{ positions: Array<{
+    fetchApi<{ items: Array<{
       id: string;
       tokenMint: string;
       tokenSymbol: string | null;
@@ -306,7 +306,7 @@ export const positionApi = {
       highestPrice: number | null;
       createdAt: string;
       closedAt: string | null;
-    }> }>(
+    }>; total: number; page: number; pageSize: number; hasMore: boolean }>(
       `/api/position${status ? `?status=${status}` : ''}`,
       {},
       token
@@ -319,6 +319,17 @@ export const positionApi = {
     fetchApi(
       `/api/position/${positionId}/close`,
       { method: 'POST', body: '{}' },
+      token
+    ),
+
+  updateMetadata: (
+    token: string,
+    positionId: string,
+    metadata: { tokenSymbol?: string; tokenName?: string; entryMarketCap?: number }
+  ) =>
+    fetchApi(
+      `/api/position/${positionId}/metadata`,
+      { method: 'PATCH', body: JSON.stringify(metadata) },
       token
     ),
 

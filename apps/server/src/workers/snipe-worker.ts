@@ -35,6 +35,7 @@ interface SnipeJob {
     tokenName?: string;
     tokenSymbol?: string;
     poolAddress: string;
+    coinCreator?: string | null; // Original token creator - required for PumpSwap trades
     initialLiquiditySol: number;
     initialMarketCapUsd?: number;
     detectedBy: string;
@@ -62,6 +63,15 @@ export class SnipeWorker {
       return;
     }
 
+    // Worker configuration optimized for 100+ concurrent snipers
+    // Key considerations:
+    // - Each snipe job takes ~2-5 seconds (balance check, lock acquisition, tx execution)
+    // - Helius RPC has generous limits with our API key
+    // - Jito bundles can handle high throughput
+    // - BullMQ handles job distribution efficiently
+    const WORKER_CONCURRENCY = parseInt(process.env.SNIPE_WORKER_CONCURRENCY || '25');
+    const RATE_LIMIT_PER_MINUTE = parseInt(process.env.SNIPE_RATE_LIMIT || '200');
+
     this.worker = new Worker<SnipeJob>(
       'snipe-queue',
       async (job) => this.processSnipeJob(job),
@@ -70,13 +80,15 @@ export class SnipeWorker {
           host: process.env.REDIS_HOST || 'localhost',
           port: parseInt(process.env.REDIS_PORT || '6379'),
         },
-        concurrency: 10, // Process up to 10 snipes concurrently
+        concurrency: WORKER_CONCURRENCY, // Process up to 25 snipes concurrently (configurable via env)
         limiter: {
-          max: 50, // Max 50 jobs per minute
+          max: RATE_LIMIT_PER_MINUTE, // Max 200 jobs per minute (configurable via env)
           duration: 60000,
         },
       }
     );
+
+    console.log(`Snipe Worker configured: concurrency=${WORKER_CONCURRENCY}, rateLimit=${RATE_LIMIT_PER_MINUTE}/min`);
 
     // Event handlers
     this.worker.on('completed', (job) => {
@@ -118,6 +130,8 @@ export class SnipeWorker {
     console.log(`   Token: ${tokenLabel} (${migration.tokenMint})`);
     console.log(`   Sniper: "${sniperName}" (${sniperId.slice(0, 8)}...)`);
     console.log(`   Config: ${config.snipeAmountSol} SOL, ${config.slippageBps}bps slippage, ${config.priorityFeeSol} SOL tip`);
+    console.log(`   CoinCreator in job: ${migration.coinCreator || 'NULL/undefined'}`);
+    console.log(`   Pool in job: ${migration.poolAddress || 'NULL/undefined'}`);
 
     // Calculate job latency
     const latencyMs = Date.now() - migration.detectedAt;
@@ -210,12 +224,28 @@ export class SnipeWorker {
 
       if (!hasBalance) {
         console.log(`   ❌ ABORT: Insufficient balance for snipe`);
+
+        // Auto-disable the sniper due to insufficient funds
+        await prisma.sniperConfig.update({
+          where: { id: sniperId },
+          data: { isActive: false },
+        });
+        console.log(`   🔴 Sniper "${sniperName}" auto-disabled due to insufficient balance`);
+
         await emitToUser(userId, 'snipe:failed', {
           sniperId,
           sniperName,
           tokenMint: migration.tokenMint,
           tokenSymbol: migration.tokenSymbol,
           error: 'Insufficient wallet balance',
+        });
+
+        // Notify user that sniper was disabled
+        await emitToUser(userId, 'sniper:disabled', {
+          sniperId,
+          sniperName,
+          reason: 'Insufficient wallet balance - please top up your wallet and re-enable the sniper',
+          requiredSol: requiredBalance,
         });
 
         await prisma.activityLog.create({
@@ -226,8 +256,9 @@ export class SnipeWorker {
             eventData: {
               tokenMint: migration.tokenMint,
               tokenSymbol: migration.tokenSymbol,
-              error: 'Insufficient wallet balance',
+              error: 'Insufficient wallet balance - sniper auto-disabled',
               requiredSol: requiredBalance,
+              autoDisabled: true,
             },
           },
         });
@@ -240,16 +271,17 @@ export class SnipeWorker {
       console.log(`   🔍 Step 3: Checking for duplicate positions...`);
       // CRITICAL: Final check - verify no existing position for this token + wallet
       // This is a last-resort safeguard against duplicate snipes
+      // Check ALL non-closed statuses to catch positions being created/sold
       const existingPosition = await prisma.position.findFirst({
         where: {
           walletId,
           tokenMint: migration.tokenMint,
-          status: { in: ['open', 'pending'] },
+          status: { in: ['open', 'pending', 'selling'] },
         },
       });
 
       if (existingPosition) {
-        console.log(`   ❌ ABORT: Duplicate position exists (${existingPosition.id})`);
+        console.log(`   ❌ ABORT: Duplicate position exists (${existingPosition.id}, status: ${existingPosition.status})`);
         await emitToUser(userId, 'snipe:skipped', {
           sniperId,
           sniperName,
@@ -259,7 +291,61 @@ export class SnipeWorker {
         });
         return;
       }
-      console.log(`   ✓ No duplicate positions`);
+      console.log(`   ✓ No duplicate positions (wallet: ${walletId.slice(0, 8)}, token: ${migration.tokenMint.slice(0, 12)})`);
+
+      // CRITICAL: TWO-LAYER atomic lock system to prevent duplicate snipes
+      // Layer 1: Wallet-level lock - prevents ANY snipe to this token from this wallet
+      //          This catches cases where user has multiple snipers with same wallet
+      // Layer 2: Sniper-level lock - prevents same sniper from double-executing
+      //
+      // Lock keys use consistent format: prefix:identifier:tokenMint
+      // TTL is 5 minutes - long enough for tx to complete + confirmation
+      const EXECUTION_LOCK_TTL = 300;
+
+      // Layer 1: WALLET-LEVEL LOCK (most important - prevents wallet from double-buying)
+      const walletLockKey = `snipe-wallet-exec:${walletId}:${migration.tokenMint}`;
+      const walletLockValue = `${sniperId}:${job.id || Date.now()}`;
+
+      console.log(`   🔒 Attempting wallet lock: ${walletLockKey}`);
+      const acquiredWalletLock = await redis.set(walletLockKey, walletLockValue, 'EX', EXECUTION_LOCK_TTL, 'NX');
+
+      if (!acquiredWalletLock) {
+        // Check who owns the lock for debugging
+        const lockOwner = await redis.get(walletLockKey);
+        console.log(`   ❌ ABORT: Wallet already has pending snipe for this token`);
+        console.log(`      Lock key: ${walletLockKey}`);
+        console.log(`      Lock owner: ${lockOwner}`);
+        console.log(`      Our attempt: ${walletLockValue}`);
+        await emitToUser(userId, 'snipe:skipped', {
+          sniperId,
+          sniperName,
+          reason: 'Wallet already sniping this token',
+          tokenMint: migration.tokenMint,
+          tokenSymbol: migration.tokenSymbol,
+        });
+        return;
+      }
+      console.log(`   ✓ Wallet lock acquired`);
+
+      // Layer 2: SNIPER-LEVEL LOCK (additional safety)
+      const sniperLockKey = `snipe-exec:${sniperId}:${migration.tokenMint}`;
+      const acquiredSniperLock = await redis.set(sniperLockKey, job.id || '1', 'EX', EXECUTION_LOCK_TTL, 'NX');
+
+      if (!acquiredSniperLock) {
+        // Release wallet lock since we couldn't get sniper lock
+        await redis.del(walletLockKey);
+        console.log(`   ❌ ABORT: Sniper execution already in progress for this token`);
+        console.log(`      Lock key: ${sniperLockKey}`);
+        await emitToUser(userId, 'snipe:skipped', {
+          sniperId,
+          sniperName,
+          reason: 'Another snipe already executing for this token',
+          tokenMint: migration.tokenMint,
+          tokenSymbol: migration.tokenSymbol,
+        });
+        return;
+      }
+      console.log(`   ✓ Sniper lock acquired`);
 
       await job.updateProgress(40);
 
@@ -272,11 +358,14 @@ export class SnipeWorker {
         walletId,
         tokenMint: migration.tokenMint,
         poolAddress: migration.poolAddress,
+        coinCreator: migration.coinCreator || undefined, // CRITICAL: Pass coinCreator from migration event
         amountSol: config.snipeAmountSol,
         slippageBps: config.slippageBps,
         priorityFeeSol: config.priorityFeeSol,
         sniperId,
         tokenSymbol: migration.tokenSymbol,
+        tokenName: migration.tokenName,
+        initialMarketCapUsd: migration.initialMarketCapUsd, // CRITICAL: Pass market cap at migration time for accurate entry MCAP
         mevProtection: config.mevProtection ?? true, // Default to enabled
       });
 
@@ -348,39 +437,59 @@ export class SnipeWorker {
 
   /**
    * Check if wallet has sufficient balance (with Redis caching to reduce Helius RPC calls)
+   * Includes retry logic for RPC failures and better error handling
    */
   private async checkWalletBalance(
     walletPublicKey: string,
     requiredSol: number
   ): Promise<boolean> {
     const cacheKey = `${BALANCE_CACHE_PREFIX}${walletPublicKey}`;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 500;
 
+    // Check cache first - always use cached value if available
     try {
-      // Check cache first
       const cachedBalance = await redis.get(cacheKey);
-      let balanceSol: number;
-
       if (cachedBalance !== null) {
-        balanceSol = parseFloat(cachedBalance);
-        console.log(`Wallet ${walletPublicKey.slice(0, 8)}... balance (cached): ${balanceSol.toFixed(4)} SOL (required: ${requiredSol.toFixed(4)} SOL)`);
-      } else {
-        // Fetch from chain and cache
+        const balanceSol = parseFloat(cachedBalance);
+        console.log(`   Wallet ${walletPublicKey} balance (cached): ${balanceSol.toFixed(4)} SOL (required: ${requiredSol.toFixed(4)} SOL)`);
+        return balanceSol >= requiredSol;
+      }
+    } catch (cacheError) {
+      console.warn(`   ⚠️ Redis cache error, will fetch from chain:`, cacheError);
+    }
+
+    // Fetch from chain with retry logic
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
         const publicKey = new PublicKey(walletPublicKey);
         const balance = await connection.getBalance(publicKey);
-        balanceSol = balance / LAMPORTS_PER_SOL;
+        const balanceSol = balance / LAMPORTS_PER_SOL;
 
         // Cache the balance
-        await redis.setex(cacheKey, BALANCE_CACHE_TTL_SECONDS, balanceSol.toString());
+        try {
+          await redis.setex(cacheKey, BALANCE_CACHE_TTL_SECONDS, balanceSol.toString());
+        } catch (cacheSetError) {
+          console.warn(`   ⚠️ Failed to cache balance:`, cacheSetError);
+        }
 
-        console.log(`Wallet ${walletPublicKey.slice(0, 8)}... balance (fresh): ${balanceSol.toFixed(4)} SOL (required: ${requiredSol.toFixed(4)} SOL)`);
+        console.log(`   Wallet ${walletPublicKey} balance (fresh): ${balanceSol.toFixed(4)} SOL (required: ${requiredSol.toFixed(4)} SOL)`);
+        return balanceSol >= requiredSol;
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.warn(`   ⚠️ Balance check attempt ${attempt}/${MAX_RETRIES} failed for ${walletPublicKey}: ${errorMsg}`);
+
+        if (attempt < MAX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+        }
       }
-
-      return balanceSol >= requiredSol;
-    } catch (error) {
-      console.error('Error checking wallet balance:', error);
-      // Return false on error to be safe - don't execute snipes if we can't verify balance
-      return false;
     }
+
+    // All retries failed - DO NOT proceed with snipe
+    // Proceeding would waste transaction fees on a likely-to-fail transaction
+    // and could create orphaned database entries
+    console.error(`   ❌ All ${MAX_RETRIES} balance check attempts failed for ${walletPublicKey} - SKIPPING snipe (RPC unreachable)`);
+    return false;
   }
 
   /**
@@ -393,6 +502,7 @@ export class SnipeWorker {
 
   /**
    * Update position with take profit / stop loss settings
+   * Includes retry logic to handle race condition with transaction recording
    */
   private async updatePositionWithAutomation(params: {
     signature: string;
@@ -401,21 +511,43 @@ export class SnipeWorker {
   }): Promise<void> {
     const { signature, sniperId, config } = params;
 
-    // Find the position created by the transaction
-    const transaction = await prisma.transaction.findFirst({
-      where: { signature },
-      include: { position: true },
-    });
+    // Skip if no automation settings configured
+    if (!config.takeProfitPct && !config.stopLossPct && !config.trailingStopPct) {
+      return;
+    }
+
+    // Retry up to 3 times with 500ms delay to handle race condition
+    // The transaction/position might not be committed yet when we first check
+    let transaction = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      transaction = await prisma.transaction.findFirst({
+        where: { signature },
+        include: { position: true },
+      });
+
+      if (transaction?.position) {
+        break;
+      }
+
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
 
     if (!transaction?.position) {
-      console.warn(`Position not found for transaction ${signature}`);
+      console.error(`[Automation] Position not found for transaction ${signature.slice(0, 20)}... after 3 retries`);
       return;
     }
 
     const position = transaction.position;
 
-    // Calculate TP/SL prices
+    // Calculate TP/SL prices from entry price
     const entryPrice = position.entryPrice || 0;
+    if (entryPrice === 0) {
+      console.warn(`[Automation] Entry price is 0 for position ${position.id}, skipping TP/SL setup`);
+      return;
+    }
+
     const updates: Record<string, unknown> = {};
 
     if (config.takeProfitPct) {
@@ -438,8 +570,10 @@ export class SnipeWorker {
       });
 
       console.log(
-        `Updated position ${position.id} with automation settings:`,
-        updates
+        `[Automation] Set TP/SL for position ${position.id.slice(0, 8)}...: ` +
+        `TP=${(updates.takeProfitPrice as number)?.toExponential(2) || 'none'}, ` +
+        `SL=${(updates.stopLossPrice as number)?.toExponential(2) || 'none'}, ` +
+        `TrailingStop=${updates.trailingStopPct || 'none'}%`
       );
     }
   }

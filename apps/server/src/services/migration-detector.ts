@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import { redis } from '../db/redis.js';
 import { prisma } from '../db/client.js';
+import { tokenInfoService } from './token-info.js';
 
 export interface MigrationEvent {
   tokenMint: string;
@@ -9,47 +10,63 @@ export interface MigrationEvent {
   tokenSymbol: string | null;
   poolAddress: string;
   bondingCurveAddress: string | null;
+  coinCreator: string | null; // Original token creator - required for PumpSwap trades
   initialLiquiditySol: number;
   initialPriceSol: number;
+  initialMarketCapUsd: number | null; // Market cap at migration - critical for accurate entry MCAP
   timestamp: number;
+  isToken2022?: boolean; // True if this is a Token-2022 token (doesn't end with 'pump')
 }
 
 interface DetectedMigration extends MigrationEvent {
-  detectedBy: 'pumpportal' | 'helius' | 'raydium';
+  detectedBy: 'helius';
   detectedAt: number;
   latencyMs: number;
 }
 
 /**
- * MigrationDetector - Triple redundancy migration detection
+ * MigrationDetector - Helius-only migration detection
  *
- * Primary: PumpPortal WebSocket (subscribeMigration)
- * Secondary: Helius Geyser/WebSocket (program monitoring)
- * Tertiary: Direct Raydium program monitoring
+ * Uses Helius WebSocket to monitor the Pump bonding curve program
+ * for migration transactions. When "Instruction: Migrate" is detected,
+ * fetches full transaction data to extract token mint and pool address.
  *
- * All sources feed into a deduplication layer before broadcasting
+ * Benefits of Helius-only:
+ * - Reliable pool addresses from actual transaction data
+ * - Stale connection detection (continuous message flow)
+ * - Single source of truth - no race conditions
  */
 export class MigrationDetector extends EventEmitter {
-  private pumpPortalWs: WebSocket | null = null;
   private heliusWs: WebSocket | null = null;
   private isRunning = false;
-  private reconnectAttempts = { pumpPortal: 0, helius: 0 };
+  private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private recentMigrations = new Map<string, number>();
   private deduplicationWindowMs = 300000; // 5 minutes
 
-  // Subscription confirmation tracking
-  private subscriptionConfirmed = { pumpPortal: false, helius: false };
+  // Track processed signatures to prevent duplicate WebSocket notifications
+  // Helius can sometimes send the same migration event multiple times
+  private processedSignatures = new Set<string>();
+  private readonly MAX_PROCESSED_SIGNATURES = 1000; // Limit memory usage
 
-  // Configuration
-  private pumpPortalUrl = 'wss://pumpportal.fun/api/data';
+  // Track last message time to detect stalled connections
+  private lastMessageTime = 0;
+  private readonly STALE_CONNECTION_MS = 60000; // 1 minute - if no messages, reconnect
+  private subscriptionConfirmed = false;
+
+  // Helius configuration
   private heliusApiKey = process.env.HELIUS_API_KEY || '';
 
   // Rate limiting for Helius API calls
   private lastHeliusFetch = 0;
-  private readonly HELIUS_MIN_INTERVAL_MS = 500; // Max 2 transaction fetches/second
+  private readonly HELIUS_MIN_INTERVAL_MS = 100; // 10 fetches/second max for speed
   private pendingHeliusFetches: string[] = [];
   private heliusFetchTimer: NodeJS.Timeout | null = null;
+
+  // Health check interval reference for cleanup
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  private pingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
@@ -61,27 +78,30 @@ export class MigrationDetector extends EventEmitter {
       return;
     }
 
-    this.isRunning = true;
-    console.log('Starting Migration Detector...');
+    if (!this.heliusApiKey) {
+      console.error('HELIUS_API_KEY not set - migration detection will not work!');
+      return;
+    }
 
-    // Start PumpPortal only - it's the primary and lowest latency source
-    // Helius WebSocket monitor disabled to save credits (was consuming ~500k+ credits/month)
-    // PumpPortal is free and provides migration events directly
-    await this.initPumpPortal();
+    this.isRunning = true;
+    console.log('Starting Migration Detector (Helius-only)...');
+
+    await this.initHeliusMonitor();
 
     // Start cleanup interval for deduplication map
-    setInterval(() => this.cleanupDeduplicationMap(), 60000);
+    this.cleanupInterval = setInterval(() => this.cleanupDeduplicationMap(), 60000);
 
-    console.log('Migration Detector started (PumpPortal primary source)');
+    // Periodic connection health check - reconnect if needed
+    this.healthCheckInterval = setInterval(() => this.checkConnectionHealth(), 15000);
+
+    // Helius recommends pings every minute to keep connection alive (10 min inactivity timeout)
+    this.pingInterval = setInterval(() => this.sendPing(), 30000);
+
+    console.log('Migration Detector started (Helius-only)');
   }
 
   async stop(): Promise<void> {
     this.isRunning = false;
-
-    if (this.pumpPortalWs) {
-      this.pumpPortalWs.close();
-      this.pumpPortalWs = null;
-    }
 
     if (this.heliusWs) {
       this.heliusWs.close();
@@ -95,125 +115,43 @@ export class MigrationDetector extends EventEmitter {
     }
     this.pendingHeliusFetches = [];
 
+    // Clear intervals
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+
     console.log('Migration Detector stopped');
   }
 
   /**
-   * Primary Source: PumpPortal WebSocket
-   * Lowest latency for PumpFun migrations
+   * Send a ping to keep the WebSocket connection alive
+   * Helius has a 10-minute inactivity timeout
    */
-  private async initPumpPortal(): Promise<void> {
-    return new Promise((resolve) => {
+  private sendPing(): void {
+    if (this.heliusWs?.readyState === WebSocket.OPEN) {
       try {
-        console.log('Connecting to PumpPortal WebSocket...');
-
-        this.pumpPortalWs = new WebSocket(this.pumpPortalUrl);
-
-        this.pumpPortalWs.on('open', () => {
-          console.log('PumpPortal WebSocket connected');
-          this.reconnectAttempts.pumpPortal = 0;
-
-          // Subscribe to migration events
-          this.pumpPortalWs?.send(JSON.stringify({
-            method: 'subscribeMigration',
-          }));
-
-          resolve();
-        });
-
-        this.pumpPortalWs.on('message', (data: Buffer) => {
-          try {
-            const message = JSON.parse(data.toString());
-            this.handlePumpPortalMessage(message);
-          } catch (error) {
-            console.error('Failed to parse PumpPortal message:', error);
-          }
-        });
-
-        this.pumpPortalWs.on('close', (code, reason) => {
-          console.log(`PumpPortal WebSocket closed: ${code} - ${reason}`);
-          this.handlePumpPortalReconnect();
-        });
-
-        this.pumpPortalWs.on('error', (error) => {
-          console.error('PumpPortal WebSocket error:', error);
-        });
-
+        // Standard WebSocket ping
+        this.heliusWs.ping();
       } catch (error) {
-        console.error('Failed to initialize PumpPortal:', error);
-        resolve();
+        console.warn('[Ping] Failed to send ping:', error);
       }
-    });
-  }
-
-  private handlePumpPortalMessage(message: any): void {
-    // Handle subscription confirmation
-    if (message.method === 'subscribeMigration' || message.subscribed === 'migration') {
-      this.subscriptionConfirmed.pumpPortal = true;
-      console.log('✓ PumpPortal migration subscription confirmed');
-      return;
     }
-
-    // Handle subscription acknowledgment (different format)
-    if (message.message && message.message.includes('subscribed')) {
-      this.subscriptionConfirmed.pumpPortal = true;
-      console.log('✓ PumpPortal subscription acknowledged:', message.message);
-      return;
-    }
-
-    // PumpPortal migration event structure
-    if (message.txType === 'migration' || message.type === 'migration') {
-      // Mark subscription as confirmed if we receive migration events
-      if (!this.subscriptionConfirmed.pumpPortal) {
-        this.subscriptionConfirmed.pumpPortal = true;
-        console.log('✓ PumpPortal subscription confirmed (received migration event)');
-      }
-
-      const migration: MigrationEvent = {
-        tokenMint: message.mint || message.tokenMint,
-        tokenName: message.name || message.tokenName || null,
-        tokenSymbol: message.symbol || message.tokenSymbol || null,
-        poolAddress: message.pool || message.poolAddress || '',
-        bondingCurveAddress: message.bondingCurve || message.bondingCurveAddress || null,
-        initialLiquiditySol: parseFloat(message.initialLiquidity || message.solAmount || '0'),
-        initialPriceSol: parseFloat(message.price || message.initialPrice || '0'),
-        timestamp: message.timestamp || Date.now(),
-      };
-
-      this.processMigration(migration, 'pumpportal');
-    }
-  }
-
-  private handlePumpPortalReconnect(): void {
-    if (!this.isRunning) return;
-
-    this.reconnectAttempts.pumpPortal++;
-
-    if (this.reconnectAttempts.pumpPortal > this.maxReconnectAttempts) {
-      console.error('PumpPortal max reconnect attempts reached');
-      return;
-    }
-
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts.pumpPortal), 30000);
-    console.log(`Reconnecting to PumpPortal in ${delay}ms (attempt ${this.reconnectAttempts.pumpPortal})`);
-
-    setTimeout(() => {
-      if (this.isRunning) {
-        this.initPumpPortal();
-      }
-    }, delay);
   }
 
   /**
-   * Secondary Source: Helius WebSocket
-   * Monitors Raydium program for new pool creation
+   * Initialize Helius WebSocket connection
+   * Monitors Pump bonding curve program for migration transactions
    */
   private async initHeliusMonitor(): Promise<void> {
-    if (!this.heliusApiKey) {
-      console.warn('HELIUS_API_KEY not set, skipping Helius monitor');
-      return;
-    }
-
     return new Promise((resolve) => {
       try {
         const heliusWsUrl = `wss://mainnet.helius-rpc.com/?api-key=${this.heliusApiKey}`;
@@ -223,18 +161,20 @@ export class MigrationDetector extends EventEmitter {
 
         this.heliusWs.on('open', () => {
           console.log('Helius WebSocket connected');
-          this.reconnectAttempts.helius = 0;
+          this.reconnectAttempts = 0;
+          this.lastMessageTime = Date.now();
 
-          // Subscribe to Raydium CPMM program logs
-          // Program ID for Raydium CPMM
-          const raydiumCpmmProgram = 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C';
+          // Subscribe to Pump bonding curve program for migrations
+          // When a token migrates, the Pump program logs "Instruction: Migrate"
+          // Pump bonding curve program: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+          const pumpBondingCurveProgram = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 
           this.heliusWs?.send(JSON.stringify({
             jsonrpc: '2.0',
             id: 1,
             method: 'logsSubscribe',
             params: [
-              { mentions: [raydiumCpmmProgram] },
+              { mentions: [pumpBondingCurveProgram] },
               { commitment: 'confirmed' },
             ],
           }));
@@ -243,6 +183,8 @@ export class MigrationDetector extends EventEmitter {
         });
 
         this.heliusWs.on('message', (data: Buffer) => {
+          // Track last message time for stale connection detection
+          this.lastMessageTime = Date.now();
           try {
             const message = JSON.parse(data.toString());
             this.handleHeliusMessage(message);
@@ -253,11 +195,13 @@ export class MigrationDetector extends EventEmitter {
 
         this.heliusWs.on('close', () => {
           console.log('Helius WebSocket closed');
+          this.subscriptionConfirmed = false;
           this.handleHeliusReconnect();
         });
 
         this.heliusWs.on('error', (error) => {
           console.error('Helius WebSocket error:', error);
+          resolve();
         });
 
       } catch (error) {
@@ -270,7 +214,7 @@ export class MigrationDetector extends EventEmitter {
   private handleHeliusMessage(message: any): void {
     // Handle subscription confirmation
     if (message.result !== undefined) {
-      this.subscriptionConfirmed.helius = true;
+      this.subscriptionConfirmed = true;
       console.log('✓ Helius subscription confirmed:', message.result);
       return;
     }
@@ -280,17 +224,37 @@ export class MigrationDetector extends EventEmitter {
       const logs = message.params?.result?.value?.logs || [];
       const signature = message.params?.result?.value?.signature;
 
-      // Look for pool initialization logs (Raydium CPMM)
-      const isPoolInit = logs.some((log: string) =>
-        log.includes('Program log: Instruction: Initialize') ||
-        log.includes('InitializePool') ||
-        log.includes('Create pool')
+      // Look for the actual migrate instruction - this is the ONLY reliable signal
+      // The Pump program logs "Instruction: Migrate" when graduating to PumpSwap
+      const hasMigrateInstruction = logs.some((log: string) =>
+        log === 'Program log: Instruction: Migrate'
       );
 
-      if (isPoolInit && signature) {
-        console.log(`Potential new pool detected via Helius: ${signature}`);
+      if (hasMigrateInstruction && signature) {
+        // CRITICAL: Deduplicate by signature FIRST to prevent processing same tx twice
+        // Helius WebSocket can sometimes send duplicate notifications for the same transaction
+        if (this.processedSignatures.has(signature)) {
+          console.log(`   ⏭️  Ignoring duplicate signature: ${signature.slice(0, 20)}...`);
+          return;
+        }
 
-        // Queue the fetch with rate limiting instead of immediate fetch
+        // Mark signature as processed
+        this.processedSignatures.add(signature);
+
+        // Limit memory usage by clearing old signatures when set gets too large
+        if (this.processedSignatures.size > this.MAX_PROCESSED_SIGNATURES) {
+          const iterator = this.processedSignatures.values();
+          // Remove oldest 20% of signatures
+          const toRemove = Math.floor(this.MAX_PROCESSED_SIGNATURES * 0.2);
+          for (let i = 0; i < toRemove; i++) {
+            const oldest = iterator.next().value;
+            if (oldest) this.processedSignatures.delete(oldest);
+          }
+        }
+
+        console.log(`\n🔔 MIGRATION detected via Helius: ${signature}`);
+
+        // Queue the fetch immediately - process as fast as possible
         this.queueHeliusFetch(signature);
       }
     }
@@ -340,10 +304,11 @@ export class MigrationDetector extends EventEmitter {
   }
 
   /**
-   * Fetch and process a Raydium pool creation transaction from Helius
+   * Fetch and process a migration transaction from Helius
    */
   private async fetchAndProcessHeliusTransaction(signature: string): Promise<void> {
-    if (!this.heliusApiKey) return;
+    const fetchStart = Date.now();
+    console.log(`   📡 Fetching transaction: ${signature.slice(0, 20)}...`);
 
     try {
       // Use Helius enhanced transaction API for parsed data
@@ -363,132 +328,361 @@ export class MigrationDetector extends EventEmitter {
 
       const transactions = await response.json();
       const tx = transactions[0];
+      const fetchDuration = Date.now() - fetchStart;
 
       if (!tx) {
-        console.log(`No transaction data found for ${signature}`);
+        console.log(`   ❌ No transaction data found for ${signature}`);
         return;
       }
 
-      // Look for Raydium CPMM pool creation in the transaction
-      // The token transfers and account keys tell us about the pool
-      const accountKeys = tx.accountData?.map((a: any) => a.account) || [];
-      const tokenTransfers = tx.tokenTransfers || [];
+      // Extract token mint, pool address, coinCreator, and liquidity from the transaction
+      const { tokenMint, poolAddress, coinCreator, liquiditySol, isToken2022 } = this.parseTransactionData(tx);
 
-      // Try to identify the token mint and pool from the transaction
-      // Raydium CPMM pools have specific instruction patterns
-      let tokenMint: string | null = null;
-      let poolAddress: string | null = null;
-      let liquiditySol = 0;
-
-      // Look for non-SOL token transfers (the new token being added to pool)
-      for (const transfer of tokenTransfers) {
-        if (transfer.mint && transfer.mint !== 'So11111111111111111111111111111111111111112') {
-          tokenMint = transfer.mint;
-          break;
-        }
-      }
-
-      // Look for SOL amount (native transfers represent liquidity)
-      const nativeTransfers = tx.nativeTransfers || [];
-      for (const transfer of nativeTransfers) {
-        if (transfer.amount > liquiditySol) {
-          liquiditySol = transfer.amount / 1e9; // Convert lamports to SOL
-        }
-      }
-
-      // Pool address is typically in the account keys
-      if (accountKeys.length > 2) {
-        // The pool account is usually one of the first few accounts after the payer
-        poolAddress = accountKeys[1] || accountKeys[2];
-      }
+      console.log(`   📊 Parsed in ${fetchDuration}ms: token=${tokenMint?.slice(0, 12) || 'null'}, pool=${poolAddress?.slice(0, 12) || 'null'}, creator=${coinCreator?.slice(0, 12) || 'null'}, liq=${liquiditySol.toFixed(2)} SOL${isToken2022 ? ' [Token-2022]' : ''}`);
 
       if (tokenMint && poolAddress) {
-        console.log(`Helius detected pool: token=${tokenMint}, pool=${poolAddress}, liq=${liquiditySol} SOL`);
+        // Only process PumpFun tokens:
+        // - SPL tokens end with 'pump'
+        // - Token-2022 tokens don't have this suffix but are detected by the Token-2022 program
+        const isPumpSuffix = tokenMint.endsWith('pump');
+        if (!isPumpSuffix && !isToken2022) {
+          console.log(`   ⏭️  Skipping non-PumpFun token: ${tokenMint.slice(0, 12)}...`);
+          return;
+        }
+
+        // PumpFun tokens graduate to Raydium at approximately $68,000 market cap
+        // Calculate based on ~85 SOL liquidity * $200/SOL * 4 (typical FDV multiplier at graduation)
+        // Or use the standard graduation market cap of ~$68,000
+        const SOL_PRICE_USD = 200; // Approximate - could fetch live price for accuracy
+        const PUMPFUN_GRADUATION_MCAP_USD = 68000; // Standard graduation threshold
+
+        // Calculate market cap: if we have liquidity, estimate from it, otherwise use standard
+        const estimatedMarketCapUsd = liquiditySol > 0
+          ? Math.round(liquiditySol * SOL_PRICE_USD * 4) // Rough estimate: liquidity * SOL price * multiplier
+          : PUMPFUN_GRADUATION_MCAP_USD;
+
+        console.log(`\n🚀 PUMPFUN MIGRATION CONFIRMED!${isToken2022 ? ' [Token-2022]' : ''}`);
+        console.log(`   Token: ${tokenMint}`);
+        console.log(`   Pool: ${poolAddress}`);
+        console.log(`   Creator: ${coinCreator || 'NOT FOUND'}`);
+        console.log(`   Liquidity: ${liquiditySol.toFixed(2)} SOL`);
+        console.log(`   Est. Market Cap: $${estimatedMarketCapUsd.toLocaleString()}`);
+
+        if (!coinCreator) {
+          console.log(`   ⚠️ WARNING: coinCreator not found - trades may fail!`);
+        }
 
         const migration: MigrationEvent = {
           tokenMint,
-          tokenName: null, // Would need additional lookup
+          tokenName: null,
           tokenSymbol: null,
           poolAddress,
           bondingCurveAddress: null,
+          coinCreator, // CRITICAL: Pass coinCreator for PumpSwap trades
           initialLiquiditySol: liquiditySol,
-          initialPriceSol: 0, // Would need price calculation
+          initialPriceSol: 0,
+          initialMarketCapUsd: estimatedMarketCapUsd, // CRITICAL: Capture market cap at migration for accurate entry MCAP
           timestamp: tx.timestamp ? tx.timestamp * 1000 : Date.now(),
+          isToken2022, // Flag for Token-2022 tokens (don't end with 'pump')
         };
 
-        this.processMigration(migration, 'helius');
+        this.processMigration(migration, isToken2022);
+      } else {
+        console.log(`   ⚠️ Could not extract token/pool from transaction`);
       }
     } catch (error) {
       console.error('Error fetching Helius transaction:', error);
     }
   }
 
+  /**
+   * Parse Helius transaction data to extract migration details
+   *
+   * The Pump bonding curve migrate instruction has this account layout:
+   * - Index 2: Token mint (ends with 'pump' for SPL tokens, or any mint for Token-2022)
+   * - Index 9: Pool address (PumpSwap pool)
+   * - Index 19: Token program (TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA for SPL, TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb for Token-2022)
+   *
+   * The PumpSwap AMM createPool instruction (23 accounts) has:
+   * - Index 18: coin_creator_vault_authority (the original token creator)
+   */
+  private parseTransactionData(tx: any): {
+    tokenMint: string | null;
+    poolAddress: string | null;
+    coinCreator: string | null;
+    liquiditySol: number;
+    isToken2022: boolean;
+  } {
+    const tokenTransfers = tx.tokenTransfers || [];
+    const instructions = tx.instructions || [];
+    const innerInstructions = tx.innerInstructions || [];
+    const nativeTransfers = tx.nativeTransfers || [];
+
+    let tokenMint: string | null = null;
+    let poolAddress: string | null = null;
+    let coinCreator: string | null = null;
+    let liquiditySol = 0;
+    let isToken2022 = false;
+
+    // Find the Pump bonding curve migrate instruction
+    // Program: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+    const PUMP_BONDING_CURVE_PROGRAM = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
+    // PumpSwap AMM program: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+    const PUMP_AMM_PROGRAM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
+    // Token-2022 program
+    const TOKEN_2022_PROGRAM = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+
+    // Collect all instructions including inner (CPI) instructions
+    // The PumpSwap createPool is called via CPI from the migrate instruction
+    const allInstructions = [...instructions];
+    for (const innerGroup of innerInstructions) {
+      if (innerGroup.instructions) {
+        allInstructions.push(...innerGroup.instructions);
+      }
+    }
+
+    for (const ix of allInstructions) {
+      if (ix.programId === PUMP_BONDING_CURVE_PROGRAM) {
+        const accounts = ix.accounts || [];
+
+        // Check if this is a Token-2022 migration (Token-2022 program at index 19)
+        if (accounts[19] === TOKEN_2022_PROGRAM) {
+          isToken2022 = true;
+          console.log(`   🔷 Token-2022 migration detected`);
+        }
+
+        // Token mint is at index 2
+        // For SPL tokens: ends with 'pump'
+        // For Token-2022 tokens: any valid pubkey (doesn't end with 'pump')
+        if (accounts[2] && typeof accounts[2] === 'string') {
+          const isPumpSuffix = accounts[2].endsWith('pump');
+          if (isPumpSuffix || isToken2022) {
+            tokenMint = accounts[2];
+            if (!isPumpSuffix) {
+              console.log(`   🔷 Token-2022 mint: ${tokenMint}`);
+            }
+          }
+        }
+
+        // Pool address is at index 9
+        if (accounts[9] && typeof accounts[9] === 'string') {
+          poolAddress = accounts[9];
+        }
+      }
+
+      // Extract coinCreator from PumpSwap AMM createPool instruction (23 accounts)
+      // This is CRITICAL for building valid buy/sell transactions
+      if (ix.programId === PUMP_AMM_PROGRAM) {
+        const accounts = ix.accounts || [];
+        console.log(`   🔍 PumpSwap AMM instruction found, ${accounts.length} accounts`);
+        // coin_creator_vault_authority is at index 18 in the 23-account createPool instruction
+        if (accounts.length >= 19 && accounts[18] && typeof accounts[18] === 'string') {
+          coinCreator = accounts[18];
+          console.log(`   💎 Found coinCreator from AMM instruction: ${coinCreator.slice(0, 12)}...`);
+        } else {
+          console.log(`   ⚠️ AMM instruction has ${accounts.length} accounts, expected 19+`);
+          if (accounts[18]) {
+            console.log(`   ⚠️ accounts[18] type: ${typeof accounts[18]}, value: ${JSON.stringify(accounts[18]).slice(0, 50)}`);
+          }
+        }
+      }
+    }
+
+    // Debug: Log if we didn't find coinCreator
+    if (!coinCreator) {
+      console.log(`   ⚠️ coinCreator not found. Top-level instructions: ${instructions.length}, Inner instruction groups: ${innerInstructions.length}`);
+      for (const ix of instructions) {
+        console.log(`      - programId: ${ix.programId}, accounts: ${(ix.accounts || []).length}`);
+      }
+      // Also log inner instructions
+      for (let i = 0; i < innerInstructions.length; i++) {
+        const group = innerInstructions[i];
+        const innerIxs = group.instructions || [];
+        console.log(`      Inner group ${i}: ${innerIxs.length} instructions`);
+        for (const ix of innerIxs) {
+          console.log(`         - programId: ${ix.programId}, accounts: ${(ix.accounts || []).length}`);
+        }
+      }
+    }
+
+    // Fallback: Look for PumpFun token in token transfers
+    // For SPL tokens, look for 'pump' suffix; for Token-2022, we already have the mint
+    if (!tokenMint) {
+      for (const transfer of tokenTransfers) {
+        if (transfer.mint && transfer.mint.endsWith('pump')) {
+          tokenMint = transfer.mint;
+          break;
+        }
+      }
+    }
+
+    // Extract SOL liquidity amount
+    for (const transfer of nativeTransfers) {
+      if (transfer.amount > liquiditySol) {
+        liquiditySol = transfer.amount / 1e9; // Convert lamports to SOL
+      }
+    }
+
+    return { tokenMint, poolAddress, coinCreator, liquiditySol, isToken2022 };
+  }
+
   private handleHeliusReconnect(): void {
     if (!this.isRunning) return;
 
-    this.reconnectAttempts.helius++;
+    this.reconnectAttempts++;
 
-    if (this.reconnectAttempts.helius > this.maxReconnectAttempts) {
-      console.error('Helius max reconnect attempts reached');
+    if (this.reconnectAttempts > this.maxReconnectAttempts) {
+      console.error('Helius max reconnect attempts reached - stopping detection');
       return;
     }
 
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts.helius), 30000);
-    console.log(`Reconnecting to Helius in ${delay}ms (attempt ${this.reconnectAttempts.helius})`);
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    console.log(`Reconnecting to Helius in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       if (this.isRunning) {
-        this.initHeliusMonitor();
+        await this.initHeliusMonitor();
+        // After successful reconnect, catch up on any missed migrations
+        await this.catchUpMissedMigrations();
       }
     }, delay);
   }
 
   /**
-   * Process and deduplicate migration events from all sources
+   * Catch up on migrations that may have been missed during disconnect
+   * Fetches recent migrations from the database and checks for any
+   * that happened in the last 60 seconds that we haven't processed
    */
-  private async processMigration(
-    event: MigrationEvent,
-    source: 'pumpportal' | 'helius' | 'raydium'
-  ): Promise<void> {
+  private async catchUpMissedMigrations(): Promise<void> {
+    const CATCH_UP_WINDOW_MS = 60_000; // 60 seconds
+    const cutoffTime = new Date(Date.now() - CATCH_UP_WINDOW_MS);
+
+    try {
+      console.log('[Catch-up] Checking for missed migrations during disconnect...');
+
+      // Fetch recent migrations from database that we might have missed
+      // Note: MigrationEvent uses 'detectedAt' not 'createdAt'
+      const recentMigrations = await prisma.migrationEvent.findMany({
+        where: {
+          detectedAt: { gte: cutoffTime },
+        },
+        orderBy: { detectedAt: 'desc' },
+        take: 20, // Limit to most recent 20
+      });
+
+      if (recentMigrations.length === 0) {
+        console.log('[Catch-up] No recent migrations found');
+        return;
+      }
+
+      let caughtUp = 0;
+      for (const migration of recentMigrations) {
+        // Skip if we already processed this one
+        if (this.recentMigrations.has(migration.tokenMint)) {
+          continue;
+        }
+
+        // Skip if too old (processMigration will reject it anyway)
+        const age = Date.now() - migration.detectedAt.getTime();
+        if (age > CATCH_UP_WINDOW_MS) {
+          continue;
+        }
+
+        // Skip if no pool address (required for trading)
+        if (!migration.poolAddress) {
+          console.log(`[Catch-up] Skipping migration without pool address: ${migration.tokenMint.slice(0, 12)}`);
+          continue;
+        }
+
+        console.log(`[Catch-up] Re-emitting missed migration: ${migration.tokenSymbol || migration.tokenMint.slice(0, 12)}`);
+
+        // Re-emit the migration event
+        const event: MigrationEvent = {
+          tokenMint: migration.tokenMint,
+          tokenName: migration.tokenName || null,
+          tokenSymbol: migration.tokenSymbol || null,
+          poolAddress: migration.poolAddress,
+          bondingCurveAddress: migration.bondingCurveAddress || null,
+          coinCreator: null, // Will be fetched by snipe orchestrator if needed
+          initialLiquiditySol: migration.initialLiquiditySol ?? 0,
+          initialPriceSol: migration.initialPriceSol ?? 0,
+          initialMarketCapUsd: migration.initialMarketCapUsd ?? null,
+          timestamp: migration.detectedAt.getTime(),
+        };
+
+        await this.processMigration(event, !migration.tokenMint.endsWith('pump'));
+        caughtUp++;
+      }
+
+      if (caughtUp > 0) {
+        console.log(`[Catch-up] Re-emitted ${caughtUp} missed migration(s)`);
+      } else {
+        console.log('[Catch-up] No missed migrations to catch up on');
+      }
+    } catch (error) {
+      console.error('[Catch-up] Failed to catch up on missed migrations:', error);
+      // Non-fatal - continue running
+    }
+  }
+
+  /**
+   * Process and deduplicate migration events
+   */
+  private async processMigration(event: MigrationEvent, isToken2022: boolean = false): Promise<void> {
     const key = event.tokenMint;
     const now = Date.now();
 
-    // CRITICAL: Reject historical migrations
-    // This prevents sniping old tokens that come through on reconnection or backfill
-    const MAX_EVENT_AGE_MS = 60_000; // 60 seconds max - event timestamp to now
+    // Safety check: only process PumpFun tokens
+    // SPL tokens end with 'pump', Token-2022 tokens don't but are explicitly flagged
+    const isPumpSuffix = event.tokenMint?.endsWith('pump');
+    if (!event.tokenMint || (!isPumpSuffix && !isToken2022)) {
+      console.log(`Rejecting non-PumpFun token: ${event.tokenMint?.slice(0, 16) || 'null'}`);
+      return;
+    }
+
+    // Reject historical migrations (older than 60 seconds)
+    const MAX_EVENT_AGE_MS = 60_000;
     const eventAge = now - event.timestamp;
 
     if (eventAge > MAX_EVENT_AGE_MS) {
-      console.log(
-        `Ignoring historical migration: ${event.tokenSymbol || event.tokenMint} ` +
-        `(event age: ${Math.round(eventAge / 1000)}s)`
-      );
+      console.log(`Ignoring historical migration: ${event.tokenMint} (age: ${Math.round(eventAge / 1000)}s)`);
       return;
     }
 
     // Check for duplicates
     if (this.recentMigrations.has(key)) {
       const firstDetection = this.recentMigrations.get(key)!;
-      console.log(`Duplicate migration ignored: ${key} (first detected ${now - firstDetection}ms ago by another source)`);
+      console.log(`Duplicate migration ignored: ${key} (first detected ${now - firstDetection}ms ago)`);
       return;
     }
 
     // Mark as detected
     this.recentMigrations.set(key, now);
 
-    const latencyMs = now - event.timestamp;
+    // Emit migration event
+    await this.emitMigration(event, now);
+  }
+
+  /**
+   * Emit a migration event to listeners
+   */
+  private async emitMigration(event: MigrationEvent, detectedAt: number): Promise<void> {
+    const latencyMs = detectedAt - event.timestamp;
+
+    // Fetch token metadata in background (non-blocking)
+    this.fetchAndBroadcastTokenMetadata(event.tokenMint);
+
     const detectedMigration: DetectedMigration = {
       ...event,
-      detectedBy: source,
-      detectedAt: now,
+      detectedBy: 'helius',
+      detectedAt,
       latencyMs,
     };
 
-    console.log(`\n🚀 MIGRATION DETECTED`);
-    console.log(`   Token: ${event.tokenSymbol || 'Unknown'} (${event.tokenMint})`);
+    console.log(`\n🎯 EMITTING MIGRATION TO SNIPE ORCHESTRATOR`);
+    console.log(`   Token: ${event.tokenMint}`);
     console.log(`   Pool: ${event.poolAddress}`);
-    console.log(`   Liquidity: ${event.initialLiquiditySol} SOL`);
-    console.log(`   Source: ${source}`);
+    console.log(`   CoinCreator: ${event.coinCreator || 'NULL'}`);
     console.log(`   Latency: ${latencyMs}ms\n`);
 
     // Store in database for analytics
@@ -502,7 +696,8 @@ export class MigrationDetector extends EventEmitter {
           poolAddress: event.poolAddress,
           initialLiquiditySol: event.initialLiquiditySol,
           initialPriceSol: event.initialPriceSol,
-          source,
+          initialMarketCapUsd: event.initialMarketCapUsd, // Store market cap at migration
+          source: 'helius',
           detectionLatencyMs: latencyMs,
         },
       });
@@ -513,7 +708,7 @@ export class MigrationDetector extends EventEmitter {
     // Publish to Redis for distribution
     await redis.publish('migrations', JSON.stringify(detectedMigration));
 
-    // Emit local event for snipe orchestrator
+    // Emit local event for snipe orchestrator - THIS IS THE KEY EVENT
     this.emit('migration', detectedMigration);
   }
 
@@ -537,30 +732,83 @@ export class MigrationDetector extends EventEmitter {
   }
 
   /**
+   * Periodic health check - reconnect if stalled
+   */
+  private checkConnectionHealth(): void {
+    const now = Date.now();
+    const connected = this.heliusWs?.readyState === WebSocket.OPEN;
+    const age = this.lastMessageTime > 0 ? Math.round((now - this.lastMessageTime) / 1000) : 0;
+    const stale = connected && this.lastMessageTime > 0 && (now - this.lastMessageTime) > this.STALE_CONNECTION_MS;
+
+    console.log(`[Health Check] Helius: ${connected ? '✓' : '✗'} (sub: ${this.subscriptionConfirmed}, age: ${age}s)${stale ? ' ⚠️ STALE - reconnecting' : ''}`);
+
+    // Reconnect if disconnected or stalled
+    if ((!connected || stale) && this.isRunning) {
+      console.log(`[Health Check] Helius ${stale ? 'stalled' : 'disconnected'} - forcing reconnect...`);
+      this.heliusWs?.close();
+      this.heliusWs = null;
+      this.subscriptionConfirmed = false;
+      this.lastMessageTime = 0;
+      this.reconnectAttempts = 0;
+      this.initHeliusMonitor();
+    }
+  }
+
+  /**
+   * Fetch token metadata in background
+   */
+  private async fetchAndBroadcastTokenMetadata(tokenMint: string): Promise<void> {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAYS = [500, 2000, 5000];
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt - 1]));
+      }
+
+      try {
+        const metadata = await tokenInfoService.getTokenMetadata(tokenMint);
+
+        if (metadata?.symbol) {
+          console.log(`   ✓ Token metadata: ${metadata.symbol} (attempt ${attempt + 1})`);
+
+          prisma.migrationEvent.updateMany({
+            where: { tokenMint },
+            data: {
+              tokenSymbol: metadata.symbol,
+              tokenName: metadata.name || undefined,
+            },
+          }).catch((err) => console.error('Failed to update token metadata:', err));
+
+          redis.publish('migration-update', JSON.stringify({
+            tokenMint,
+            tokenSymbol: metadata.symbol,
+            tokenName: metadata.name,
+          })).catch(() => {});
+
+          return;
+        }
+      } catch {
+        // Continue to next retry
+      }
+    }
+  }
+
+  /**
    * Get connection status for health checks
    */
   getStatus(): {
     isRunning: boolean;
-    connections: {
-      pumpPortal: boolean;
-      helius: boolean;
-    };
-    subscriptions: {
-      pumpPortal: boolean;
-      helius: boolean;
-    };
+    connected: boolean;
+    subscribed: boolean;
+    lastMessageAge: number;
     recentMigrations: number;
   } {
     return {
       isRunning: this.isRunning,
-      connections: {
-        pumpPortal: this.pumpPortalWs?.readyState === WebSocket.OPEN,
-        helius: this.heliusWs?.readyState === WebSocket.OPEN,
-      },
-      subscriptions: {
-        pumpPortal: this.subscriptionConfirmed.pumpPortal,
-        helius: this.subscriptionConfirmed.helius,
-      },
+      connected: this.heliusWs?.readyState === WebSocket.OPEN,
+      subscribed: this.subscriptionConfirmed,
+      lastMessageAge: this.lastMessageTime > 0 ? Date.now() - this.lastMessageTime : 0,
       recentMigrations: this.recentMigrations.size,
     };
   }

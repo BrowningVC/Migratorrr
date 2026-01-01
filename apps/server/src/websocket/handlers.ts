@@ -120,6 +120,15 @@ function setupRedisPubSub(io: Server, adminNamespace: ReturnType<Server['of']>) 
     }
   });
 
+  // Subscribe to migration-update channel (token metadata updates)
+  redisSub.subscribe('migration-update', (err) => {
+    if (err) {
+      console.error('Failed to subscribe to migration-update channel:', err);
+    } else {
+      console.log('Subscribed to migration-update channel');
+    }
+  });
+
   // Handle incoming messages
   redisSub.on('message', (channel, message) => {
     try {
@@ -130,8 +139,9 @@ function setupRedisPubSub(io: Server, adminNamespace: ReturnType<Server['of']>) 
           // Broadcast to all connected users
           io.emit('migration:detected', event);
 
-          // Also broadcast to admin namespace for live feed (only PumpFun tokens)
-          if (event.tokenMint && event.tokenMint.endsWith('pump')) {
+          // Also broadcast to admin namespace for live feed (PumpFun tokens: SPL ending with 'pump' OR Token-2022)
+          const isPumpFunToken = (event.tokenMint && event.tokenMint.endsWith('pump')) || event.isToken2022;
+          if (isPumpFunToken) {
             adminNamespace.to('admin:migrations').emit('migration:live', {
               id: `live-${Date.now()}-${event.tokenMint.slice(-8)}`,
               tokenMint: event.tokenMint,
@@ -142,6 +152,7 @@ function setupRedisPubSub(io: Server, adminNamespace: ReturnType<Server['of']>) 
               detectionLatencyMs: event.latencyMs || 0,
               source: event.detectedBy || 'unknown',
               detectedAt: new Date().toISOString(),
+              isToken2022: event.isToken2022 || false,
             });
           }
           break;
@@ -151,6 +162,11 @@ function setupRedisPubSub(io: Server, adminNamespace: ReturnType<Server['of']>) 
           if (event.userId) {
             io.to(`user:${event.userId}`).emit(event.type, event);
           }
+          break;
+
+        case 'migration-update':
+          // Broadcast token metadata update to all connected users
+          io.emit('migration:update', event);
           break;
 
         default:

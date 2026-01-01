@@ -13,6 +13,12 @@ interface TokenMarketData {
   fetchedAt: number;
 }
 
+interface TokenMetadata {
+  symbol: string | null;
+  name: string | null;
+  fetchedAt: number;
+}
+
 interface DexScreenerPair {
   chainId: string;
   dexId: string;
@@ -328,12 +334,132 @@ class TokenInfoService {
   }
 
   /**
+   * Get token metadata (symbol and name) from multiple sources
+   * Tries Jupiter first (fastest for new tokens), then DexScreener
+   */
+  async getTokenMetadata(tokenMint: string): Promise<TokenMetadata | null> {
+    const cacheKey = `token-meta:${tokenMint}`;
+    const cached = await redis.get(cacheKey);
+
+    if (cached) {
+      try {
+        return JSON.parse(cached) as TokenMetadata;
+      } catch {
+        // Invalid cache, continue to fetch
+      }
+    }
+
+    // Try Jupiter first (indexes faster than DexScreener)
+    const jupiterMeta = await this.getTokenMetadataFromJupiter(tokenMint);
+    if (jupiterMeta?.symbol) {
+      // Cache for 5 minutes
+      await redis.setex(cacheKey, 300, JSON.stringify(jupiterMeta));
+      return jupiterMeta;
+    }
+
+    // Fall back to DexScreener
+    await this.rateLimitDexScreener();
+
+    try {
+      const response = await fetch(
+        `${this.dexScreenerBaseUrl}/tokens/${tokenMint}`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data: DexScreenerResponse = await response.json();
+
+      if (!data.pairs || data.pairs.length === 0) {
+        return null;
+      }
+
+      // Find the token in the pairs (could be base or quote)
+      let symbol: string | null = null;
+      let name: string | null = null;
+
+      for (const pair of data.pairs) {
+        if (pair.chainId === 'solana') {
+          if (pair.baseToken.address === tokenMint) {
+            symbol = pair.baseToken.symbol;
+            name = pair.baseToken.name;
+            break;
+          }
+          if (pair.quoteToken.address === tokenMint) {
+            symbol = pair.quoteToken.symbol;
+            name = pair.quoteToken.name;
+            break;
+          }
+        }
+      }
+
+      const metadata: TokenMetadata = {
+        symbol,
+        name,
+        fetchedAt: Date.now(),
+      };
+
+      // Cache for 5 minutes (metadata rarely changes)
+      if (symbol) {
+        await redis.setex(cacheKey, 300, JSON.stringify(metadata));
+      }
+
+      return metadata;
+    } catch (error) {
+      console.error(`Failed to fetch token metadata for ${tokenMint}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get token metadata from Jupiter Token API (faster for new tokens)
+   */
+  private async getTokenMetadataFromJupiter(tokenMint: string): Promise<TokenMetadata | null> {
+    try {
+      const response = await fetch(
+        `https://tokens.jup.ag/token/${tokenMint}`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (!data || !data.symbol) {
+        return null;
+      }
+
+      return {
+        symbol: data.symbol || null,
+        name: data.name || null,
+        fetchedAt: Date.now(),
+      };
+    } catch {
+      // Jupiter API failed, will fall back to DexScreener
+      return null;
+    }
+  }
+
+  /**
    * Clear the volume cache for a specific token
    */
   async clearCache(tokenMint: string): Promise<void> {
     const cacheKey = `${this.cachePrefix}${tokenMint}`;
     await redis.del(cacheKey);
     await redis.del(`token-market:${tokenMint}`);
+    await redis.del(`token-meta:${tokenMint}`);
   }
 }
 

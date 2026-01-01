@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { X, ImageIcon } from 'lucide-react';
 
 interface StatsCardsProps {
   stats: {
@@ -192,14 +191,8 @@ export function StatsCards({ stats }: StatsCardsProps) {
           onClick={() => setShowComingSoon(true)}
         >
           <CardContent className="p-3 flex flex-col items-center justify-center h-full">
-            <div className="w-8 h-8 rounded-full bg-green-900/30 flex items-center justify-center mb-1 group-hover:bg-green-900/50 transition-colors overflow-hidden">
-              <Image
-                src="/share-icon.svg"
-                alt="Share"
-                width={18}
-                height={18}
-                className="object-contain"
-              />
+            <div className="w-8 h-8 rounded-full bg-green-900/30 flex items-center justify-center mb-1 group-hover:bg-green-900/50 transition-colors">
+              <ImageIcon className="w-4 h-4 text-green-400" />
             </div>
             <p className="text-xs font-medium text-green-400">Share Results</p>
             <p className="text-zinc-500 text-[10px]">Show off gains</p>
@@ -219,13 +212,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
                 <X className="w-5 h-5" />
               </button>
               <div className="w-16 h-16 rounded-full bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-                <Image
-                  src="/share-icon.svg"
-                  alt="Share"
-                  width={32}
-                  height={32}
-                  className="object-contain"
-                />
+                <ImageIcon className="w-8 h-8 text-green-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Coming Soon</h3>
               <p className="text-zinc-400 text-sm">

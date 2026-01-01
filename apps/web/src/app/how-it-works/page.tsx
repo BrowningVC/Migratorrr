@@ -31,6 +31,7 @@ import {
   Layers,
   RefreshCw,
   ChevronRight,
+  Flame,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo, LogoText } from '@/components/logo';
@@ -65,6 +66,7 @@ export default function HowItWorksPage() {
     { id: 'exit', label: 'Exit Strategies', icon: TrendingUp },
     { id: 'protection', label: 'MEV Protection', icon: Shield },
     { id: 'monitoring', label: 'Monitoring & Alerts', icon: Activity },
+    { id: 'buybacks', label: '$MIGRATOR Buybacks', icon: Flame },
     { id: 'fees', label: 'Fees & Costs', icon: DollarSign },
   ];
 
@@ -79,7 +81,7 @@ export default function HowItWorksPage() {
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
+              <Button variant="ghost">Sniper Dashboard</Button>
             </Link>
             <Link href="/buybacks">
               <Button variant="ghost">$MIGRATOR Buybacks</Button>
@@ -139,7 +141,7 @@ export default function HowItWorksPage() {
             <Section id="overview" title="Overview" icon={Eye}>
               <p className="text-muted-foreground mb-6">
                 Migratorrr is an automated trading platform that monitors PumpFun token migrations
-                to Raydium and executes trades based on your configured strategies. Here&apos;s the
+                to Raydium and PumpSwap, executing trades based on your configured strategies. Here&apos;s the
                 high-level flow:
               </p>
 
@@ -172,7 +174,7 @@ export default function HowItWorksPage() {
 
               <InfoBox type="info" title="What is a Migration?">
                 When a token on PumpFun completes its bonding curve (reaches ~$69k market cap),
-                it &quot;graduates&quot; and migrates to Raydium, a decentralized exchange. This is when
+                it &quot;graduates&quot; and migrates to either Raydium or PumpSwap DEX. This is when
                 liquidity is added and the token becomes freely tradeable. Only ~1.4% of PumpFun
                 tokens ever reach this milestone.
               </InfoBox>
@@ -181,8 +183,8 @@ export default function HowItWorksPage() {
             {/* Migration Detection Section */}
             <Section id="detection" title="Migration Detection" icon={Zap}>
               <p className="text-muted-foreground mb-6">
-                Speed is everything in token sniping. Migratorrr uses a triple-redundant detection
-                system to catch migrations as fast as possible.
+                Speed is everything in token sniping. Migratorrr uses real-time WebSocket streaming
+                to catch migrations as fast as possible.
               </p>
 
               <div className="grid md:grid-cols-3 gap-4 mb-6">
@@ -193,8 +195,8 @@ export default function HowItWorksPage() {
                 />
                 <FeatureBox
                   icon={RefreshCw}
-                  title="Polling Backup"
-                  description="Secondary polling system ensures no migrations are missed"
+                  title="Multi-DEX Support"
+                  description="Monitors both Raydium and PumpSwap migrations automatically"
                 />
                 <FeatureBox
                   icon={Activity}
@@ -216,11 +218,11 @@ export default function HowItWorksPage() {
                   />
                   <TimelineItem
                     time="~50ms"
-                    event="Transaction parsed and validated"
+                    event="Transaction parsed and validated (Raydium or PumpSwap)"
                   />
                   <TimelineItem
                     time="~100ms"
-                    event="Token info enriched (name, symbol, liquidity)"
+                    event="Token info enriched (name, symbol, liquidity, market cap)"
                   />
                   <TimelineItem
                     time="~150ms"
@@ -262,23 +264,23 @@ export default function HowItWorksPage() {
                     <tr>
                       <td className="px-4 py-3 font-medium">Snipe Amount</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
-                        SOL to spend per snipe (excluding fees)
+                        SOL to spend per snipe (excluding fees). Minimum 0.1 SOL.
                       </td>
                       <td className="px-4 py-3 text-sm">0.1 - 1 SOL</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 font-medium">Slippage Tolerance</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
-                        Maximum price difference allowed from quote
+                        Maximum price difference allowed from quote. Minimum 10%.
                       </td>
                       <td className="px-4 py-3 text-sm">10-20%</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 font-medium">Priority Fee</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
-                        Jito tip for faster transaction inclusion
+                        Jito tip for faster transaction inclusion. Minimum 0.003 SOL.
                       </td>
-                      <td className="px-4 py-3 text-sm">0.002-0.005 SOL</td>
+                      <td className="px-4 py-3 text-sm">0.003-0.01 SOL</td>
                     </tr>
                   </tbody>
                 </table>
@@ -375,7 +377,8 @@ export default function HowItWorksPage() {
             <Section id="execution" title="Trade Execution" icon={Target}>
               <p className="text-muted-foreground mb-6">
                 When a migration matches your sniper&apos;s criteria, Migratorrr automatically
-                executes a buy transaction using Jupiter for optimal routing.
+                executes a buy transaction. For Raydium migrations, Jupiter is used for optimal routing.
+                For PumpSwap, direct swap instructions are used.
               </p>
 
               <div className="bg-card border border-border rounded-xl p-6 mb-6">
@@ -384,7 +387,7 @@ export default function HowItWorksPage() {
                   <ExecutionStep
                     step={1}
                     title="Quote Generation"
-                    description="Jupiter API calculates the best swap route from SOL to the new token"
+                    description="Best swap route calculated (Jupiter for Raydium, direct for PumpSwap)"
                     status="success"
                   />
                   <ExecutionStep
@@ -410,7 +413,7 @@ export default function HowItWorksPage() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <InfoBox type="success" title="Successful Trade">
-                  Position is opened and tracked. Exit strategies begin monitoring price.
+                  Position is opened and tracked. Exit strategies begin monitoring market cap.
                   You&apos;ll see the position in your dashboard with real-time P&L.
                 </InfoBox>
                 <InfoBox type="error" title="Failed Trade">
@@ -424,7 +427,7 @@ export default function HowItWorksPage() {
             <Section id="exit" title="Exit Strategies" icon={TrendingUp}>
               <p className="text-muted-foreground mb-6">
                 Automated exit strategies ensure you lock in profits and limit losses without
-                constant monitoring.
+                constant monitoring. Exit triggers are based on market cap changes from your entry point.
               </p>
 
               <div className="space-y-4 mb-6">
@@ -432,15 +435,15 @@ export default function HowItWorksPage() {
                   title="Take Profit"
                   icon={ArrowUpRight}
                   iconColor="text-green-500"
-                  description="Automatically sell when your position reaches a target profit percentage"
-                  example="Set to 100% = sell when position doubles (2x)"
+                  description="Automatically sell when your position reaches a target profit percentage based on market cap increase"
+                  example="Set to 100% = sell when market cap doubles from entry (2x)"
                   required
                 />
                 <ExitStrategyCard
                   title="Stop Loss"
                   icon={ArrowDownRight}
                   iconColor="text-red-500"
-                  description="Automatically sell when position drops below a threshold from entry"
+                  description="Automatically sell when market cap drops below a threshold from your entry"
                   example="Set to 50% = sell if market cap drops to half of entry"
                   required
                 />
@@ -448,8 +451,8 @@ export default function HowItWorksPage() {
                   title="Trailing Stop"
                   icon={TrendingUp}
                   iconColor="text-yellow-500"
-                  description="Sell when price drops X% from its highest point (follows price up)"
-                  example="Set to 20% = sell if price drops 20% from peak"
+                  description="Sell when market cap drops X% from its highest point (follows price up)"
+                  example="Set to 20% = sell if market cap drops 20% from peak"
                 />
                 <ExitStrategyCard
                   title="Cover Initials"
@@ -463,7 +466,7 @@ export default function HowItWorksPage() {
               <InfoBox type="info" title="Strategy Combinations">
                 Exit strategies work together. For example: Cover Initials triggers at 2x,
                 then Take Profit closes the remaining 50% at your target, while Stop Loss
-                protects against sudden drops.
+                protects against sudden drops. The Activity Log shows exactly which exit triggered (TP Hit, SL Hit, TS Hit).
               </InfoBox>
             </Section>
 
@@ -543,7 +546,7 @@ export default function HowItWorksPage() {
                 <FeatureBox
                   icon={Activity}
                   title="Live Activity Log"
-                  description="Real-time feed of migrations detected, trades executed, and position updates"
+                  description="Real-time feed of migrations detected, trades executed, and position updates with specific labels (TP Hit, SL Hit, Manual Sell)"
                 />
                 <FeatureBox
                   icon={Bell}
@@ -553,12 +556,12 @@ export default function HowItWorksPage() {
                 <FeatureBox
                   icon={BarChart3}
                   title="P&L Tracking"
-                  description="Real-time profit/loss calculations for all open and closed positions"
+                  description="Real-time profit/loss calculations based on entry market cap vs current market cap"
                 />
                 <FeatureBox
                   icon={Eye}
                   title="Position Dashboard"
-                  description="Overview of all positions with current prices and exit status"
+                  description="Overview of all positions with current prices, entry market cap, and exit status"
                 />
               </div>
 
@@ -571,6 +574,60 @@ export default function HowItWorksPage() {
                   <StatPreview label="Success Rate" value="78%" />
                 </div>
               </div>
+            </Section>
+
+            {/* Buybacks Section */}
+            <Section id="buybacks" title="$MIGRATOR Buybacks" icon={Flame}>
+              <p className="text-muted-foreground mb-6">
+                Platform fees are used to buy back and burn $MIGRATOR tokens, creating deflationary
+                pressure and rewarding holders.
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                <FeatureBox
+                  icon={Crosshair}
+                  title="Sniper Fees"
+                  description="1% fee on successful buy transactions funds the buyback pool"
+                />
+                <FeatureBox
+                  icon={BarChart3}
+                  title="Volume Fees"
+                  description="Trading volume on the platform contributes to buybacks"
+                />
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-6 mb-6">
+                <h4 className="font-semibold mb-4 flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5 text-primary" />
+                  Buyback Flow
+                </h4>
+                <div className="space-y-3">
+                  <TimelineItem
+                    time="1"
+                    event="Fees collected from sniper trades and volume"
+                  />
+                  <TimelineItem
+                    time="2"
+                    event="SOL accumulates in buyback treasury"
+                  />
+                  <TimelineItem
+                    time="3"
+                    event="Automatic buybacks executed periodically"
+                    highlight
+                  />
+                  <TimelineItem
+                    time="4"
+                    event="$MIGRATOR tokens burned, reducing supply"
+                    highlight
+                  />
+                </div>
+              </div>
+
+              <InfoBox type="success" title="Deflationary Tokenomics">
+                Every successful trade on Migratorrr contributes to $MIGRATOR buybacks.
+                Tokens are permanently burned, reducing total supply over time.
+                Track buyback stats on the <Link href="/buybacks" className="underline text-primary">$MIGRATOR Buybacks</Link> page.
+              </InfoBox>
             </Section>
 
             {/* Fees Section */}
@@ -593,14 +650,14 @@ export default function HowItWorksPage() {
                       <td className="px-4 py-3 font-medium">Platform Fee</td>
                       <td className="px-4 py-3 text-primary font-semibold">1%</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
-                        On successful buy transactions only
+                        On successful buy transactions only (funds $MIGRATOR buybacks)
                       </td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 font-medium">Priority Fee (Jito Tip)</td>
-                      <td className="px-4 py-3 text-sm">0.001-0.01 SOL</td>
+                      <td className="px-4 py-3 text-sm">0.003-0.01 SOL</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
-                        Per transaction, configurable
+                        Per transaction, configurable (minimum 0.003 SOL)
                       </td>
                     </tr>
                     <tr>
@@ -614,7 +671,7 @@ export default function HowItWorksPage() {
                       <td className="px-4 py-3 font-medium">Swap Fee</td>
                       <td className="px-4 py-3 text-sm">0.25-0.3%</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
-                        AMM fees (Raydium pool)
+                        AMM fees (Raydium/PumpSwap pool)
                       </td>
                     </tr>
                   </tbody>
@@ -623,7 +680,7 @@ export default function HowItWorksPage() {
 
               <InfoBox type="info" title="No Hidden Fees">
                 Failed transactions only cost gas (network fee). The 1% platform fee is only
-                charged on successful buys. Sells have no platform fee—just network and swap fees.
+                charged on successful buys and goes directly to $MIGRATOR buybacks. Sells have no platform fee—just network and swap fees.
               </InfoBox>
             </Section>
 
@@ -661,7 +718,7 @@ export default function HowItWorksPage() {
             </Link>
             <div className="flex items-center gap-6">
               <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Dashboard
+                Sniper Dashboard
               </Link>
               <Link href="/buybacks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 $MIGRATOR Buybacks

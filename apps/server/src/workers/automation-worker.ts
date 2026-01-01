@@ -2,6 +2,7 @@ import { prisma } from '../db/client.js';
 import { transactionExecutor } from '../services/transaction-executor.js';
 import { emitToUser } from '../websocket/handlers.js';
 import { redis } from '../db/redis.js';
+import { pumpSwapService } from '../services/pumpswap.js';
 
 interface PriceData {
   mint: string;
@@ -23,6 +24,9 @@ export class AutomationWorker {
   private priceMonitorInterval: NodeJS.Timeout | null = null;
   private priceCache = new Map<string, PriceData>();
   private monitorIntervalMs = 500; // Check prices every 500ms
+  // Track positions with recent sell attempts to prevent repeated triggers
+  private sellAttemptCooldown = new Map<string, number>();
+  private readonly SELL_COOLDOWN_MS = 30000; // 30 second cooldown between sell attempts
 
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -108,17 +112,19 @@ export class AutomationWorker {
   }
 
   /**
-   * Fetch prices for multiple tokens
+   * Fetch prices for multiple tokens from PumpSwap pools
+   * PumpSwap tokens (migrated from pump.fun) don't have prices on Raydium/Jupiter
+   * We calculate prices directly from pool reserves
    */
   private async fetchPrices(mints: string[]): Promise<Map<string, number>> {
     const prices = new Map<string, number>();
     const now = Date.now();
 
-    // Check cache first (prices older than 200ms are stale)
+    // Check cache first (prices older than 500ms are stale for automation)
     const cacheMisses: string[] = [];
     for (const mint of mints) {
       const cached = this.priceCache.get(mint);
-      if (cached && now - cached.timestamp < 200) {
+      if (cached && now - cached.timestamp < 500) {
         prices.set(mint, cached.price);
       } else {
         cacheMisses.push(mint);
@@ -129,26 +135,22 @@ export class AutomationWorker {
       return prices;
     }
 
-    // Fetch missing prices from Raydium/Jupiter
-    try {
-      const response = await fetch(
-        `https://api.raydium.io/v2/main/price?tokens=${cacheMisses.join(',')}`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-
-        for (const mint of cacheMisses) {
-          const price = data.data?.[mint];
-          if (price) {
-            prices.set(mint, price);
-            this.priceCache.set(mint, { mint, price, timestamp: now });
-          }
+    // Fetch prices from PumpSwap pools
+    // Each token needs its own pool lookup
+    const pricePromises = cacheMisses.map(async (mint) => {
+      try {
+        const price = await pumpSwapService.getTokenPrice(mint);
+        if (price !== null) {
+          prices.set(mint, price);
+          this.priceCache.set(mint, { mint, price, timestamp: now });
         }
+      } catch (error) {
+        // Silently ignore individual price fetch failures
       }
-    } catch (error) {
-      console.error('Price fetch error:', error);
-    }
+    });
+
+    // Fetch all prices in parallel
+    await Promise.allSettled(pricePromises);
 
     return prices;
   }
@@ -218,19 +220,40 @@ export class AutomationWorker {
     }
 
     // Check trailing stop
-    if (trailingStopPct && highestPrice) {
+    if (trailingStopPct) {
+      // Initialize highestPrice if null (can happen if trailing stop was enabled after position creation)
+      const effectiveHighestPrice = highestPrice ?? entryPrice;
+
       // Update highest price if current is higher
-      if (currentPrice > highestPrice) {
+      if (currentPrice > effectiveHighestPrice) {
         await prisma.position.update({
           where: { id },
           data: { highestPrice: currentPrice },
         });
+      } else if (!highestPrice) {
+        // First time seeing this position with trailing stop - initialize highestPrice
+        await prisma.position.update({
+          where: { id },
+          data: { highestPrice: effectiveHighestPrice },
+        });
+      }
+
+      // CRITICAL FIX: Only activate trailing stop AFTER position has been in profit
+      // This prevents immediate triggers on positions that never went up
+      // A position is considered "in profit" when highestPrice > entryPrice
+      const hasBeenInProfit = effectiveHighestPrice > entryPrice;
+
+      if (!hasBeenInProfit) {
+        // Position has never been in profit - trailing stop not yet active
+        // The regular stop loss (if configured) will protect against downside
+        return;
       }
 
       // Check if price dropped by trailing stop percentage from highest
-      const dropPct = ((highestPrice - currentPrice) / highestPrice) * 100;
+      const peakPrice = Math.max(effectiveHighestPrice, currentPrice);
+      const dropPct = ((peakPrice - currentPrice) / peakPrice) * 100;
       if (dropPct >= trailingStopPct) {
-        console.log(`Trailing stop triggered for position ${id}`);
+        console.log(`Trailing stop triggered for position ${id} (peak: ${peakPrice.toExponential(2)}, current: ${currentPrice.toExponential(2)}, drop: ${dropPct.toFixed(1)}%)`);
         await this.executeSell(position, currentPrice, 'trailing_stop');
         return;
       }
@@ -258,6 +281,13 @@ export class AutomationWorker {
   ): Promise<void> {
     const { id, userId, tokenMint, tokenSymbol, currentTokenAmount, sniper } =
       position;
+
+    // Check cooldown to prevent repeated sell attempts for same position
+    const lastAttempt = this.sellAttemptCooldown.get(id);
+    if (lastAttempt && Date.now() - lastAttempt < this.SELL_COOLDOWN_MS) {
+      // Position is in cooldown from a recent failed attempt
+      return;
+    }
 
     if (!sniper || !currentTokenAmount) {
       console.error(`Cannot execute sell for position ${id}: missing data`);
@@ -297,36 +327,8 @@ export class AutomationWorker {
       return;
     }
 
-    // Notify user
-    const reasonLabels = {
-      take_profit: 'Take profit triggered',
-      stop_loss: 'Stop loss triggered',
-      trailing_stop: 'Trailing stop triggered',
-    };
-
-    await emitToUser(userId, `position:${reason}`, {
-      positionId: id,
-      tokenMint,
-      tokenSymbol,
-      currentPrice,
-      reason: reasonLabels[reason],
-    });
-
-    // Log activity
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        sniperId: sniper.id,
-        eventType: `position:${reason}`,
-        eventData: {
-          positionId: id,
-          tokenMint,
-          tokenSymbol,
-          currentPrice,
-          tokenAmount: currentTokenAmount,
-        },
-      },
-    });
+    // Mark this position as having a sell attempt in progress
+    this.sellAttemptCooldown.set(id, Date.now());
 
     // Extract config
     const config = sniper.config as { slippageBps?: number; priorityFeeSol?: number };
@@ -339,20 +341,40 @@ export class AutomationWorker {
         positionId: id,
         tokenMint,
         tokenAmount: currentTokenAmount,
-        slippageBps: config.slippageBps || 500, // 5% default slippage for sells
+        slippageBps: config.slippageBps || 2000, // 20% default slippage for autosells (volatile meme tokens)
         priorityFeeSol: config.priorityFeeSol || 0.001,
         reason,
       });
 
       if (result.success) {
+        // Clear cooldown on success
+        this.sellAttemptCooldown.delete(id);
+
         await prisma.position.update({
           where: { id },
           data: {
             status: 'closed',
             closedAt: new Date(),
             exitPrice: currentPrice,
-            exitSol: result.solSpent || 0,
+            exitSol: result.solReceived || 0, // executeSell returns solReceived, not solSpent
           },
+        });
+
+        // Emit events to frontend for real-time updates
+        // NOTE: Activity log is already created by transactionExecutor.executeSell() -> recordSellTransaction()
+        const reasonLabels = {
+          take_profit: 'Take profit triggered',
+          stop_loss: 'Stop loss triggered',
+          trailing_stop: 'Trailing stop triggered',
+        };
+
+        await emitToUser(userId, `position:${reason}`, {
+          positionId: id,
+          tokenMint,
+          tokenSymbol,
+          currentPrice,
+          reason: reasonLabels[reason],
+          signature: result.signature,
         });
 
         await emitToUser(userId, 'position:closed', {
@@ -366,12 +388,13 @@ export class AutomationWorker {
 
         console.log(`Position ${id} closed successfully via ${reason}`);
       } else {
-        // Revert to open status on failure
+        // Revert to open status on failure, but keep cooldown active to prevent immediate retry
         await prisma.position.update({
           where: { id },
           data: { status: 'open' },
         });
 
+        // Notify user of failure (but don't log to activity - only successful sells get logged)
         await emitToUser(userId, 'position:sell_failed', {
           positionId: id,
           tokenMint,
@@ -380,16 +403,16 @@ export class AutomationWorker {
           error: result.error,
         });
 
-        console.error(`Failed to close position ${id}: ${result.error}`);
+        console.error(`Failed to close position ${id}: ${result.error} (cooldown for ${this.SELL_COOLDOWN_MS / 1000}s)`);
       }
     } catch (error) {
-      // Revert to open status on error
+      // Revert to open status on error, but keep cooldown active to prevent immediate retry
       await prisma.position.update({
         where: { id },
         data: { status: 'open' },
       });
 
-      console.error(`Error executing sell for position ${id}:`, error);
+      console.error(`Error executing sell for position ${id}:`, error, `(cooldown for ${this.SELL_COOLDOWN_MS / 1000}s)`);
     }
   }
 

@@ -78,6 +78,55 @@ export function getIO(): Server | null {
   return ioInstance;
 }
 
+/**
+ * Recover positions stuck in 'selling' status from a previous crash
+ * These positions were mid-sell when the server stopped unexpectedly
+ * Reset them to 'open' so users can retry the sell
+ *
+ * Note: Position model doesn't have updatedAt, so we recover ALL stuck positions
+ * on startup. This is safe because 'selling' is a transient state that should
+ * only last seconds during normal operation.
+ */
+async function recoverStuckPositions(): Promise<void> {
+  try {
+    // Find all positions stuck in 'selling' status
+    // Since this runs on startup, any position in 'selling' state is stuck
+    const stuckPositions = await prisma.position.findMany({
+      where: {
+        status: 'selling',
+      },
+      select: { id: true, tokenSymbol: true, tokenMint: true, userId: true },
+    });
+
+    if (stuckPositions.length === 0) {
+      console.log('✅ No stuck positions to recover');
+      return;
+    }
+
+    console.log(`🔧 Recovering ${stuckPositions.length} stuck position(s)...`);
+
+    // Reset all stuck positions to 'open'
+    const result = await prisma.position.updateMany({
+      where: {
+        status: 'selling',
+      },
+      data: {
+        status: 'open',
+      },
+    });
+
+    console.log(`✅ Recovered ${result.count} position(s) from 'selling' → 'open'`);
+
+    // Log each recovered position for debugging
+    for (const pos of stuckPositions) {
+      console.log(`   - ${pos.tokenSymbol || pos.tokenMint.slice(0, 12)} (${pos.id.slice(0, 8)}...)`);
+    }
+  } catch (error) {
+    console.error('⚠️ Failed to recover stuck positions:', error);
+    // Non-fatal - continue startup
+  }
+}
+
 async function main() {
   // Validate environment before starting
   validateEnvironment();
@@ -146,6 +195,9 @@ async function main() {
   fastify.get('/health', async () => {
     return { status: 'ok', timestamp: Date.now() };
   });
+
+  // Recover any positions stuck in 'selling' status from previous crash
+  await recoverStuckPositions();
 
   // Start core services
   await migrationDetector.start();

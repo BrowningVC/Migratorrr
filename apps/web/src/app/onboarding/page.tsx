@@ -8,7 +8,7 @@ import bs58 from 'bs58';
 import toast from 'react-hot-toast';
 
 import { useAuthStore } from '@/lib/stores/auth';
-import { useWalletsStore } from '@/lib/stores/wallets';
+import { useWalletsStore, Wallet as WalletType } from '@/lib/stores/wallets';
 import { useSnipersStore, Sniper } from '@/lib/stores/snipers';
 import { usePendingSniperStore } from '@/lib/stores/pending-sniper';
 import { authApi, walletApi, sniperApi } from '@/lib/api';
@@ -31,7 +31,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { publicKey, signMessage, connected } = useWallet();
   const { setAuth, token, completeOnboarding, hasCompletedOnboarding } = useAuthStore();
-  const { setWallets, addWallet, wallets } = useWalletsStore();
+  const { setWallets, addWallet, wallets, _hasHydrated: walletsHydrated } = useWalletsStore();
   const { addSniper } = useSnipersStore();
   const { pendingSniper, clearPendingSniper, hasPendingSniper } = usePendingSniperStore();
 
@@ -50,6 +50,9 @@ export default function OnboardingPage() {
   // Redirect if already completed onboarding
   // BUT: If there's a pending sniper, create it first before redirecting
   useEffect(() => {
+    // Wait for stores to hydrate from localStorage
+    if (!walletsHydrated) return;
+
     // Prevent running multiple times
     if (isCreatingForExistingUser) return;
 
@@ -73,7 +76,7 @@ export default function OnboardingPage() {
         router.push('/dashboard');
       }
     }
-  }, [hasCompletedOnboarding, token, wallets, isCreatingForExistingUser]);
+  }, [hasCompletedOnboarding, token, wallets, isCreatingForExistingUser, walletsHydrated]);
 
   // Auto-advance when wallet connects
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface Position {
   id: string;
@@ -18,73 +19,148 @@ export interface Position {
   stopLossPrice?: number;
   trailingStopPct?: number;
   highestPrice?: number;
+  exitSol?: number; // SOL received when position closed
+  exitPrice?: number; // Price at exit
   status: 'open' | 'selling' | 'closed';
   createdAt: string;
+  closedAt?: string;
 }
 
 interface PositionsState {
   positions: Position[];
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
   setPositions: (positions: Position[]) => void;
   addPosition: (position: Position) => void;
   updatePosition: (id: string, updates: Partial<Position>) => void;
   removePosition: (id: string) => void;
   updatePrice: (tokenMint: string, price: number) => void;
+  mergePositions: (apiPositions: Position[]) => void;
 }
 
-export const usePositionsStore = create<PositionsState>((set) => ({
-  positions: [],
+export const usePositionsStore = create<PositionsState>()(
+  persist(
+    (set) => ({
+      positions: [],
+      _hasHydrated: false,
 
-  setPositions: (positions) => set({ positions }),
+      setHasHydrated: (state) => {
+        set({ _hasHydrated: state });
+      },
 
-  addPosition: (position) =>
-    set((state) => ({
-      positions: [position, ...state.positions],
-    })),
+      setPositions: (positions) => set({ positions }),
 
-  updatePosition: (id, updates) =>
-    set((state) => ({
-      positions: state.positions.map((p) =>
-        p.id === id ? { ...p, ...updates } : p
-      ),
-    })),
+      addPosition: (position) =>
+        set((state) => {
+          // Check if position already exists
+          const exists = state.positions.some((p) => p.id === position.id);
+          if (exists) return state;
+          return { positions: [position, ...state.positions] };
+        }),
 
-  removePosition: (id) =>
-    set((state) => ({
-      positions: state.positions.filter((p) => p.id !== id),
-    })),
+      updatePosition: (id, updates) =>
+        set((state) => ({
+          positions: state.positions.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        })),
 
-  updatePrice: (tokenMint, price) =>
-    set((state) => {
-      // Find index for O(n) search once, then O(1) update
-      const idx = state.positions.findIndex((p) => p.tokenMint === tokenMint);
-      if (idx === -1) return state; // No matching position, skip update
+      removePosition: (id) =>
+        set((state) => ({
+          positions: state.positions.filter((p) => p.id !== id),
+        })),
 
-      const p = state.positions[idx];
-      // Skip if price hasn't changed meaningfully (< 0.01% change)
-      if (p.currentPrice && Math.abs(price - p.currentPrice) / p.currentPrice < 0.0001) {
-        return state;
-      }
+      updatePrice: (tokenMint, price) =>
+        set((state) => {
+          // Find index for O(n) search once, then O(1) update
+          const idx = state.positions.findIndex((p) => p.tokenMint === tokenMint);
+          if (idx === -1) return state; // No matching position, skip update
 
-      const pnlPct = ((price - p.entryPrice) / p.entryPrice) * 100;
-      const pnlSol = (price - p.entryPrice) * p.currentTokenAmount;
+          const p = state.positions[idx];
+          // Skip if price hasn't changed meaningfully (< 0.01% change)
+          if (p.currentPrice && Math.abs(price - p.currentPrice) / p.currentPrice < 0.0001) {
+            return state;
+          }
 
-      // Calculate current market cap based on price change ratio from entry
-      const currentMarketCap = p.entryMarketCap && p.entryPrice > 0
-        ? p.entryMarketCap * (price / p.entryPrice)
-        : null;
+          const pnlPct = ((price - p.entryPrice) / p.entryPrice) * 100;
+          const pnlSol = (price - p.entryPrice) * p.currentTokenAmount;
 
-      const updated = {
-        ...p,
-        currentPrice: price,
-        currentMarketCap,
-        pnlPct,
-        pnlSol,
-        highestPrice: Math.max(p.highestPrice || price, price),
-      };
+          // Calculate current market cap based on price change ratio from entry
+          const currentMarketCap = p.entryMarketCap && p.entryPrice > 0
+            ? p.entryMarketCap * (price / p.entryPrice)
+            : null;
 
-      // Create new array with only the changed position
-      const newPositions = [...state.positions];
-      newPositions[idx] = updated;
-      return { positions: newPositions };
+          const updated = {
+            ...p,
+            currentPrice: price,
+            currentMarketCap,
+            pnlPct,
+            pnlSol,
+            highestPrice: Math.max(p.highestPrice || price, price),
+          };
+
+          // Create new array with only the changed position
+          const newPositions = [...state.positions];
+          newPositions[idx] = updated;
+          return { positions: newPositions };
+        }),
+
+      // Merge API positions with existing local positions
+      // - Updates existing positions with API data (API is source of truth for status)
+      // - Adds new positions from API that don't exist locally
+      // - Keeps local positions that are open but not in API (race condition protection)
+      // - Removes positions only if API says they're closed
+      mergePositions: (apiPositions) =>
+        set((state) => {
+          const apiPositionMap = new Map(apiPositions.map((p) => [p.id, p]));
+          const existingIds = new Set(state.positions.map((p) => p.id));
+
+          // Start with existing positions, updating them with API data
+          const mergedPositions: Position[] = [];
+
+          // Process existing positions
+          for (const existing of state.positions) {
+            const apiVersion = apiPositionMap.get(existing.id);
+
+            if (apiVersion) {
+              // Position exists in both - use API data but preserve local price updates
+              mergedPositions.push({
+                ...apiVersion,
+                // Keep local real-time price data if available
+                currentPrice: existing.currentPrice ?? apiVersion.currentPrice,
+                currentMarketCap: existing.currentMarketCap ?? apiVersion.currentMarketCap,
+                pnlPct: existing.pnlPct ?? apiVersion.pnlPct,
+                pnlSol: existing.pnlSol ?? apiVersion.pnlSol,
+                highestPrice: existing.highestPrice ?? apiVersion.highestPrice,
+              });
+            } else if (existing.status === 'open' || existing.status === 'selling') {
+              // Position is open locally but not in API - keep it (race condition protection)
+              // This handles the case where WebSocket added it before API returned
+              mergedPositions.push(existing);
+            }
+            // If position is closed locally and not in API, drop it (already cleaned up)
+          }
+
+          // Add new positions from API that don't exist locally
+          for (const apiPosition of apiPositions) {
+            if (!existingIds.has(apiPosition.id)) {
+              mergedPositions.push(apiPosition);
+            }
+          }
+
+          // Sort by createdAt (newest first) to maintain consistent order
+          mergedPositions.sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+
+          return { positions: mergedPositions };
+        }),
     }),
-}));
+    {
+      name: 'migratorrr-positions',
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
+  )
+);

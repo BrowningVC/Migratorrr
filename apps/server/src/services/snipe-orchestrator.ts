@@ -23,7 +23,6 @@ interface SniperConfig {
   stopLossPct?: number;
   trailingStopPct?: number;
   maxMarketCapUsd?: number;
-  minLiquiditySol?: number;
   namePatterns?: string[];
   excludedPatterns?: string[];
   creatorWhitelist?: string[];
@@ -114,11 +113,23 @@ export class SnipeOrchestrator {
     console.log('Snipe Orchestrator stopped');
   }
 
+  // Cache for token analysis data - shared across all snipers for same migration
+  // This prevents 100+ redundant API calls when many snipers have filters enabled
+  private tokenDataCache = new Map<string, {
+    volumeData?: Awaited<ReturnType<typeof tokenInfoService.getTokenVolume>>;
+    marketData?: Awaited<ReturnType<typeof tokenInfoService.getTokenMarketData>>;
+    analysisData?: Awaited<ReturnType<typeof tokenAnalysisService.getTokenAnalysis>>;
+    fetchedAt: number;
+  }>();
+  private readonly TOKEN_DATA_CACHE_MS = 30000; // 30 second cache
+
   /**
    * Handle a new migration event
+   * OPTIMIZED: Parallel processing for 100+ snipers
    */
   private async handleMigration(migration: MigrationEvent & { detectedBy: string; detectedAt: number }): Promise<void> {
     const timestamp = new Date().toISOString();
+    const startTime = Date.now();
     console.log(`\n📥 [${timestamp}] ORCHESTRATOR: Processing migration`);
     console.log(`   Token: ${migration.tokenSymbol || 'Unknown'} (${migration.tokenMint})`);
     console.log(`   Pool: ${migration.poolAddress}`);
@@ -134,49 +145,156 @@ export class SnipeOrchestrator {
 
     console.log(`   Found ${activeSnipers.length} active sniper(s)`);
 
-    // Filter and dispatch jobs
-    let matched = 0;
-    let dispatched = 0;
+    // OPTIMIZATION: Pre-fetch token data ONCE if ANY sniper needs it
+    // This prevents N redundant API calls for N snipers
+    await this.prefetchTokenData(activeSnipers, migration);
+
+    // OPTIMIZATION: Process all snipers in PARALLEL instead of sequentially
+    // This is critical for 100+ snipers - sequential processing would take too long
+    const results = await Promise.allSettled(
+      activeSnipers.map(async (sniper) => {
+        const meetsFilter = await this.matchesCriteria(sniper.config, migration);
+        return { sniper, meetsFilter };
+      })
+    );
+
+    // Collect results and dispatch jobs
+    const matchedSnipers: ActiveSniper[] = [];
     const filteredSniperIds: string[] = [];
 
-    for (const sniper of activeSnipers) {
-      console.log(`\n   🔍 Evaluating sniper: "${sniper.name}" (${sniper.id.slice(0, 8)}...)`);
-      const meetsFilter = await this.matchesCriteria(sniper.config, migration);
-      if (meetsFilter) {
-        matched++;
-        console.log(`   ✅ Sniper "${sniper.name}" PASSED all filters`);
-        // dispatchSnipeJob returns false if token was already sniped (duplicate blocked)
-        const wasDispatched = await this.dispatchSnipeJob(sniper, migration);
-        if (wasDispatched) {
-          dispatched++;
-          console.log(`   📤 Snipe job DISPATCHED for "${sniper.name}"`);
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { sniper, meetsFilter } = result.value;
+        if (meetsFilter) {
+          matchedSnipers.push(sniper);
         } else {
-          console.log(`   ⏭️  Snipe job SKIPPED (duplicate) for "${sniper.name}"`);
+          filteredSniperIds.push(sniper.id);
         }
       } else {
-        // Track that this sniper filtered out this migration
-        filteredSniperIds.push(sniper.id);
-        console.log(`   ❌ Sniper "${sniper.name}" FILTERED OUT (see filter logs above)`);
+        console.error(`   ❌ Error evaluating sniper:`, result.reason);
       }
     }
 
-    console.log(`\n   📊 SUMMARY: ${dispatched}/${matched} jobs dispatched, ${filteredSniperIds.length} snipers filtered`);
+    // Dispatch jobs for matched snipers (in parallel for speed)
+    const dispatchResults = await Promise.allSettled(
+      matchedSnipers.map(async (sniper) => {
+        const wasDispatched = await this.dispatchSnipeJob(sniper, migration);
+        return { sniper, wasDispatched };
+      })
+    );
 
-    // Update migration event with snipe count (only count actually dispatched)
+    let dispatched = 0;
+    for (const result of dispatchResults) {
+      if (result.status === 'fulfilled' && result.value.wasDispatched) {
+        dispatched++;
+        console.log(`   📤 Snipe job DISPATCHED for "${result.value.sniper.name}"`);
+      }
+    }
+
+    const processingTime = Date.now() - startTime;
+    console.log(`\n   📊 SUMMARY: ${dispatched}/${matchedSnipers.length} jobs dispatched, ${filteredSniperIds.length} filtered (${processingTime}ms)`);
+
+    // Batch update stats (single query each instead of per-sniper)
+    const updatePromises: Promise<unknown>[] = [];
+
     if (dispatched > 0) {
-      await prisma.migrationEvent.updateMany({
-        where: { tokenMint: migration.tokenMint },
-        data: { totalSnipesAttempted: { increment: dispatched } },
-      });
+      updatePromises.push(
+        prisma.migrationEvent.updateMany({
+          where: { tokenMint: migration.tokenMint },
+          data: { totalSnipesAttempted: { increment: dispatched } },
+        })
+      );
     }
 
-    // Update tokensFiltered counter for each sniper that filtered this migration
     if (filteredSniperIds.length > 0) {
-      await prisma.sniperConfig.updateMany({
-        where: { id: { in: filteredSniperIds } },
-        data: { tokensFiltered: { increment: 1 } },
-      });
+      updatePromises.push(
+        prisma.sniperConfig.updateMany({
+          where: { id: { in: filteredSniperIds } },
+          data: { tokensFiltered: { increment: 1 } },
+        })
+      );
     }
+
+    // Run stat updates in background - don't block the response
+    Promise.allSettled(updatePromises).catch(console.error);
+
+    // Clear token data cache for this migration (no longer needed)
+    this.tokenDataCache.delete(migration.tokenMint);
+  }
+
+  /**
+   * Pre-fetch token data ONCE for all snipers that need it
+   * This prevents 100+ redundant API calls
+   */
+  private async prefetchTokenData(
+    snipers: ActiveSniper[],
+    migration: MigrationEvent
+  ): Promise<void> {
+    const needsVolume = snipers.some(s => s.config.minVolumeUsd);
+    const needsMarketCap = snipers.some(s => s.config.maxMarketCapUsd);
+    const needsAnalysis = snipers.some(s =>
+      s.config.minHolderCount ||
+      s.config.maxDevHoldingsPct ||
+      s.config.maxTop10HoldingsPct ||
+      s.config.requireTwitter ||
+      s.config.requireTelegram ||
+      s.config.requireWebsite
+    );
+
+    if (!needsVolume && !needsMarketCap && !needsAnalysis) {
+      return; // No external data needed
+    }
+
+    console.log(`   🔄 Pre-fetching token data (volume: ${needsVolume}, mcap: ${needsMarketCap}, analysis: ${needsAnalysis})...`);
+    const fetchStart = Date.now();
+
+    const cache: typeof this.tokenDataCache extends Map<string, infer V> ? V : never = {
+      fetchedAt: Date.now(),
+    };
+
+    // Fetch all needed data in parallel
+    const fetchPromises: Promise<void>[] = [];
+
+    if (needsVolume) {
+      fetchPromises.push(
+        tokenInfoService.getTokenVolume(migration.tokenMint).then(data => {
+          cache.volumeData = data;
+        }).catch(err => {
+          console.warn(`   ⚠️ Volume fetch failed:`, err);
+        })
+      );
+    }
+
+    if (needsMarketCap) {
+      fetchPromises.push(
+        tokenInfoService.getTokenMarketData(migration.tokenMint).then(data => {
+          cache.marketData = data;
+        }).catch(err => {
+          console.warn(`   ⚠️ Market data fetch failed:`, err);
+        })
+      );
+    }
+
+    if (needsAnalysis) {
+      fetchPromises.push(
+        tokenAnalysisService.getTokenAnalysis(migration.tokenMint).then(data => {
+          cache.analysisData = data;
+        }).catch(err => {
+          console.warn(`   ⚠️ Analysis fetch failed:`, err);
+        })
+      );
+    }
+
+    await Promise.allSettled(fetchPromises);
+    this.tokenDataCache.set(migration.tokenMint, cache);
+    console.log(`   ✓ Token data pre-fetched in ${Date.now() - fetchStart}ms`);
+  }
+
+  /**
+   * Get cached token data (populated by prefetchTokenData)
+   */
+  private getCachedTokenData(tokenMint: string) {
+    return this.tokenDataCache.get(tokenMint);
   }
 
   /**
@@ -253,16 +371,8 @@ export class SnipeOrchestrator {
     }
     console.log(`      ✓ Migration age OK (${Math.round(migrationAge / 1000)}s)`);
 
-    // Check minimum liquidity
-    if (config.minLiquiditySol) {
-      if (migration.initialLiquiditySol < config.minLiquiditySol) {
-        console.log(
-          `      ⏱️  FILTER FAIL: Liquidity ${migration.initialLiquiditySol} SOL < min ${config.minLiquiditySol} SOL`
-        );
-        return false;
-      }
-      console.log(`      ✓ Liquidity OK (${migration.initialLiquiditySol} SOL >= ${config.minLiquiditySol} SOL)`);
-    }
+    // NOTE: Liquidity check removed - PumpFun tokens always graduate with ~85 SOL
+    // The migration detection itself (via "Instruction: Migrate" log) is sufficient validation
 
     // Check name patterns (if any match, include)
     if (config.namePatterns && config.namePatterns.length > 0) {
@@ -320,10 +430,14 @@ export class SnipeOrchestrator {
       console.log(`      ✓ Migration time OK (${migrationTimeMinutes.toFixed(1)}m <= ${config.maxMigrationTimeMinutes}m)`);
     }
 
+    // OPTIMIZATION: Use pre-fetched cached data instead of making N API calls for N snipers
+    // The data was fetched ONCE in prefetchTokenData() before parallel sniper evaluation
+    const cachedData = this.getCachedTokenData(migration.tokenMint);
+
     // Check volume filter
     if (config.minVolumeUsd) {
-      console.log(`      🔄 Fetching volume data...`);
-      const volumeData = await tokenInfoService.getTokenVolume(migration.tokenMint);
+      // Use cached data if available, otherwise fetch (fallback for edge cases)
+      const volumeData = cachedData?.volumeData ?? await tokenInfoService.getTokenVolume(migration.tokenMint);
 
       if (!tokenInfoService.meetsVolumeCriteria(volumeData, config.minVolumeUsd)) {
         console.log(
@@ -336,8 +450,8 @@ export class SnipeOrchestrator {
 
     // Check max market cap filter
     if (config.maxMarketCapUsd) {
-      console.log(`      🔄 Fetching market cap data...`);
-      const marketData = await tokenInfoService.getTokenMarketData(migration.tokenMint);
+      // Use cached data if available
+      const marketData = cachedData?.marketData ?? await tokenInfoService.getTokenMarketData(migration.tokenMint);
 
       if (!tokenInfoService.meetsMarketCapCriteria(marketData, config.maxMarketCapUsd)) {
         console.log(
@@ -358,8 +472,8 @@ export class SnipeOrchestrator {
       config.requireWebsite;
 
     if (needsTokenAnalysis) {
-      console.log(`      🔄 Fetching token analysis...`);
-      const tokenAnalysis = await tokenAnalysisService.getTokenAnalysis(migration.tokenMint);
+      // Use cached data if available
+      const tokenAnalysis = cachedData?.analysisData ?? await tokenAnalysisService.getTokenAnalysis(migration.tokenMint);
 
       // Check minimum holder count
       if (config.minHolderCount) {
@@ -424,20 +538,41 @@ export class SnipeOrchestrator {
 
   /**
    * Dispatch a snipe job to the queue
+   * Uses TWO-LAYER locking to prevent duplicates:
+   * 1. Wallet-level lock - prevents ANY sniper from sniping same token with same wallet
+   * 2. Sniper-level lock - prevents same sniper from dispatching twice
    */
   private async dispatchSnipeJob(
     sniper: ActiveSniper,
     migration: MigrationEvent & { detectedBy: string; detectedAt: number }
   ): Promise<boolean> {
-    // CRITICAL: Atomic lock to prevent sniping the same token twice
+    const tokenLabel = migration.tokenSymbol || migration.tokenMint.slice(0, 12);
+
+    // LAYER 1: WALLET-LEVEL LOCK (most critical)
+    // This prevents the same wallet from sniping the same token via different snipers
+    const walletLockKey = `snipe-wallet-dispatch:${sniper.walletId}:${migration.tokenMint}`;
+    const walletLockAcquired = await redis.set(walletLockKey, sniper.id, 'EX', this.SNIPE_LOCK_TTL_SECONDS, 'NX');
+
+    if (!walletLockAcquired) {
+      const existingSniper = await redis.get(walletLockKey);
+      console.log(
+        `   🔒 Wallet dispatch blocked: ${tokenLabel} - wallet ${sniper.walletId.slice(0, 8)} ` +
+        `already dispatching via sniper ${existingSniper?.slice(0, 8) || 'unknown'}`
+      );
+      return false;
+    }
+
+    // LAYER 2: SNIPER-LEVEL LOCK (additional safety)
     // Uses Redis SETNX (set if not exists) for atomic check-and-set
     const lockKey = `${this.SNIPE_LOCK_PREFIX}${sniper.id}:${migration.tokenMint}`;
     const acquired = await redis.set(lockKey, '1', 'EX', this.SNIPE_LOCK_TTL_SECONDS, 'NX');
 
     if (!acquired) {
+      // Release wallet lock since we couldn't get sniper lock
+      await redis.del(walletLockKey);
       console.log(
-        `Duplicate snipe blocked: ${migration.tokenSymbol || migration.tokenMint} ` +
-        `already sniped by sniper "${sniper.name}"`
+        `   🔒 Sniper dispatch blocked: ${tokenLabel} ` +
+        `already dispatched by sniper "${sniper.name}"`
       );
       return false;
     }

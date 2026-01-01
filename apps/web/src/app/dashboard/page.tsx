@@ -600,7 +600,7 @@ export default function DashboardPage() {
             <nav className="flex items-center gap-1">
               <Link href="/dashboard">
                 <Button variant="ghost" size="sm" className="text-green-400 bg-green-900/20">
-                  Dashboard
+                  Sniper Dashboard
                 </Button>
               </Link>
               <Link href="/buybacks">

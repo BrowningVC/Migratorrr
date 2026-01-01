@@ -28,7 +28,6 @@ export interface SniperConfig {
   trailingStopPct?: number; // Optional - sell when drops X% from peak
   coverInitials?: boolean; // Sell 50% at 2x to cover initial investment
   maxMarketCapUsd?: number;
-  minLiquiditySol?: number;
   namePatterns?: string[];
   excludedPatterns?: string[];
   // Migration time filter (minutes from token creation to migration)

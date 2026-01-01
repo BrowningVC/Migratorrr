@@ -13,7 +13,6 @@ interface SniperCardProps {
   walletBalance?: number; // SOL balance of associated wallet
   walletAddress?: string; // Public key of the wallet
   onToggle?: (sniperId: string, hasInsufficientFunds: boolean) => void;
-  onEdit?: (sniperId: string) => void;
   onDelete?: (sniperId: string) => void;
 }
 
@@ -22,7 +21,6 @@ export const SniperCard = memo(function SniperCard({
   walletBalance,
   walletAddress,
   onToggle,
-  onEdit,
   onDelete,
 }: SniperCardProps) {
   const { id, name, isActive, config, stats } = sniper;
@@ -67,8 +65,36 @@ export const SniperCard = memo(function SniperCard({
     return `$${usd}+`;
   };
 
+  // Format holder count filter for display
+  const formatHolders = (count?: number) => {
+    if (!count) return null;
+    return `${count}+`;
+  };
+
+  // Format percentage filter for display
+  const formatPercentage = (pct?: number) => {
+    if (!pct) return null;
+    return `≤${pct}%`;
+  };
+
+  // Get active social requirements
+  const getSocialRequirements = () => {
+    const socials = [];
+    if (config.requireTwitter) socials.push('X');
+    if (config.requireTelegram) socials.push('TG');
+    if (config.requireWebsite) socials.push('Web');
+    return socials.length > 0 ? socials.join(', ') : null;
+  };
+
   // Check if any migration filters are set
-  const hasFilters = config.maxMigrationTimeMinutes || config.minVolumeUsd || config.minLiquiditySol;
+  const hasFilters = config.maxMigrationTimeMinutes ||
+    config.minVolumeUsd ||
+    config.minHolderCount ||
+    config.maxDevHoldingsPct ||
+    config.maxTop10HoldingsPct ||
+    config.requireTwitter ||
+    config.requireTelegram ||
+    config.requireWebsite;
 
   return (
     <Card
@@ -175,12 +201,6 @@ export const SniperCard = memo(function SniperCard({
               <span className="text-yellow-400">{config.trailingStopPct}%</span>
             </div>
           )}
-          {config.minLiquiditySol && (
-            <div className="flex justify-between">
-              <span className="text-zinc-500">Min Liquidity</span>
-              <span>{config.minLiquiditySol} SOL</span>
-            </div>
-          )}
           <div className="flex justify-between">
             <span className="text-zinc-500 flex items-center gap-1">
               <Shield className="w-3 h-3" />
@@ -205,7 +225,16 @@ export const SniperCard = memo(function SniperCard({
             Migration Filters
             {hasFilters && (
               <span className="px-1.5 py-0.5 text-xs bg-blue-900/40 text-blue-400 rounded">
-                {[config.maxMigrationTimeMinutes, config.minVolumeUsd, config.minLiquiditySol].filter(Boolean).length}
+                {[
+                  config.maxMigrationTimeMinutes,
+                  config.minVolumeUsd,
+                  config.minHolderCount,
+                  config.maxDevHoldingsPct,
+                  config.maxTop10HoldingsPct,
+                  config.requireTwitter,
+                  config.requireTelegram,
+                  config.requireWebsite
+                ].filter(Boolean).length}
               </span>
             )}
           </span>
@@ -215,20 +244,32 @@ export const SniperCard = memo(function SniperCard({
           )} />
         </button>
 
-        {/* Migration Filters Content */}
+        {/* Migration Filters Content - Compact 2-column grid */}
         {showFilters && (
-          <div className="space-y-2 text-sm mb-4 p-3 bg-zinc-800/30 rounded-lg border border-zinc-800">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-4 p-2 bg-zinc-800/30 rounded-lg border border-zinc-800">
             <div className="flex justify-between">
               <span className="text-zinc-500">Migration Speed</span>
               <span className="text-white">{formatMigrationTime(config.maxMigrationTimeMinutes)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-500">Min Volume</span>
+              <span className="text-zinc-500">Volume</span>
               <span className="text-white">{formatVolume(config.minVolumeUsd)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-500">Min Liquidity</span>
-              <span className="text-white">{config.minLiquiditySol ? `${config.minLiquiditySol} SOL` : 'Any'}</span>
+              <span className="text-zinc-500">Holders</span>
+              <span className="text-white">{formatHolders(config.minHolderCount) || 'Any'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-500">Dev %</span>
+              <span className="text-white">{formatPercentage(config.maxDevHoldingsPct) || 'Any'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-500">Top 10</span>
+              <span className="text-white">{formatPercentage(config.maxTop10HoldingsPct) || 'Any'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-500">Socials</span>
+              <span className="text-white">{getSocialRequirements() || 'None'}</span>
             </div>
           </div>
         )}
@@ -273,15 +314,7 @@ export const SniperCard = memo(function SniperCard({
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
-            onClick={() => onEdit?.(id)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+            className="flex-1 text-red-400 hover:text-red-300 hover:bg-red-900/20"
             onClick={() => onDelete?.(id)}
           >
             Delete

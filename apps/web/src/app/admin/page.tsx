@@ -64,14 +64,9 @@ interface ServerStatus {
   };
   migrationDetector: {
     isRunning: boolean;
-    connections: {
-      pumpPortal: boolean;
-      helius: boolean;
-    };
-    subscriptions: {
-      pumpPortal: boolean;
-      helius: boolean;
-    };
+    connected: boolean; // Helius WebSocket connected
+    subscribed: boolean; // Helius subscription confirmed
+    lastMessageAge: number;
     recentMigrations: number;
     recentMigrations24h: number;
   };
@@ -167,6 +162,17 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [hasCheckedStorage, setHasCheckedStorage] = useState(false);
+
+  // Restore admin key from localStorage on mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('migratorrr-admin-key');
+    if (savedKey) {
+      setAdminKey(savedKey);
+      // Don't set isAuthenticated yet - let fetchAllData validate the key
+    }
+    setHasCheckedStorage(true);
+  }, []);
 
   // Data states
   const [status, setStatus] = useState<ServerStatus | null>(null);
@@ -198,6 +204,9 @@ export default function AdminPage() {
       // Check for auth errors
       if (statusResult.error?.includes('Unauthorized') || statusResult.error?.includes('Invalid admin key')) {
         toast.error('Invalid admin key');
+        // Clear saved key if it's invalid
+        localStorage.removeItem('migratorrr-admin-key');
+        setIsAuthenticated(false);
         setIsLoading(false);
         return;
       }
@@ -209,6 +218,8 @@ export default function AdminPage() {
 
       if (statusResult.data || snipersResult.data || walletsResult.data) {
         setIsAuthenticated(true);
+        // Save admin key to localStorage for persistence across refreshes
+        localStorage.setItem('migratorrr-admin-key', adminKey);
         toast.success('Authenticated successfully');
       } else {
         toast.error(statusResult.error || 'Failed to fetch admin data');
@@ -219,6 +230,13 @@ export default function AdminPage() {
       setIsLoading(false);
     }
   }, [adminKey]);
+
+  // Auto-fetch data when admin key is restored from localStorage
+  useEffect(() => {
+    if (hasCheckedStorage && adminKey && !isAuthenticated) {
+      fetchAllData();
+    }
+  }, [hasCheckedStorage, adminKey, isAuthenticated, fetchAllData]);
 
   // Auto refresh every 5 seconds when enabled
   useEffect(() => {
@@ -300,6 +318,20 @@ export default function AdminPage() {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   };
 
+  // Show loading while checking localStorage or auto-authenticating with saved key
+  if (!hasCheckedStorage || (adminKey && !isAuthenticated && isLoading)) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+        <Card className="bg-zinc-900 border-zinc-800 w-full max-w-md">
+          <CardContent className="p-8 flex flex-col items-center justify-center gap-4">
+            <RefreshCw className="w-8 h-8 text-red-500 animate-spin" />
+            <p className="text-zinc-400">Authenticating...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Login screen
   if (!isAuthenticated) {
     return (
@@ -373,6 +405,7 @@ export default function AdminPage() {
               variant="outline"
               size="sm"
               onClick={() => {
+                localStorage.removeItem('migratorrr-admin-key');
                 setIsAuthenticated(false);
                 setAdminKey('');
               }}
@@ -432,21 +465,21 @@ export default function AdminPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">PumpPortal</span>
+                  <span className="text-zinc-500">Helius WebSocket</span>
                   <span className={cn(
                     'flex items-center gap-1 text-xs',
-                    status.migrationDetector.connections.pumpPortal ? 'text-green-400' : 'text-red-400'
+                    status.migrationDetector.connected ? 'text-green-400' : 'text-red-400'
                   )}>
-                    {status.migrationDetector.connections.pumpPortal ? 'Connected' : 'Disconnected'}
+                    {status.migrationDetector.connected ? 'Connected' : 'Disconnected'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Helius</span>
+                  <span className="text-zinc-500">Subscription</span>
                   <span className={cn(
                     'flex items-center gap-1 text-xs',
-                    status.migrationDetector.connections.helius ? 'text-green-400' : 'text-red-400'
+                    status.migrationDetector.subscribed ? 'text-green-400' : 'text-yellow-400'
                   )}>
-                    {status.migrationDetector.connections.helius ? 'Connected' : 'Disconnected'}
+                    {status.migrationDetector.subscribed ? 'Confirmed' : 'Pending'}
                   </span>
                 </div>
                 <div className="flex justify-between">

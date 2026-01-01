@@ -13,7 +13,6 @@ const sniperParamsSchema = z.object({
   trailingStopPct: z.number().min(1).max(100).optional(),
   coverInitials: z.boolean().optional(), // Sell 50% at 2x to cover initial investment
   maxMarketCapUsd: z.number().positive().optional(),
-  minLiquiditySol: z.number().positive().optional(),
   namePatterns: z.array(z.string()).optional(),
   excludedPatterns: z.array(z.string()).optional(),
   creatorWhitelist: z.array(z.string()).optional(),
@@ -134,6 +133,19 @@ export const sniperRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/', { preHandler: authenticate }, async (request, reply) => {
     const userId = (request as any).userId;
     const body = createSniperSchema.parse(request.body);
+
+    // LIMIT: Maximum 5 snipers per user
+    const MAX_SNIPERS_PER_USER = 5;
+    const existingSniperCount = await prisma.sniperConfig.count({
+      where: { userId },
+    });
+
+    if (existingSniperCount >= MAX_SNIPERS_PER_USER) {
+      return reply.status(400).send({
+        success: false,
+        error: `Maximum ${MAX_SNIPERS_PER_USER} snipers allowed per account. Please delete an existing sniper to create a new one.`,
+      });
+    }
 
     // Verify wallet belongs to user
     const wallet = await prisma.wallet.findFirst({

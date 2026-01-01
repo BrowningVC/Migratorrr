@@ -28,6 +28,10 @@ interface MigrationsState {
     tokenMint: string,
     status: { sniped: boolean; snipeSuccess?: boolean; snipeError?: string; sniperId?: string; sniperName?: string }
   ) => void;
+  updateMigrationMetadata: (
+    tokenMint: string,
+    metadata: { tokenSymbol?: string; tokenName?: string }
+  ) => void;
   clearMigrations: () => void;
 }
 
@@ -81,6 +85,19 @@ export const useMigrationsStore = create<MigrationsState>()(
         set((state) => ({
           migrations: state.migrations.map((m) =>
             m.tokenMint === tokenMint ? { ...m, ...status } : m
+          ),
+        })),
+
+      updateMigrationMetadata: (tokenMint, metadata) =>
+        set((state) => ({
+          migrations: state.migrations.map((m) =>
+            m.tokenMint === tokenMint
+              ? {
+                  ...m,
+                  tokenSymbol: metadata.tokenSymbol || m.tokenSymbol,
+                  tokenName: metadata.tokenName || m.tokenName,
+                }
+              : m
           ),
         })),
 

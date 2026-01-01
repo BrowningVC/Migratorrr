@@ -92,7 +92,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           balanceSol: balance / LAMPORTS_PER_SOL,
         };
       } catch (error) {
-        fastify.log.error(`Failed to fetch balance for ${wallet.publicKey}:`, error);
+        fastify.log.error(`Failed to fetch balance for ${wallet.publicKey}: ${error instanceof Error ? error.message : String(error)}`);
         return {
           walletId: wallet.id,
           publicKey: wallet.publicKey,
@@ -162,7 +162,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
         },
       };
     } catch (error) {
-      fastify.log.error(`Failed to fetch balance for ${wallet.publicKey}:`, error);
+      fastify.log.error(`Failed to fetch balance for ${wallet.publicKey}: ${error instanceof Error ? error.message : String(error)}`);
       return reply.status(500).send({
         success: false,
         error: 'Failed to fetch balance from Solana network',

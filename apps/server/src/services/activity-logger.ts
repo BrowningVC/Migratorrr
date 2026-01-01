@@ -58,7 +58,7 @@ export class ActivityLogger {
         userId,
         sniperId,
         eventType,
-        eventData,
+        eventData: eventData as Record<string, any>,
         createdAt: timestamp || new Date(),
       },
     });
