@@ -1963,14 +1963,19 @@ export class TransactionExecutor {
 
     // Fetch token metadata from DexScreener/Jupiter (for symbol/name if not provided)
     // Only fetch if we don't have the data from migration event
-    let tokenMetadata: { symbol?: string; name?: string } | null = null;
+    let fetchedSymbol: string | null = null;
+    let fetchedName: string | null = null;
     if (!tokenSymbol || !tokenName) {
-      tokenMetadata = await tokenInfoService.getTokenMetadata(tokenMint).catch(() => null);
+      const metadata = await tokenInfoService.getTokenMetadata(tokenMint).catch(() => null);
+      if (metadata) {
+        fetchedSymbol = metadata.symbol || null;
+        fetchedName = metadata.name || null;
+      }
     }
 
     // Use provided values from migration event first, then fall back to fetched data
-    const finalSymbol = tokenSymbol || tokenMetadata?.symbol || null;
-    const finalName = tokenName || tokenMetadata?.name || null;
+    const finalSymbol = tokenSymbol || fetchedSymbol;
+    const finalName = tokenName || fetchedName;
 
     // CRITICAL: Calculate entry market cap from ACTUAL execution price
     // This is the TRUE entry market cap - not the migration threshold

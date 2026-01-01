@@ -518,14 +518,15 @@ export class SnipeWorker {
 
     // Retry up to 3 times with 500ms delay to handle race condition
     // The transaction/position might not be committed yet when we first check
-    let transaction: Awaited<ReturnType<typeof prisma.transaction.findFirst<{ include: { position: true } }>>> = null;
+    let transactionWithPosition: { position: NonNullable<Awaited<ReturnType<typeof prisma.transaction.findFirst>>['position']> } | null = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      transaction = await prisma.transaction.findFirst({
+      const tx = await prisma.transaction.findFirst({
         where: { signature },
         include: { position: true },
       });
 
-      if (transaction?.position) {
+      if (tx?.position) {
+        transactionWithPosition = { position: tx.position };
         break;
       }
 
@@ -534,12 +535,12 @@ export class SnipeWorker {
       }
     }
 
-    if (!transaction?.position) {
+    if (!transactionWithPosition) {
       console.error(`[Automation] Position not found for transaction ${signature.slice(0, 20)}... after 3 retries`);
       return;
     }
 
-    const position = transaction.position;
+    const position = transactionWithPosition.position;
 
     // Calculate TP/SL prices from entry price
     const entryPrice = position.entryPrice || 0;
