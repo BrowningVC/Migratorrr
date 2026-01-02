@@ -46,6 +46,15 @@ export interface SniperConfig {
   requireWebsite?: boolean;
   // Top 10 wallet concentration - max % of supply held by top 10 wallets
   maxTop10HoldingsPct?: number; // 30, 50, 70, 90
+  // NEW FILTERS
+  // Twitter follower count - minimum followers required
+  minTwitterFollowers?: number; // 100, 500, 1000, 5000
+  // Liquidity lock - require LP tokens to be locked
+  requireLiquidityLock?: boolean;
+  // DexScreener paid - require token to have paid DexScreener promotion
+  requireDexScreenerPaid?: boolean;
+  // Creator history score - minimum trust score (0-100)
+  minCreatorScore?: number; // 25, 50, 75
 }
 
 interface SnipersState {

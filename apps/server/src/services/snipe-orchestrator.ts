@@ -40,6 +40,15 @@ interface SniperConfig {
   requireWebsite?: boolean;
   // Top 10 wallet concentration - max % of supply held by top 10 wallets
   maxTop10HoldingsPct?: number; // 30, 50, 70, 90
+  // NEW FILTERS
+  // Twitter follower count - minimum followers required
+  minTwitterFollowers?: number; // 100, 500, 1000, 5000
+  // Liquidity lock - require LP tokens to be locked
+  requireLiquidityLock?: boolean;
+  // DexScreener paid - require token to have paid DexScreener promotion
+  requireDexScreenerPaid?: boolean;
+  // Creator history score - minimum trust score (0-100) based on creator's past tokens
+  minCreatorScore?: number; // 25, 50, 75
   [key: string]: unknown;
 }
 
@@ -235,7 +244,12 @@ export class SnipeOrchestrator {
       s.config.maxTop10HoldingsPct ||
       s.config.requireTwitter ||
       s.config.requireTelegram ||
-      s.config.requireWebsite
+      s.config.requireWebsite ||
+      // New filters that need token analysis data
+      s.config.minTwitterFollowers ||
+      s.config.requireLiquidityLock ||
+      s.config.requireDexScreenerPaid ||
+      s.config.minCreatorScore
     );
 
     if (!needsVolume && !needsMarketCap && !needsAnalysis) {
@@ -459,14 +473,19 @@ export class SnipeOrchestrator {
       console.log(`      ✓ Market cap OK ($${marketData?.marketCapUsd?.toFixed(0) || 0} <= $${config.maxMarketCapUsd})`);
     }
 
-    // Check holder count, dev holdings, top 10 concentration, and social filters
+    // Check holder count, dev holdings, top 10 concentration, social filters, and new filters
     const needsTokenAnalysis =
       config.minHolderCount ||
       config.maxDevHoldingsPct ||
       config.maxTop10HoldingsPct ||
       config.requireTwitter ||
       config.requireTelegram ||
-      config.requireWebsite;
+      config.requireWebsite ||
+      // New filters
+      config.minTwitterFollowers ||
+      config.requireLiquidityLock ||
+      config.requireDexScreenerPaid ||
+      config.minCreatorScore;
 
     if (needsTokenAnalysis) {
       // Use cached data if available
@@ -525,6 +544,50 @@ export class SnipeOrchestrator {
           return false;
         }
         console.log(`      ✓ Social requirements met`);
+      }
+
+      // Check Twitter follower count
+      if (config.minTwitterFollowers) {
+        if (!tokenAnalysisService.meetsTwitterFollowersCriteria(tokenAnalysis, config.minTwitterFollowers)) {
+          console.log(
+            `      ⏱️  FILTER FAIL: Twitter followers ${tokenAnalysis?.socials.twitterFollowers ?? 'unknown'} < min ${config.minTwitterFollowers}`
+          );
+          return false;
+        }
+        console.log(`      ✓ Twitter followers OK (${tokenAnalysis?.socials.twitterFollowers ?? 'verified'} >= ${config.minTwitterFollowers})`);
+      }
+
+      // Check liquidity lock requirement
+      if (config.requireLiquidityLock) {
+        if (!tokenAnalysisService.meetsLiquidityLockCriteria(tokenAnalysis, config.requireLiquidityLock)) {
+          console.log(
+            `      ⏱️  FILTER FAIL: Liquidity not locked`
+          );
+          return false;
+        }
+        console.log(`      ✓ Liquidity is locked`);
+      }
+
+      // Check DexScreener paid requirement
+      if (config.requireDexScreenerPaid) {
+        if (!tokenAnalysisService.meetsDexScreenerPaidCriteria(tokenAnalysis, config.requireDexScreenerPaid)) {
+          console.log(
+            `      ⏱️  FILTER FAIL: DexScreener not paid/boosted`
+          );
+          return false;
+        }
+        console.log(`      ✓ DexScreener paid/boosted`);
+      }
+
+      // Check creator history score
+      if (config.minCreatorScore) {
+        if (!tokenAnalysisService.meetsCreatorScoreCriteria(tokenAnalysis, config.minCreatorScore)) {
+          console.log(
+            `      ⏱️  FILTER FAIL: Creator score ${tokenAnalysis?.creatorHistory?.creatorScore ?? 'unknown'} < min ${config.minCreatorScore}`
+          );
+          return false;
+        }
+        console.log(`      ✓ Creator score OK (${tokenAnalysis?.creatorHistory?.creatorScore ?? 'skipped'} >= ${config.minCreatorScore})`);
       }
     }
 

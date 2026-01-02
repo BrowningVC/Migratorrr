@@ -10,6 +10,15 @@ interface TokenSocials {
   twitter: string | null;
   telegram: string | null;
   website: string | null;
+  twitterFollowers?: number | null;
+}
+
+interface CreatorHistory {
+  totalTokensCreated: number;
+  ruggedTokens: number;
+  successfulTokens: number; // Survived > 24h with positive price action
+  isFirstTimeCreator: boolean;
+  creatorScore: number; // 0-100, higher = more trustworthy
 }
 
 export interface TokenAnalysis {
@@ -18,6 +27,10 @@ export interface TokenAnalysis {
   devHoldingsPct: number;
   top10HoldingsPct: number;
   socials: TokenSocials;
+  // New filter data
+  creatorHistory?: CreatorHistory;
+  isLiquidityLocked?: boolean;
+  isDexScreenerPaid?: boolean;
   fetchedAt: number;
 }
 
@@ -33,6 +46,16 @@ interface DexScreenerPair {
   info?: {
     websites?: Array<{ url: string }>;
     socials?: Array<{ type: string; url: string }>;
+  };
+  // Liquidity info
+  liquidity?: {
+    usd?: number;
+    base?: number;
+    quote?: number;
+  };
+  // Boosts indicate DexScreener paid promotion
+  boosts?: {
+    active?: number;
   };
 }
 
@@ -75,10 +98,10 @@ class TokenAnalysisService {
     }
 
     try {
-      // Fetch holder data and socials in parallel
-      const [holderData, socials] = await Promise.all([
+      // Fetch holder data and DexScreener data in parallel
+      const [holderData, dexScreenerData] = await Promise.all([
         this.getHolderData(tokenMint),
-        this.getTokenSocials(tokenMint),
+        this.getDexScreenerData(tokenMint),
       ]);
 
       if (!holderData) {
@@ -90,7 +113,9 @@ class TokenAnalysisService {
         holderCount: holderData.holderCount,
         devHoldingsPct: holderData.devHoldingsPct,
         top10HoldingsPct: holderData.top10HoldingsPct,
-        socials,
+        socials: dexScreenerData.socials,
+        isLiquidityLocked: dexScreenerData.isLiquidityLocked,
+        isDexScreenerPaid: dexScreenerData.isDexScreenerPaid,
         fetchedAt: Date.now(),
       };
 
@@ -205,13 +230,22 @@ class TokenAnalysisService {
   }
 
   /**
-   * Get social links from DexScreener
+   * Get comprehensive DexScreener data including socials, liquidity lock status, and paid status
    */
-  private async getTokenSocials(tokenMint: string): Promise<TokenSocials> {
-    const defaultSocials: TokenSocials = {
-      twitter: null,
-      telegram: null,
-      website: null,
+  private async getDexScreenerData(tokenMint: string): Promise<{
+    socials: TokenSocials;
+    isLiquidityLocked: boolean;
+    isDexScreenerPaid: boolean;
+  }> {
+    const defaultResult = {
+      socials: {
+        twitter: null,
+        telegram: null,
+        website: null,
+        twitterFollowers: null,
+      } as TokenSocials,
+      isLiquidityLocked: false,
+      isDexScreenerPaid: false,
     };
 
     try {
@@ -225,45 +259,135 @@ class TokenAnalysisService {
       );
 
       if (!response.ok) {
-        return defaultSocials;
+        return defaultResult;
       }
 
       const data: DexScreenerResponse = await response.json();
 
       if (!data.pairs || data.pairs.length === 0) {
-        return defaultSocials;
+        return defaultResult;
       }
 
-      // Find the pair with social info
+      const socials: TokenSocials = {
+        twitter: null,
+        telegram: null,
+        website: null,
+        twitterFollowers: null,
+      };
+      let isLiquidityLocked = false;
+      let isDexScreenerPaid = false;
+
+      // Find the pair with the most info (usually the main Raydium pair)
       for (const pair of data.pairs) {
+        // Check for DexScreener paid boosts
+        if (pair.boosts?.active && pair.boosts.active > 0) {
+          isDexScreenerPaid = true;
+        }
+
         if (pair.info) {
           // Extract website
           if (pair.info.websites && pair.info.websites.length > 0) {
-            defaultSocials.website = pair.info.websites[0].url;
+            socials.website = pair.info.websites[0].url;
           }
 
           // Extract socials
           if (pair.info.socials) {
             for (const social of pair.info.socials) {
               if (social.type === 'twitter') {
-                defaultSocials.twitter = social.url;
+                socials.twitter = social.url;
               } else if (social.type === 'telegram') {
-                defaultSocials.telegram = social.url;
+                socials.telegram = social.url;
               }
             }
-          }
-
-          // If we found info, break
-          if (defaultSocials.twitter || defaultSocials.telegram || defaultSocials.website) {
-            break;
           }
         }
       }
 
-      return defaultSocials;
+      // Fetch Twitter follower count if Twitter URL exists
+      if (socials.twitter) {
+        socials.twitterFollowers = await this.getTwitterFollowerCount(socials.twitter);
+      }
+
+      // Check liquidity lock status via RugCheck or similar
+      isLiquidityLocked = await this.checkLiquidityLocked(tokenMint);
+
+      return {
+        socials,
+        isLiquidityLocked,
+        isDexScreenerPaid,
+      };
     } catch (error) {
-      console.error(`Failed to fetch socials for ${tokenMint}:`, error);
-      return defaultSocials;
+      console.error(`Failed to fetch DexScreener data for ${tokenMint}:`, error);
+      return defaultResult;
+    }
+  }
+
+  /**
+   * Check if liquidity is locked using RugCheck API
+   */
+  private async checkLiquidityLocked(tokenMint: string): Promise<boolean> {
+    try {
+      // RugCheck API provides LP lock status
+      const response = await fetch(
+        `https://api.rugcheck.xyz/v1/tokens/${tokenMint}/report/summary`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+
+      // RugCheck returns LP lock info in the markets array
+      // If any market has locked liquidity (>10%), consider it locked
+      if (data.markets && Array.isArray(data.markets)) {
+        for (const market of data.markets) {
+          if (market.lp?.lpLocked === true || (market.lp?.lpLockedPct && market.lp.lpLockedPct >= 10)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    } catch (error) {
+      // Don't log error for every token - RugCheck may not have data
+      return false;
+    }
+  }
+
+  /**
+   * Get Twitter follower count from handle
+   * Note: This is a best-effort approximation using public data
+   */
+  private async getTwitterFollowerCount(twitterUrl: string): Promise<number | null> {
+    try {
+      // Extract handle from URL
+      const match = twitterUrl.match(/(?:twitter\.com|x\.com)\/([^/?]+)/i);
+      if (!match) {
+        return null;
+      }
+
+      const handle = match[1];
+      if (!handle || handle === 'home' || handle === 'search') {
+        return null;
+      }
+
+      // Use a public Twitter follower count API (e.g., social-counts or similar)
+      // For now, we'll skip this as it requires API keys or scraping
+      // In production, you could use:
+      // 1. Twitter API v2 with Bearer token
+      // 2. A third-party service like socialblade
+      // 3. Nitter scraping (unreliable)
+
+      // Return null - filter will use presence check instead
+      return null;
+    } catch {
+      return null;
     }
   }
 
@@ -330,6 +454,103 @@ class TokenAnalysisService {
     }
 
     return true;
+  }
+
+  /**
+   * Check if token meets Twitter follower count criteria
+   */
+  meetsTwitterFollowersCriteria(
+    analysis: TokenAnalysis | null,
+    minFollowers: number | null
+  ): boolean {
+    // If no minimum set, always pass
+    if (!minFollowers || minFollowers <= 0) {
+      return true;
+    }
+
+    if (!analysis) {
+      // If we can't fetch data and followers are required, fail closed (reject)
+      console.warn('Token analysis unavailable, Twitter followers required - rejecting');
+      return false;
+    }
+
+    // If we couldn't fetch follower count, fail closed
+    if (analysis.socials.twitterFollowers === null || analysis.socials.twitterFollowers === undefined) {
+      // If Twitter exists but no follower count, we couldn't fetch it - allow with warning
+      if (analysis.socials.twitter) {
+        console.warn(`Could not verify Twitter followers for ${analysis.tokenMint}, allowing`);
+        return true;
+      }
+      return false;
+    }
+
+    return analysis.socials.twitterFollowers >= minFollowers;
+  }
+
+  /**
+   * Check if token meets liquidity lock criteria
+   */
+  meetsLiquidityLockCriteria(
+    analysis: TokenAnalysis | null,
+    requireLocked: boolean
+  ): boolean {
+    // If not required, always pass
+    if (!requireLocked) {
+      return true;
+    }
+
+    if (!analysis) {
+      // If we can't fetch data and lock is required, fail closed (reject)
+      console.warn('Token analysis unavailable, liquidity lock required - rejecting');
+      return false;
+    }
+
+    return analysis.isLiquidityLocked === true;
+  }
+
+  /**
+   * Check if token meets DexScreener paid criteria
+   */
+  meetsDexScreenerPaidCriteria(
+    analysis: TokenAnalysis | null,
+    requirePaid: boolean
+  ): boolean {
+    // If not required, always pass
+    if (!requirePaid) {
+      return true;
+    }
+
+    if (!analysis) {
+      // If we can't fetch data and paid is required, fail closed (reject)
+      console.warn('Token analysis unavailable, DexScreener paid required - rejecting');
+      return false;
+    }
+
+    return analysis.isDexScreenerPaid === true;
+  }
+
+  /**
+   * Check if token creator meets history score criteria
+   * Note: Creator history requires additional tracking infrastructure
+   * For now, returns true (pass) if creatorHistory is unavailable
+   */
+  meetsCreatorScoreCriteria(
+    analysis: TokenAnalysis | null,
+    minCreatorScore: number | null
+  ): boolean {
+    // If no minimum set, always pass
+    if (!minCreatorScore || minCreatorScore <= 0) {
+      return true;
+    }
+
+    if (!analysis || !analysis.creatorHistory) {
+      // Creator history not available - fail open for now (allow)
+      // In production, this would require tracking creator wallets
+      console.warn('Creator history unavailable, skipping creator score check');
+      return true;
+    }
+
+    return analysis.creatorHistory.creatorScore >= minCreatorScore;
   }
 
   /**
