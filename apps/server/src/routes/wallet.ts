@@ -492,9 +492,26 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = sourcePubkey;
 
-      const signature = await sendAndConfirmTransaction(connection, transaction, [keypair], {
-        commitment: 'confirmed',
+      // Sign the transaction
+      transaction.sign(keypair);
+
+      // Send raw transaction for faster response
+      const rawTransaction = transaction.serialize();
+      const signature = await connection.sendRawTransaction(rawTransaction, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
       });
+
+      // Wait for confirmation with timeout
+      const confirmationResult = await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        'confirmed'
+      );
+
+      if (confirmationResult.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmationResult.value.err)}`);
+      }
 
       // Invalidate balance cache
       const cacheKey = `${USER_BALANCE_CACHE_PREFIX}${wallet.publicKey}`;
