@@ -214,9 +214,8 @@ export default function BuybacksPage() {
               {/* Factory processor */}
               <div className="relative">
                 {/* Top section with status */}
-                <div className="w-36 h-8 bg-gradient-to-b from-green-950/80 to-green-950/40 rounded-t-xl border-t border-l border-r border-green-700/50 flex items-center justify-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-[10px] text-green-400 uppercase tracking-wider font-medium">Processing</span>
+                <div className="w-36 h-8 bg-gradient-to-b from-green-950/80 to-green-950/40 rounded-t-xl border-t border-l border-r border-green-700/50 flex items-center justify-center">
+                  <span className="text-[10px] text-green-400 uppercase tracking-wider font-medium">Revenue Spend</span>
                 </div>
                 {/* Main body with logo */}
                 <div
