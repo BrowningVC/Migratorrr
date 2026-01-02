@@ -148,7 +148,7 @@ function LiveMigrationFeed() {
   );
 }
 
-const BOND_TOKEN_ADDRESS = 'BnbvSDF8zUjWAvkD6eyxbrTNtkRwG4i3oDNRumFRpump';
+const BOND_TOKEN_ADDRESS = 'BpVBuJwg9roU6EwvfZfbMd7Zi3XutSwYxYFrKNwppump';
 
 const STATS = [
   { value: '<50ms', label: 'Detection' },
