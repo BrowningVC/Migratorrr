@@ -331,15 +331,43 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Decrypt private key
-    const privateKey = await walletService.decryptPrivateKey(
-      {
-        ciphertext: wallet.encryptedPrivateKey,
-        iv: wallet.iv,
-        authTag: wallet.authTag,
-        version: wallet.keyVersion || 1,
-      },
-      userId
-    );
+    let privateKey: Uint8Array;
+    try {
+      privateKey = await walletService.decryptPrivateKey(
+        {
+          ciphertext: wallet.encryptedPrivateKey,
+          iv: wallet.iv,
+          authTag: wallet.authTag,
+          version: wallet.keyVersion || 1,
+        },
+        userId
+      );
+    } catch (decryptError) {
+      fastify.log.error(`Failed to decrypt wallet ${walletId}: ${decryptError instanceof Error ? decryptError.message : String(decryptError)}`);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to decrypt wallet. The encryption key may have changed since this wallet was created.',
+      });
+    }
+
+    // Verify the decrypted key matches the wallet's public key
+    try {
+      const keypair = Keypair.fromSecretKey(privateKey);
+      if (keypair.publicKey.toBase58() !== wallet.publicKey) {
+        fastify.log.error(`Export key mismatch! Wallet: ${wallet.publicKey}, Decrypted: ${keypair.publicKey.toBase58()}`);
+        privateKey.fill(0);
+        return reply.status(500).send({
+          success: false,
+          error: 'Wallet key verification failed. The MASTER_ENCRYPTION_KEY has changed since this wallet was created. Contact support to recover funds.',
+        });
+      }
+    } catch (verifyError) {
+      privateKey.fill(0);
+      return reply.status(500).send({
+        success: false,
+        error: 'Invalid decrypted key format.',
+      });
+    }
 
     const privateKeyBase58 = bs58.encode(privateKey);
 
@@ -579,7 +607,9 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Provide more specific error messages for common issues
       let userMessage = 'Transaction failed. Please try again.';
-      if (errorMessage.includes('insufficient funds') || errorMessage.includes('Insufficient') || errorMessage.includes('0x1')) {
+      if (errorMessage.includes('Invalid signature') || errorMessage.includes('signature verification')) {
+        userMessage = 'Wallet key mismatch. The encryption key may have changed. Please generate a new trading wallet and transfer funds manually.';
+      } else if (errorMessage.includes('insufficient funds') || errorMessage.includes('Insufficient') || errorMessage.includes('0x1')) {
         userMessage = 'Insufficient funds for transaction (including fee)';
       } else if (errorMessage.includes('blockhash') || errorMessage.includes('expired')) {
         userMessage = 'Transaction expired. Please try again.';
