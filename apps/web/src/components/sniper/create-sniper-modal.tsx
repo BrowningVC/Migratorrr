@@ -261,7 +261,7 @@ export function CreateSniperModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="bg-zinc-900 border-zinc-800 w-full max-w-lg max-h-[85vh] flex flex-col">
+      <Card className="bg-zinc-900 border-zinc-800 w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
         <CardHeader className="border-b border-zinc-800">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl">
@@ -298,7 +298,7 @@ export function CreateSniperModal({
           )}
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-y-auto p-4">
+        <CardContent className="flex-1 min-h-0 overflow-y-auto p-4">
           {/* Step 1: Basics */}
           {step === 'basics' && (
             <div className="space-y-4">
