@@ -544,10 +544,7 @@ export class SnipeWorker {
 
     // Retry up to 3 times with 500ms delay to handle race condition
     // The transaction/position might not be committed yet when we first check
-    type TransactionWithPosition = NonNullable<Awaited<ReturnType<typeof prisma.transaction.findFirst<{ include: { position: true } }>>>>;
-    type Position = NonNullable<TransactionWithPosition['position']>;
-
-    let position: Position | null = null;
+    let position: Awaited<ReturnType<typeof prisma.position.findFirst>> = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       const tx = await prisma.transaction.findFirst({
         where: { signature },
