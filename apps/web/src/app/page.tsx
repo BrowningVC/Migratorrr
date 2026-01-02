@@ -455,15 +455,9 @@ export default function LandingPage() {
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
             {/* Left side - Text content */}
             <div className="flex-1 text-center lg:text-left">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm mb-8">
-                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                <span className="text-sm text-zinc-400">Migration Sniper for Solana</span>
-              </div>
-
               {/* Main headline */}
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-                <span className="block text-white">Catch Every</span>
+                <span className="block text-white">Profit From Every</span>
                 <span className="block bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 bg-clip-text text-transparent">
                   Migration
                 </span>
@@ -471,7 +465,7 @@ export default function LandingPage() {
 
               {/* Subheadline */}
               <p className="text-lg md:text-xl text-zinc-400 max-w-xl mb-10 leading-relaxed">
-                Automated sniping for PumpFun to Raydium migrations.
+                Automated sniping on PumpFun Migrations.
                 Sub-50ms detection, MEV protection, and intelligent position management.
               </p>
 
