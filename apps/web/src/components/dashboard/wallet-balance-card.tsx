@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Copy, Check, RefreshCw, ExternalLink, Info, Bot, ArrowUpRight, X, Loader2 } from 'lucide-react';
+import { Copy, Check, RefreshCw, Wallet, ExternalLink, Info, Bot, ArrowUpRight, X, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useWalletsStore } from '@/lib/stores/wallets';
 import { walletApi } from '@/lib/api';
