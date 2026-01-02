@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Zap, Shield, Target, BarChart3, Copy, Check, ChevronRight, TrendingUp } from 'lucide-react';
+import { ArrowRight, Zap, Shield, Target, BarChart3, Copy, Check, ChevronRight, TrendingUp, BookOpen, Crosshair } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo, LogoText } from '@/components/logo';
@@ -251,7 +251,7 @@ export default function LandingPage() {
             <div className="hidden md:flex items-center gap-1">
               <Link href="/how-it-works">
                 <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white text-sm">
-                  How it Works
+                  Documentation
                 </Button>
               </Link>
               <Link href="/buybacks">
@@ -273,9 +273,10 @@ export default function LandingPage() {
 
             <Button
               size="sm"
-              className="bg-orange-500 hover:bg-orange-600 text-black font-semibold px-4"
+              className="bg-orange-500 hover:bg-orange-600 text-black font-semibold px-4 gap-1.5"
               onClick={handleDashboardClick}
             >
+              <Crosshair className="w-4 h-4" />
               Launch App
             </Button>
           </div>
@@ -335,6 +336,7 @@ export default function LandingPage() {
                   className="h-14 px-8 bg-orange-500 hover:bg-orange-600 text-black font-semibold text-lg gap-2 rounded-xl"
                   onClick={() => setIsSniperModalOpen(true)}
                 >
+                  <Crosshair className="w-5 h-5" />
                   Start Sniping
                   <ArrowRight className="w-5 h-5" />
                 </Button>
@@ -342,9 +344,10 @@ export default function LandingPage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="h-14 px-8 border-zinc-700 hover:bg-zinc-900 text-white font-medium text-lg rounded-xl"
+                    className="h-14 px-8 border-zinc-700 hover:bg-zinc-900 text-white font-medium text-lg rounded-xl gap-2"
                   >
-                    Learn More
+                    <BookOpen className="w-5 h-5" />
+                    Documentation
                   </Button>
                 </Link>
               </div>
@@ -523,7 +526,7 @@ export default function LandingPage() {
               Dashboard
             </Link>
             <Link href="/how-it-works" className="hover:text-white transition-colors">
-              How it Works
+              Documentation
             </Link>
             <Link href="/buybacks" className="hover:text-white transition-colors">
               Buybacks
