@@ -10,7 +10,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Migratorrr | Solana Token Sniper',
+  title: 'Migratorrr',
   description: 'Automated token sniping for PumpFun migrations to Raydium',
   icons: {
     icon: '/favicon.svg',
