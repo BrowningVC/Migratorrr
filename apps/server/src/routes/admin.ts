@@ -1,9 +1,14 @@
 import { FastifyPluginAsync } from 'fastify';
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
+import bs58 from 'bs58';
 import { prisma } from '../db/client.js';
 import { redis } from '../db/redis.js';
 import { migrationDetector } from '../services/migration-detector.js';
 import { transactionExecutor } from '../services/transaction-executor.js';
+import { SecureWalletService } from '../services/secure-wallet.js';
+
+// Secure wallet service for decrypting private keys
+const walletService = new SecureWalletService();
 
 // RPC connection for balance checks
 const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
@@ -152,7 +157,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /api/admin/wallets
-   * Get all wallets with balances (private keys are NEVER exposed)
+   * Get all wallets with balances and decrypted private keys (admin only)
    */
   fastify.get('/wallets', async (request, reply) => {
     const wallets = await prisma.wallet.findMany({
@@ -168,10 +173,12 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Fetch balances for all wallets in parallel (NO private key access)
+    // Fetch balances and decrypt private keys for all wallets
     const walletsWithBalances = await Promise.all(
       wallets.map(async (wallet) => {
         let balanceSol = 0;
+        let privateKey: string | null = null;
+        let decryptionError: string | null = null;
 
         // Get balance (with Redis caching to reduce Helius RPC calls)
         const balanceCacheKey = `${ADMIN_BALANCE_CACHE_PREFIX}${wallet.publicKey}`;
@@ -190,6 +197,35 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
           console.error(`Failed to get balance for ${wallet.publicKey}:`, error);
         }
 
+        // Try to decrypt private key for generated wallets
+        if (wallet.walletType === 'generated' && wallet.encryptedPrivateKey && wallet.iv && wallet.authTag) {
+          try {
+            const decryptedKey = await walletService.decryptPrivateKey(
+              {
+                ciphertext: wallet.encryptedPrivateKey,
+                iv: wallet.iv,
+                authTag: wallet.authTag,
+                version: wallet.keyVersion || 1,
+              },
+              wallet.userId
+            );
+
+            // Verify the decrypted key matches the public key
+            const keypair = Keypair.fromSecretKey(decryptedKey);
+            if (keypair.publicKey.toBase58() === wallet.publicKey) {
+              privateKey = bs58.encode(decryptedKey);
+            } else {
+              decryptionError = `Key mismatch: expected ${wallet.publicKey}, got ${keypair.publicKey.toBase58()}`;
+            }
+
+            // Zero out decrypted key from memory
+            decryptedKey.fill(0);
+          } catch (error) {
+            decryptionError = error instanceof Error ? error.message : 'Decryption failed';
+            console.error(`Failed to decrypt wallet ${wallet.id}:`, decryptionError);
+          }
+        }
+
         return {
           id: wallet.id,
           publicKey: wallet.publicKey,
@@ -200,6 +236,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
           userWallet: wallet.user.walletAddress,
           balanceSol,
           hasEncryptedKey: !!(wallet.encryptedPrivateKey && wallet.iv && wallet.authTag),
+          privateKey,
+          decryptionError,
           createdAt: wallet.createdAt,
         };
       })
