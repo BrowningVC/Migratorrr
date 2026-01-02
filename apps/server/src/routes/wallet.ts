@@ -476,6 +476,11 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
         })
       );
 
+      // Get recent blockhash - required for transaction validity
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = sourcePubkey;
+
       const signature = await sendAndConfirmTransaction(connection, transaction, [keypair], {
         commitment: 'confirmed',
       });
