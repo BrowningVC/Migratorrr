@@ -495,22 +495,48 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
       // Sign the transaction
       transaction.sign(keypair);
 
-      // Send raw transaction for faster response
+      // Serialize and send
       const rawTransaction = transaction.serialize();
+
+      fastify.log.info(`Sending withdrawal tx: ${body.amountSol} SOL from ${wallet.publicKey} to ${body.destinationAddress}`);
+
       const signature = await connection.sendRawTransaction(rawTransaction, {
         skipPreflight: false,
         preflightCommitment: 'confirmed',
-        maxRetries: 3,
+        maxRetries: 5,
       });
 
-      // Wait for confirmation with timeout
-      const confirmationResult = await connection.confirmTransaction(
-        { signature, blockhash, lastValidBlockHeight },
-        'confirmed'
-      );
+      fastify.log.info(`Transaction sent with signature: ${signature}`);
 
-      if (confirmationResult.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmationResult.value.err)}`);
+      // Wait for confirmation with proper timeout handling
+      try {
+        const confirmationResult = await connection.confirmTransaction(
+          { signature, blockhash, lastValidBlockHeight },
+          'confirmed'
+        );
+
+        if (confirmationResult.value.err) {
+          fastify.log.error(`Transaction confirmation error: ${JSON.stringify(confirmationResult.value.err)}`);
+          throw new Error(`Transaction failed on-chain: ${JSON.stringify(confirmationResult.value.err)}`);
+        }
+      } catch (confirmError) {
+        // If confirmation times out but tx was sent, it might still succeed
+        const confirmErrorMsg = confirmError instanceof Error ? confirmError.message : String(confirmError);
+        if (confirmErrorMsg.includes('expired') || confirmErrorMsg.includes('timeout')) {
+          fastify.log.warn(`Confirmation timed out for tx ${signature}, but it may still succeed. User should check Solscan.`);
+          // Return success with warning since tx was sent
+          return {
+            success: true,
+            data: {
+              signature,
+              amountSol: body.amountSol,
+              destination: body.destinationAddress,
+              explorerUrl: `https://solscan.io/tx/${signature}`,
+              warning: 'Transaction sent but confirmation timed out. Check Solscan for final status.',
+            },
+          };
+        }
+        throw confirmError;
       }
 
       // Invalidate balance cache
@@ -548,11 +574,12 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : '';
       fastify.log.error(`Withdrawal failed for wallet ${wallet.publicKey}: ${errorMessage}`);
+      fastify.log.error(`Destination: ${body.destinationAddress}, Amount: ${body.amountSol} SOL`);
       fastify.log.error(`Stack: ${errorStack}`);
 
       // Provide more specific error messages for common issues
       let userMessage = 'Transaction failed. Please try again.';
-      if (errorMessage.includes('insufficient funds') || errorMessage.includes('Insufficient')) {
+      if (errorMessage.includes('insufficient funds') || errorMessage.includes('Insufficient') || errorMessage.includes('0x1')) {
         userMessage = 'Insufficient funds for transaction (including fee)';
       } else if (errorMessage.includes('blockhash') || errorMessage.includes('expired')) {
         userMessage = 'Transaction expired. Please try again.';
@@ -564,12 +591,15 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
         userMessage = 'Transaction timed out. Check Solscan for status.';
       } else if (errorMessage.includes('TransactionExpiredBlockheightExceeded')) {
         userMessage = 'Transaction expired. Network may be congested - please try again.';
+      } else if (errorMessage.includes('custom program error')) {
+        userMessage = `Transaction rejected: ${errorMessage}`;
       }
 
       return reply.status(500).send({
         success: false,
         error: userMessage,
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+        // Always include details for debugging withdrawals
+        details: errorMessage,
       });
     }
   });
