@@ -357,96 +357,88 @@ export default function DashboardPage() {
       </nav>
 
       {/* Main Content */}
-      <main className="pt-14 pb-20 relative z-10">
-        <div className="max-w-[1600px] mx-auto px-4 py-6">
-          {/* Hero Stats Section - Compact */}
-          <div className="mb-6">
-            <div className="flex flex-col lg:flex-row gap-4 items-start">
-              {/* Main P&L Card - Smaller */}
+      <main className="pt-14 pb-8 relative z-10">
+        <div className="max-w-[1600px] mx-auto px-3 py-3">
+          {/* Hero Stats Section - Ultra Compact */}
+          <div className="mb-4">
+            <div className="flex flex-col lg:flex-row gap-2 items-start">
+              {/* Main P&L Card - Minimal */}
               <div className={cn(
-                "relative rounded-2xl px-6 py-5 border overflow-hidden",
+                "relative rounded-xl px-4 py-3 border overflow-hidden",
                 isProfitable
                   ? "bg-gradient-to-br from-orange-950/40 via-orange-900/20 to-transparent border-orange-500/20"
                   : "bg-gradient-to-br from-red-950/40 via-red-900/20 to-transparent border-red-500/20"
               )}>
-                <div className="absolute top-3 right-3">
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 border border-white/10">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-                    <span className="text-[10px] text-white/70">Live</span>
+                <div className="absolute top-2 right-2">
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/40 border border-white/10">
+                    <span className="w-1 h-1 rounded-full bg-orange-400 animate-pulse" />
+                    <span className="text-[9px] text-white/70">Live</span>
                   </div>
                 </div>
 
-                <p className="text-xs text-white/50 mb-1">Total P&L</p>
-                <div className="flex items-end gap-2">
+                <p className="text-[10px] text-white/50">Total P&L</p>
+                <div className="flex items-end gap-1.5">
                   <h1 className={cn(
-                    "text-4xl font-bold tracking-tight",
+                    "text-2xl font-bold tracking-tight",
                     isProfitable ? "text-orange-400" : "text-red-400"
                   )}>
                     {isProfitable ? '+' : ''}{stats.totalPnlSol.toFixed(3)}
                   </h1>
-                  <span className="text-lg text-white/30 mb-1">SOL</span>
+                  <span className="text-sm text-white/30 mb-0.5">SOL</span>
+                  <span className={cn(
+                    "text-xs mb-0.5 ml-1",
+                    isProfitable ? "text-orange-400/70" : "text-red-400/70"
+                  )}>
+                    ({isProfitable ? '+' : ''}{stats.totalPnlPct.toFixed(1)}%)
+                  </span>
                 </div>
-                <p className={cn(
-                  "text-sm mt-1",
-                  isProfitable ? "text-orange-400/70" : "text-red-400/70"
-                )}>
-                  {isProfitable ? '+' : ''}{stats.totalPnlPct.toFixed(1)}%
-                </p>
               </div>
 
-              {/* Stats Grid - Compact */}
-              <div className="flex flex-wrap gap-2 lg:gap-3">
-                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
-                  <Activity className="w-4 h-4 text-orange-400" />
-                  <div>
-                    <p className="text-lg font-semibold text-white">{openPositions.length}</p>
-                    <p className="text-[10px] text-white/40 -mt-0.5">Positions</p>
-                  </div>
+              {/* Stats Grid - Inline compact */}
+              <div className="flex flex-wrap gap-1.5">
+                <div className="bg-white/[0.02] rounded-lg px-2.5 py-1.5 border border-white/5 backdrop-blur-sm flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-sm font-semibold text-white">{openPositions.length}</span>
+                  <span className="text-[9px] text-white/40">pos</span>
                 </div>
-                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
-                  <Target className="w-4 h-4 text-blue-400" />
-                  <div>
-                    <p className="text-lg font-semibold text-white">{activeSnipers.length}</p>
-                    <p className="text-[10px] text-white/40 -mt-0.5">Active Snipers</p>
-                  </div>
+                <div className="bg-white/[0.02] rounded-lg px-2.5 py-1.5 border border-white/5 backdrop-blur-sm flex items-center gap-2">
+                  <Target className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-sm font-semibold text-white">{activeSnipers.length}</span>
+                  <span className="text-[9px] text-white/40">active</span>
                 </div>
-                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
-                  <Zap className="w-4 h-4 text-yellow-400" />
-                  <div>
-                    <p className="text-lg font-semibold text-white">{stats.snipesToday}</p>
-                    <p className="text-[10px] text-white/40 -mt-0.5">Total Snipes</p>
-                  </div>
+                <div className="bg-white/[0.02] rounded-lg px-2.5 py-1.5 border border-white/5 backdrop-blur-sm flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-sm font-semibold text-white">{stats.snipesToday}</span>
+                  <span className="text-[9px] text-white/40">snipes</span>
                 </div>
-                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
-                  <BarChart3 className="w-4 h-4 text-purple-400" />
-                  <div>
-                    <p className="text-lg font-semibold text-white">{stats.successRate}%</p>
-                    <p className="text-[10px] text-white/40 -mt-0.5">Success Rate</p>
-                  </div>
+                <div className="bg-white/[0.02] rounded-lg px-2.5 py-1.5 border border-white/5 backdrop-blur-sm flex items-center gap-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-sm font-semibold text-white">{stats.successRate}%</span>
+                  <span className="text-[9px] text-white/40">win</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Three Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             {/* Positions Column */}
-            <div className="lg:col-span-5 space-y-4">
+            <div className="lg:col-span-5 space-y-2">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-orange-400" />
+                <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-orange-400" />
                   Positions
                 </h2>
               </div>
 
               {openPositions.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.01] p-12 text-center">
-                  <TrendingUp className="w-10 h-10 text-white/20 mx-auto mb-4" />
-                  <p className="text-white/40 mb-1">No open positions</p>
-                  <p className="text-sm text-white/20">Trades appear when snipers fire</p>
+                <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.01] p-8 text-center">
+                  <TrendingUp className="w-8 h-8 text-white/20 mx-auto mb-3" />
+                  <p className="text-white/40 text-sm mb-1">No open positions</p>
+                  <p className="text-xs text-white/20">Trades appear when snipers fire</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {openPositions.map((position) => {
                     const pnlPct = position.pnlPct ?? 0;
                     const isProfit = pnlPct > 0;
@@ -456,28 +448,28 @@ export default function DashboardPage() {
                       <div
                         key={position.id}
                         className={cn(
-                          "group relative rounded-2xl border bg-white/[0.02] backdrop-blur-sm p-4 transition-all hover:bg-white/[0.04]",
+                          "group relative rounded-xl border bg-white/[0.02] backdrop-blur-sm px-3 py-2 transition-all hover:bg-white/[0.04]",
                           isProfit && "border-orange-500/20 hover:border-orange-500/30",
                           isLoss && "border-red-500/20 hover:border-red-500/30",
                           !isProfit && !isLoss && "border-white/5"
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-sm font-bold text-black shadow-lg shadow-orange-500/20">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-xs font-bold text-black shadow-md shadow-orange-500/20">
                               {position.tokenSymbol?.charAt(0) || '?'}
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-white">{position.tokenSymbol || position.tokenMint?.slice(0, 6)}</span>
-                                <button onClick={() => { navigator.clipboard.writeText(position.tokenMint || ''); toast.success('Copied!'); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all">
-                                  <Copy className="w-3 h-3 text-white/50" />
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-sm text-white">{position.tokenSymbol || position.tokenMint?.slice(0, 6)}</span>
+                                <button onClick={() => { navigator.clipboard.writeText(position.tokenMint || ''); toast.success('Copied!'); }} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-white/10 rounded transition-all">
+                                  <Copy className="w-2.5 h-2.5 text-white/50" />
                                 </button>
-                                <a href={`https://dexscreener.com/solana/${position.tokenMint}`} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all">
-                                  <ExternalLink className="w-3 h-3 text-white/50" />
+                                <a href={`https://dexscreener.com/solana/${position.tokenMint}`} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-white/10 rounded transition-all">
+                                  <ExternalLink className="w-2.5 h-2.5 text-white/50" />
                                 </a>
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-white/40">
+                              <div className="flex items-center gap-1.5 text-[10px] text-white/40">
                                 <span>{position.entrySol?.toFixed(3)} SOL</span>
                                 <span>•</span>
                                 <span>{formatMcap(position.currentMarketCap)}</span>
@@ -485,10 +477,10 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
                             <div className="text-right">
                               <p className={cn(
-                                "text-xl font-bold font-mono",
+                                "text-base font-bold font-mono",
                                 isProfit && "text-orange-400",
                                 isLoss && "text-red-400",
                                 !isProfit && !isLoss && "text-white/40"
@@ -496,18 +488,18 @@ export default function DashboardPage() {
                                 {isProfit ? '+' : ''}{pnlPct.toFixed(1)}%
                               </p>
                               {position.pnlSol !== undefined && (
-                                <p className={cn("text-xs font-mono", isProfit ? "text-orange-400/60" : isLoss ? "text-red-400/60" : "text-white/30")}>
+                                <p className={cn("text-[10px] font-mono", isProfit ? "text-orange-400/60" : isLoss ? "text-red-400/60" : "text-white/30")}>
                                   {isProfit ? '+' : ''}{position.pnlSol.toFixed(4)}
                                 </p>
                               )}
                             </div>
                             <Button
                               size="sm"
-                              className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border-0 h-9"
+                              className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border-0 h-7 px-2 text-xs"
                               onClick={() => handleSellPosition(position.id)}
                               disabled={sellingPositions.has(position.id) || position.status === 'selling'}
                             >
-                              {sellingPositions.has(position.id) || position.status === 'selling' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sell'}
+                              {sellingPositions.has(position.id) || position.status === 'selling' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Sell'}
                             </Button>
                           </div>
                         </div>
@@ -519,33 +511,33 @@ export default function DashboardPage() {
             </div>
 
             {/* Snipers Column */}
-            <div className="lg:col-span-4 space-y-4">
+            <div className="lg:col-span-4 space-y-2">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Crosshair className="w-5 h-5 text-orange-400" />
+                <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <Crosshair className="w-4 h-4 text-orange-400" />
                   Snipers
                 </h2>
                 <Button
                   size="sm"
-                  className="bg-orange-500 hover:bg-orange-600 text-black font-semibold h-8"
+                  className="bg-orange-500 hover:bg-orange-600 text-black font-semibold h-6 text-xs px-2"
                   onClick={() => setIsCreateModalOpen(true)}
                 >
-                  <Plus className="w-4 h-4 mr-1" />
+                  <Plus className="w-3 h-3 mr-0.5" />
                   New
                 </Button>
               </div>
 
               {snipers.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.01] p-8 text-center">
-                  <Crosshair className="w-10 h-10 text-orange-400/30 mx-auto mb-4" />
-                  <p className="text-white/40 mb-1">No snipers yet</p>
-                  <p className="text-sm text-white/20 mb-4">Create your first sniper to start</p>
-                  <Button className="bg-orange-500 hover:bg-orange-600 text-black" onClick={() => setIsCreateModalOpen(true)}>
+                <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.01] p-6 text-center">
+                  <Crosshair className="w-8 h-8 text-orange-400/30 mx-auto mb-3" />
+                  <p className="text-white/40 text-sm mb-1">No snipers yet</p>
+                  <p className="text-xs text-white/20 mb-3">Create your first sniper to start</p>
+                  <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-black h-7 text-xs" onClick={() => setIsCreateModalOpen(true)}>
                     Create Sniper
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {snipers.map((sniper) => (
                     <SniperCard
                       key={sniper.id}
@@ -560,18 +552,18 @@ export default function DashboardPage() {
               )}
 
               {/* Wallet Card */}
-              <div className="mt-6">
+              <div className="mt-3">
                 <WalletBalanceCard />
               </div>
             </div>
 
             {/* Activity Column */}
-            <div className="lg:col-span-3 space-y-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Radio className="w-5 h-5 text-orange-400" />
+            <div className="lg:col-span-3 space-y-2">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                <Radio className="w-4 h-4 text-orange-400" />
                 Live Feed
               </h2>
-              <div className="rounded-2xl border border-white/5 bg-white/[0.02] backdrop-blur-sm overflow-hidden">
+              <div className="rounded-xl border border-white/5 bg-white/[0.02] backdrop-blur-sm overflow-hidden">
                 <ActivityLog />
               </div>
             </div>
