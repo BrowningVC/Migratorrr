@@ -466,6 +466,15 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
     // Zero out the decrypted key immediately after creating keypair
     privateKeyBytes.fill(0);
 
+    // Verify the keypair matches the wallet's public key
+    if (keypair.publicKey.toBase58() !== wallet.publicKey) {
+      fastify.log.error(`Keypair mismatch! Expected: ${wallet.publicKey}, Got: ${keypair.publicKey.toBase58()}`);
+      return reply.status(500).send({
+        success: false,
+        error: 'Wallet key verification failed. Please contact support.',
+      });
+    }
+
     // Create and send transaction
     try {
       const transaction = new Transaction().add(
@@ -517,10 +526,27 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
         },
       };
     } catch (error) {
-      fastify.log.error(`Withdrawal failed: ${error instanceof Error ? error.message : String(error)}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : '';
+      fastify.log.error(`Withdrawal failed for wallet ${wallet.publicKey}: ${errorMessage}`);
+      fastify.log.error(`Stack: ${errorStack}`);
+
+      // Provide more specific error messages for common issues
+      let userMessage = 'Transaction failed. Please try again.';
+      if (errorMessage.includes('insufficient funds') || errorMessage.includes('Insufficient')) {
+        userMessage = 'Insufficient funds for transaction (including fee)';
+      } else if (errorMessage.includes('blockhash') || errorMessage.includes('expired')) {
+        userMessage = 'Transaction expired. Please try again.';
+      } else if (errorMessage.includes('signature')) {
+        userMessage = 'Transaction signature failed. Please contact support.';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        userMessage = 'Transaction timed out. Check Solscan for status.';
+      }
+
       return reply.status(500).send({
         success: false,
-        error: `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: userMessage,
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
       });
     }
   });
