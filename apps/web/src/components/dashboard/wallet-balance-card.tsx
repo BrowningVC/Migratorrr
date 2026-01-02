@@ -132,10 +132,14 @@ export function WalletBalanceCard() {
         setWithdrawAmount('');
         fetchBalances();
       } else {
-        toast.error(res.error || 'Withdrawal failed');
+        // Show more detailed error if available
+        const errorMsg = res.details ? `${res.error}: ${res.details}` : (res.error || 'Withdrawal failed');
+        toast.error(errorMsg, { duration: 8000 });
+        console.error('Withdrawal failed:', res);
       }
-    } catch {
-      toast.error('Withdrawal failed');
+    } catch (err) {
+      console.error('Withdrawal error:', err);
+      toast.error('Withdrawal failed - check console for details');
     } finally {
       setIsWithdrawing(false);
     }

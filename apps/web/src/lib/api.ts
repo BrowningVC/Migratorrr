@@ -4,6 +4,7 @@ interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  details?: string; // Additional error details from server
 }
 
 // Retry configuration
@@ -72,6 +73,7 @@ async function fetchApi<T>(
       return {
         success: false,
         error: data.error || `HTTP ${response.status}`,
+        details: data.details,
       };
     }
 
