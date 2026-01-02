@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Copy, Check, RefreshCw, Wallet, ExternalLink, Info, Bot, ArrowUpRight, X, Loader2, Key, Eye, EyeOff } from 'lucide-react';
+import { Copy, Check, RefreshCw, Wallet, ExternalLink, Info, Bot, ArrowUpRight, X, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useWalletsStore } from '@/lib/stores/wallets';
 import { walletApi } from '@/lib/api';
@@ -37,12 +37,6 @@ export function WalletBalanceCard() {
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
-
-  // Export key state
-  const [exportWalletId, setExportWalletId] = useState<string | null>(null);
-  const [exportedKey, setExportedKey] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [showKey, setShowKey] = useState(false);
 
   const fetchBalances = useCallback(async (showToast = false) => {
     if (!token) return;
@@ -155,46 +149,6 @@ export function WalletBalanceCard() {
     // Leave a small amount for fees (0.001 SOL)
     const maxAmount = Math.max(0, balance - 0.001);
     setWithdrawAmount(maxAmount.toFixed(6));
-  };
-
-  const handleExportKey = async (walletId: string) => {
-    if (!token) return;
-
-    setIsExporting(true);
-    try {
-      const res = await walletApi.exportKey(token, walletId);
-      if (res.success && res.data) {
-        setExportedKey(res.data.privateKey);
-        setExportWalletId(walletId);
-        setShowKey(false);
-        toast.success('Private key exported. Keep it safe!', { duration: 5000 });
-      } else {
-        const errorMsg = res.details ? `${res.error}: ${res.details}` : (res.error || 'Export failed');
-        toast.error(errorMsg, { duration: 8000 });
-        console.error('Export failed:', res);
-      }
-    } catch (err) {
-      console.error('Export error:', err);
-      toast.error('Failed to export private key');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleCopyPrivateKey = async () => {
-    if (!exportedKey) return;
-    try {
-      await navigator.clipboard.writeText(exportedKey);
-      toast.success('Private key copied!');
-    } catch {
-      toast.error('Failed to copy');
-    }
-  };
-
-  const closeExportModal = () => {
-    setExportWalletId(null);
-    setExportedKey(null);
-    setShowKey(false);
   };
 
   // Memoize filtered wallets and total
@@ -407,60 +361,6 @@ export function WalletBalanceCard() {
                   </Button>
                 )}
               </>
-            )}
-
-            {/* Export Key Section */}
-            {exportWalletId === wallet.walletId && exportedKey ? (
-              <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-orange-400 font-medium">Private Key</span>
-                  <button
-                    onClick={closeExportModal}
-                    className="text-zinc-500 hover:text-zinc-300"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="bg-zinc-900 border border-orange-800/50 rounded p-2">
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-[10px] font-mono text-orange-300 break-all">
-                      {showKey ? exportedKey : '•'.repeat(44)}
-                    </code>
-                    <button
-                      onClick={() => setShowKey(!showKey)}
-                      className="text-zinc-400 hover:text-zinc-200 p-1"
-                      title={showKey ? 'Hide key' : 'Show key'}
-                    >
-                      {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                    <button
-                      onClick={handleCopyPrivateKey}
-                      className="text-zinc-400 hover:text-zinc-200 p-1"
-                      title="Copy key"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[10px] text-orange-400/80">
-                  ⚠️ Never share this key. Anyone with it has full control of this wallet.
-                </p>
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleExportKey(wallet.walletId)}
-                disabled={isExporting}
-                className="w-full mt-1 h-7 text-xs text-zinc-500 hover:text-orange-400 hover:bg-zinc-700/50 gap-1.5"
-              >
-                {isExporting && exportWalletId === wallet.walletId ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Key className="h-3 w-3" />
-                )}
-                Export Private Key
-              </Button>
             )}
           </div>
         ))}
