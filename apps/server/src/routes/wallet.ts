@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { prisma } from '../db/client.js';
 import { redis } from '../db/redis.js';
@@ -26,6 +26,11 @@ const connectWalletSchema = z.object({
 const generateWalletSchema = z.object({
   label: z.string().max(100).optional(),
   isPrimary: z.boolean().optional(),
+});
+
+const withdrawSchema = z.object({
+  destinationAddress: z.string().min(32).max(44),
+  amountSol: z.number().positive().max(1000), // Max 1000 SOL per withdrawal
 });
 
 export const walletRoutes: FastifyPluginAsync = async (fastify) => {
@@ -361,6 +366,158 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
         warning: 'Store this securely. Anyone with this key has full control of the wallet.',
       },
     };
+  });
+
+  // Withdraw SOL from generated wallet
+  fastify.post('/:walletId/withdraw', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).userId;
+    const { walletId } = request.params as { walletId: string };
+
+    let body;
+    try {
+      body = withdrawSchema.parse(request.body);
+    } catch (error) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Invalid request. Provide destinationAddress and amountSol.',
+      });
+    }
+
+    const wallet = await prisma.wallet.findFirst({
+      where: { id: walletId, userId },
+    });
+
+    if (!wallet) {
+      return reply.status(404).send({
+        success: false,
+        error: 'Wallet not found',
+      });
+    }
+
+    if (wallet.walletType !== 'generated') {
+      return reply.status(400).send({
+        success: false,
+        error: 'Can only withdraw from generated wallets. Use your external wallet app for connected wallets.',
+      });
+    }
+
+    if (!wallet.encryptedPrivateKey || !wallet.iv || !wallet.authTag) {
+      return reply.status(500).send({
+        success: false,
+        error: 'Wallet encryption data not found',
+      });
+    }
+
+    // Validate destination address
+    let destinationPubkey: PublicKey;
+    try {
+      destinationPubkey = new PublicKey(body.destinationAddress);
+    } catch {
+      return reply.status(400).send({
+        success: false,
+        error: 'Invalid destination address',
+      });
+    }
+
+    // Check current balance
+    const sourcePubkey = new PublicKey(wallet.publicKey);
+    let currentBalance: number;
+    try {
+      currentBalance = await connection.getBalance(sourcePubkey);
+    } catch (error) {
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to fetch wallet balance',
+      });
+    }
+
+    const amountLamports = Math.floor(body.amountSol * LAMPORTS_PER_SOL);
+    const estimatedFee = 5000; // ~0.000005 SOL for a simple transfer
+
+    if (currentBalance < amountLamports + estimatedFee) {
+      return reply.status(400).send({
+        success: false,
+        error: `Insufficient balance. Available: ${(currentBalance / LAMPORTS_PER_SOL).toFixed(6)} SOL (need ${body.amountSol} + fee)`,
+      });
+    }
+
+    // Decrypt private key
+    let privateKeyBytes: Uint8Array;
+    try {
+      privateKeyBytes = await walletService.decryptPrivateKey(
+        {
+          ciphertext: wallet.encryptedPrivateKey,
+          iv: wallet.iv,
+          authTag: wallet.authTag,
+          version: wallet.keyVersion || 1,
+        },
+        userId
+      );
+    } catch (error) {
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to decrypt wallet key',
+      });
+    }
+
+    // Create keypair from decrypted key
+    const keypair = Keypair.fromSecretKey(privateKeyBytes);
+
+    // Zero out the decrypted key immediately after creating keypair
+    privateKeyBytes.fill(0);
+
+    // Create and send transaction
+    try {
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: sourcePubkey,
+          toPubkey: destinationPubkey,
+          lamports: amountLamports,
+        })
+      );
+
+      const signature = await sendAndConfirmTransaction(connection, transaction, [keypair], {
+        commitment: 'confirmed',
+      });
+
+      // Invalidate balance cache
+      const cacheKey = `${USER_BALANCE_CACHE_PREFIX}${wallet.publicKey}`;
+      await redis.del(cacheKey);
+
+      // Log audit event
+      await prisma.auditLog.create({
+        data: {
+          userId,
+          action: 'WALLET_WITHDRAWAL',
+          resourceType: 'wallet',
+          resourceId: walletId,
+          ipAddress: request.ip,
+          metadata: JSON.stringify({
+            amountSol: body.amountSol,
+            destination: body.destinationAddress,
+            signature,
+          }),
+        },
+      });
+
+      fastify.log.info(`Withdrawal: ${body.amountSol} SOL from ${wallet.publicKey} to ${body.destinationAddress} (tx: ${signature})`);
+
+      return {
+        success: true,
+        data: {
+          signature,
+          amountSol: body.amountSol,
+          destination: body.destinationAddress,
+          explorerUrl: `https://solscan.io/tx/${signature}`,
+        },
+      };
+    } catch (error) {
+      fastify.log.error(`Withdrawal failed: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({
+        success: false,
+        error: `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+    }
   });
 
   // Set wallet as primary

@@ -193,6 +193,22 @@ export const walletApi = {
       balanceLamports: number;
       balanceSol: number;
     }>(`/api/wallet/${walletId}/balance`, {}, token),
+
+  // Withdraw SOL from generated wallet
+  withdraw: (token: string, walletId: string, destinationAddress: string, amountSol: number) =>
+    fetchApi<{
+      signature: string;
+      amountSol: number;
+      destination: string;
+      explorerUrl: string;
+    }>(
+      `/api/wallet/${walletId}/withdraw`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ destinationAddress, amountSol }),
+      },
+      token
+    ),
 };
 
 // Sniper API

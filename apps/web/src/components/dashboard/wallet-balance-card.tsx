@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Copy, Check, RefreshCw, Wallet, ExternalLink, Info, Bot } from 'lucide-react';
+import { Copy, Check, RefreshCw, ExternalLink, Info, Bot, ArrowUpRight, X, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useWalletsStore } from '@/lib/stores/wallets';
 import { walletApi } from '@/lib/api';
@@ -31,6 +31,12 @@ export function WalletBalanceCard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  // Withdraw state
+  const [withdrawWalletId, setWithdrawWalletId] = useState<string | null>(null);
+  const [withdrawAddress, setWithdrawAddress] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const fetchBalances = useCallback(async (showToast = false) => {
     if (!token) return;
@@ -85,6 +91,60 @@ export function WalletBalanceCard() {
 
   const openSolscan = (address: string) => {
     window.open(`https://solscan.io/account/${address}`, '_blank');
+  };
+
+  const handleWithdraw = async (walletId: string) => {
+    if (!token || !withdrawAddress || !withdrawAmount) return;
+
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+
+    // Basic Solana address validation
+    if (withdrawAddress.length < 32 || withdrawAddress.length > 44) {
+      toast.error('Invalid Solana address');
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      const res = await walletApi.withdraw(token, walletId, withdrawAddress, amount);
+      if (res.success && res.data) {
+        toast.success(
+          <div>
+            <p>Withdrew {res.data.amountSol} SOL</p>
+            <a
+              href={res.data.explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-400 underline text-xs"
+            >
+              View transaction
+            </a>
+          </div>,
+          { duration: 6000 }
+        );
+        // Reset form and refresh balances
+        setWithdrawWalletId(null);
+        setWithdrawAddress('');
+        setWithdrawAmount('');
+        fetchBalances();
+      } else {
+        toast.error(res.error || 'Withdrawal failed');
+      }
+    } catch {
+      toast.error('Withdrawal failed');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  const handleMaxAmount = (balance: number) => {
+    // Leave a small amount for fees (0.001 SOL)
+    const maxAmount = Math.max(0, balance - 0.001);
+    setWithdrawAmount(maxAmount.toFixed(6));
   };
 
   // Memoize filtered wallets and total
@@ -222,6 +282,81 @@ export function WalletBalanceCard() {
 
             {wallet.error && (
               <p className="text-red-400 text-xs">{wallet.error}</p>
+            )}
+
+            {/* Withdraw Section */}
+            {wallet.balanceSol > 0 && (
+              <>
+                {withdrawWalletId === wallet.walletId ? (
+                  <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-400">Withdraw SOL</span>
+                      <button
+                        onClick={() => {
+                          setWithdrawWalletId(null);
+                          setWithdrawAddress('');
+                          setWithdrawAmount('');
+                        }}
+                        className="text-zinc-500 hover:text-zinc-300"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Destination address"
+                      value={withdrawAddress}
+                      onChange={(e) => setWithdrawAddress(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-green-600"
+                    />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          placeholder="Amount"
+                          value={withdrawAmount}
+                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                          step="0.0001"
+                          min="0"
+                          max={wallet.balanceSol}
+                          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-green-600 pr-14"
+                        />
+                        <button
+                          onClick={() => handleMaxAmount(wallet.balanceSol)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-green-400 hover:text-green-300 font-medium"
+                        >
+                          MAX
+                        </button>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleWithdraw(wallet.walletId)}
+                        disabled={isWithdrawing || !withdrawAddress || !withdrawAmount}
+                        className="h-7 px-3 bg-green-600 hover:bg-green-700 text-xs"
+                      >
+                        {isWithdrawing ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          'Send'
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-zinc-500">
+                      Available: {wallet.balanceSol.toFixed(6)} SOL (fee ~0.000005)
+                    </p>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setWithdrawWalletId(wallet.walletId)}
+                    className="w-full mt-2 h-7 text-xs text-zinc-400 hover:text-green-400 hover:bg-zinc-700/50 gap-1.5"
+                  >
+                    <ArrowUpRight className="h-3 w-3" />
+                    Withdraw
+                  </Button>
+                )}
+              </>
             )}
           </div>
         ))}
