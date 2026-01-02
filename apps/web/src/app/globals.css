@@ -110,7 +110,7 @@
 /* Solana Wallet Adapter - Orange Theme Override */
 .wallet-adapter-button {
   background-color: #f97316 !important;
-  font-family: var(--font-space-grotesk), system-ui, sans-serif !important;
+  font-family: var(--font-inter), system-ui, sans-serif !important;
   border-radius: 0.5rem !important;
   height: 40px !important;
   padding: 0 16px !important;
@@ -139,7 +139,7 @@
   background-color: #0a0f14 !important;
   border: 1px solid #27272a !important;
   border-radius: 1rem !important;
-  font-family: var(--font-space-grotesk), system-ui, sans-serif !important;
+  font-family: var(--font-inter), system-ui, sans-serif !important;
 }
 
 .wallet-adapter-modal-title {
@@ -194,7 +194,7 @@
   border: 1px solid #27272a !important;
   border-radius: 0.75rem !important;
   padding: 8px !important;
-  font-family: var(--font-space-grotesk), system-ui, sans-serif !important;
+  font-family: var(--font-inter), system-ui, sans-serif !important;
 }
 
 .wallet-adapter-dropdown-list-item {

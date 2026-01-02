@@ -359,64 +359,70 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="pt-14 pb-20 relative z-10">
         <div className="max-w-[1600px] mx-auto px-4 py-6">
-          {/* Hero Stats Section */}
-          <div className="mb-8">
-            <div className="flex flex-col lg:flex-row gap-6 items-start">
-              {/* Main P&L Card */}
-              <div className="flex-1 relative">
-                <div className={cn(
-                  "relative rounded-3xl p-8 border overflow-hidden",
-                  isProfitable
-                    ? "bg-gradient-to-br from-green-950/40 via-green-900/20 to-transparent border-green-500/20"
-                    : "bg-gradient-to-br from-red-950/40 via-red-900/20 to-transparent border-red-500/20"
-                )}>
-                  <div className="absolute top-4 right-4">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/10">
-                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                      <span className="text-xs text-white/70">Live</span>
-                    </div>
+          {/* Hero Stats Section - Compact */}
+          <div className="mb-6">
+            <div className="flex flex-col lg:flex-row gap-4 items-start">
+              {/* Main P&L Card - Smaller */}
+              <div className={cn(
+                "relative rounded-2xl px-6 py-5 border overflow-hidden",
+                isProfitable
+                  ? "bg-gradient-to-br from-green-950/40 via-green-900/20 to-transparent border-green-500/20"
+                  : "bg-gradient-to-br from-red-950/40 via-red-900/20 to-transparent border-red-500/20"
+              )}>
+                <div className="absolute top-3 right-3">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 border border-white/10">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-[10px] text-white/70">Live</span>
                   </div>
-
-                  <p className="text-sm text-white/50 mb-2">Total P&L</p>
-                  <div className="flex items-end gap-4">
-                    <h1 className={cn(
-                      "text-5xl lg:text-6xl font-bold font-mono tracking-tight",
-                      isProfitable ? "text-green-400" : "text-red-400"
-                    )}>
-                      {isProfitable ? '+' : ''}{stats.totalPnlSol.toFixed(3)}
-                    </h1>
-                    <span className="text-2xl text-white/30 mb-2">SOL</span>
-                  </div>
-                  <p className={cn(
-                    "text-lg font-mono mt-2",
-                    isProfitable ? "text-green-400/70" : "text-red-400/70"
-                  )}>
-                    {isProfitable ? '+' : ''}{stats.totalPnlPct.toFixed(1)}%
-                  </p>
                 </div>
+
+                <p className="text-xs text-white/50 mb-1">Total P&L</p>
+                <div className="flex items-end gap-2">
+                  <h1 className={cn(
+                    "text-4xl font-bold tracking-tight",
+                    isProfitable ? "text-green-400" : "text-red-400"
+                  )}>
+                    {isProfitable ? '+' : ''}{stats.totalPnlSol.toFixed(3)}
+                  </h1>
+                  <span className="text-lg text-white/30 mb-1">SOL</span>
+                </div>
+                <p className={cn(
+                  "text-sm mt-1",
+                  isProfitable ? "text-green-400/70" : "text-red-400/70"
+                )}>
+                  {isProfitable ? '+' : ''}{stats.totalPnlPct.toFixed(1)}%
+                </p>
               </div>
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:w-auto w-full">
-                <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
-                  <Activity className="w-5 h-5 text-orange-400 mb-3" />
-                  <p className="text-2xl font-bold font-mono text-white">{openPositions.length}</p>
-                  <p className="text-xs text-white/40">Positions</p>
+              {/* Stats Grid - Compact */}
+              <div className="flex flex-wrap gap-2 lg:gap-3">
+                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
+                  <Activity className="w-4 h-4 text-orange-400" />
+                  <div>
+                    <p className="text-lg font-semibold text-white">{openPositions.length}</p>
+                    <p className="text-[10px] text-white/40 -mt-0.5">Positions</p>
+                  </div>
                 </div>
-                <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
-                  <Target className="w-5 h-5 text-blue-400 mb-3" />
-                  <p className="text-2xl font-bold font-mono text-white">{activeSnipers.length}</p>
-                  <p className="text-xs text-white/40">Active Snipers</p>
+                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
+                  <Target className="w-4 h-4 text-blue-400" />
+                  <div>
+                    <p className="text-lg font-semibold text-white">{activeSnipers.length}</p>
+                    <p className="text-[10px] text-white/40 -mt-0.5">Active Snipers</p>
+                  </div>
                 </div>
-                <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
-                  <Zap className="w-5 h-5 text-yellow-400 mb-3" />
-                  <p className="text-2xl font-bold font-mono text-white">{stats.snipesToday}</p>
-                  <p className="text-xs text-white/40">Total Snipes</p>
+                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                  <div>
+                    <p className="text-lg font-semibold text-white">{stats.snipesToday}</p>
+                    <p className="text-[10px] text-white/40 -mt-0.5">Total Snipes</p>
+                  </div>
                 </div>
-                <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
-                  <BarChart3 className="w-5 h-5 text-purple-400 mb-3" />
-                  <p className="text-2xl font-bold font-mono text-white">{stats.successRate}%</p>
-                  <p className="text-xs text-white/40">Success Rate</p>
+                <div className="bg-white/[0.02] rounded-xl px-4 py-2.5 border border-white/5 backdrop-blur-sm flex items-center gap-3">
+                  <BarChart3 className="w-4 h-4 text-purple-400" />
+                  <div>
+                    <p className="text-lg font-semibold text-white">{stats.successRate}%</p>
+                    <p className="text-[10px] text-white/40 -mt-0.5">Success Rate</p>
+                  </div>
                 </div>
               </div>
             </div>
