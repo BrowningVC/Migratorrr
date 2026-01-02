@@ -8,36 +8,42 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { useWalletsStore } from '@/lib/stores/wallets';
 import { useSnipersStore, SniperConfig, Sniper } from '@/lib/stores/snipers';
 import { sniperApi } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { Check, Wallet, Shield, Crosshair, ArrowRight } from 'lucide-react';
+import {
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Zap,
+  Target,
+  Shield,
+  Check,
+  Sparkles,
+  TrendingUp,
+  TrendingDown,
+  Filter,
+  Rocket
+} from 'lucide-react';
 
 interface PreAuthSniperModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Simplified steps - no wallet generation here (server handles that during onboarding)
 type Step = 'basics' | 'buying' | 'selling' | 'filters' | 'review';
 
 const DEFAULT_CONFIG: SniperConfig = {
   snipeAmountSol: 0.1,
-  slippageBps: 1000, // 10%
-  priorityFeeSol: 0.003, // Minimum for reliable execution
-  takeProfitPct: 100, // 2x
+  slippageBps: 1000,
+  priorityFeeSol: 0.003,
+  takeProfitPct: 100,
   stopLossPct: 50,
   trailingStopPct: undefined,
-  mevProtection: true, // Enabled by default
+  mevProtection: true,
 };
 
 export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps) {
   const router = useRouter();
   const { setPendingSniper } = usePendingSniperStore();
-
-  // Auth and wallet stores for authenticated users
   const { token, isAuthenticated, _hasHydrated: authHydrated } = useAuthStore();
   const { wallets, _hasHydrated: walletsHydrated } = useWalletsStore();
   const { addSniper } = useSnipersStore();
@@ -45,11 +51,9 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   const [step, setStep] = useState<Step>('basics');
   const [isCreatingSniper, setIsCreatingSniper] = useState(false);
 
-  // Form state
   const [name, setName] = useState('My First Sniper');
   const [config, setConfig] = useState<SniperConfig>(DEFAULT_CONFIG);
 
-  // String input states for better UX (allows typing decimals freely)
   const [snipeAmountInput, setSnipeAmountInput] = useState(String(DEFAULT_CONFIG.snipeAmountSol));
   const [slippageInput, setSlippageInput] = useState(String(DEFAULT_CONFIG.slippageBps / 100));
   const [priorityFeeInput, setPriorityFeeInput] = useState(String(DEFAULT_CONFIG.priorityFeeSol));
@@ -57,38 +61,31 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   const [stopLossInput, setStopLossInput] = useState(String(DEFAULT_CONFIG.stopLossPct));
   const [trailingStopInput, setTrailingStopInput] = useState('');
 
-  // Check if user is authenticated with a GENERATED wallet (server can sign)
-  // Connected wallets don't work for sniping - server needs signing authority
-  // Only check after stores have hydrated from localStorage
   const storesHydrated = authHydrated && walletsHydrated;
-  // Only look for wallet after stores have hydrated
   const existingGeneratedWallet = storesHydrated ? wallets.find(w => w.walletType === 'generated') : undefined;
   const hasExistingWallet = storesHydrated && isAuthenticated && token && !!existingGeneratedWallet;
 
-  // Validation errors for buy settings
   const [validationErrors, setValidationErrors] = useState<{
     snipeAmountSol?: boolean;
     slippageBps?: boolean;
     priorityFeeSol?: boolean;
   }>({});
 
-  // Simplified steps - wallet generation happens server-side during onboarding
   const steps: Step[] = ['basics', 'buying', 'selling', 'filters', 'review'];
   const stepIndex = steps.indexOf(step);
 
-  const stepLabels: Record<Step, string> = {
-    basics: 'Name Your Sniper',
-    buying: 'Buy Settings',
-    selling: 'Exit Strategy',
-    filters: 'Token Filters',
-    review: 'Review & Continue',
+  const stepConfig = {
+    basics: { icon: Sparkles, label: 'Name', color: 'text-purple-400' },
+    buying: { icon: Zap, label: 'Buy', color: 'text-blue-400' },
+    selling: { icon: Target, label: 'Sell', color: 'text-green-400' },
+    filters: { icon: Filter, label: 'Filter', color: 'text-yellow-400' },
+    review: { icon: Rocket, label: 'Launch', color: 'text-orange-400' },
   };
 
   const updateConfig = (updates: Partial<SniperConfig>) => {
     setConfig((prev) => ({ ...prev, ...updates }));
   };
 
-  // Create sniper directly for authenticated users with existing GENERATED wallet
   const handleCreateSniperDirect = async () => {
     if (!token || !hasExistingWallet || !existingGeneratedWallet) {
       toast.error('Please generate a trading wallet first');
@@ -128,13 +125,10 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
         addSniper(newSniper);
         toast.success(`Sniper "${name}" created successfully!`, { id: toastId });
 
-        // Reset form and close modal
         setStep('basics');
         setName('My First Sniper');
         setConfig(DEFAULT_CONFIG);
         onClose();
-
-        // Force dashboard refresh by navigating
         router.refresh();
       } else {
         throw new Error(res.error || 'Failed to create sniper');
@@ -150,14 +144,11 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   };
 
   const handleNext = () => {
-    // Validate buy settings before proceeding
     if (step === 'buying') {
-      // Parse string inputs
       const snipeAmount = parseFloat(snipeAmountInput) || 0;
       const slippagePct = parseFloat(slippageInput) || 0;
       const priorityFee = parseFloat(priorityFeeInput) || 0;
 
-      // Update config with parsed values
       updateConfig({
         snipeAmountSol: snipeAmount,
         slippageBps: Math.round(slippagePct * 100),
@@ -166,15 +157,9 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
 
       const errors: typeof validationErrors = {};
 
-      if (snipeAmount < 0.1) {
-        errors.snipeAmountSol = true;
-      }
-      if (slippagePct < 10) { // 10% minimum
-        errors.slippageBps = true;
-      }
-      if (priorityFee < 0.003) {
-        errors.priorityFeeSol = true;
-      }
+      if (snipeAmount < 0.1) errors.snipeAmountSol = true;
+      if (slippagePct < 10) errors.slippageBps = true;
+      if (priorityFee < 0.003) errors.priorityFeeSol = true;
 
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors);
@@ -185,13 +170,11 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
       setValidationErrors({});
     }
 
-    // Validate exit strategy before proceeding
     if (step === 'selling') {
       const takeProfit = parseFloat(takeProfitInput) || 0;
       const stopLoss = parseFloat(stopLossInput) || 0;
       const trailingStop = trailingStopInput ? parseFloat(trailingStopInput) : undefined;
 
-      // Update config with parsed values
       updateConfig({
         takeProfitPct: takeProfit,
         stopLossPct: stopLoss,
@@ -212,27 +195,21 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
     }
   };
 
-  // Continue to onboarding where wallet will be generated server-side
   const handleContinueToOnboarding = () => {
-    // Store sniper config for creation after onboarding
     setPendingSniper({
       name,
       config,
       createdAt: Date.now(),
     });
-
-    // Navigate to onboarding
     router.push('/onboarding');
     onClose();
   };
 
   const handleClose = () => {
-    // Reset all state
     setStep('basics');
     setName('My First Sniper');
     setConfig(DEFAULT_CONFIG);
     setValidationErrors({});
-    // Reset string inputs
     setSnipeAmountInput(String(DEFAULT_CONFIG.snipeAmountSol));
     setSlippageInput(String(DEFAULT_CONFIG.slippageBps / 100));
     setPriorityFeeInput(String(DEFAULT_CONFIG.priorityFeeSol));
@@ -245,698 +222,614 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className={cn(
-        "bg-zinc-900 border-zinc-800 w-full flex flex-col",
-        step === 'filters' ? 'max-w-3xl max-h-[90vh]' : 'max-w-lg max-h-[85vh]'
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop with blur */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-md"
+        onClick={handleClose}
+      />
+
+      {/* Modal */}
+      <div className={cn(
+        "relative w-full bg-[#0c0c0c] rounded-3xl border border-white/10 shadow-2xl overflow-hidden",
+        step === 'filters' ? 'max-w-4xl' : 'max-w-xl'
       )}>
-        <CardHeader className="border-b border-zinc-800">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">Configure Your Sniper</CardTitle>
-            <button
-              onClick={handleClose}
-              className="text-zinc-400 hover:text-white"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        {/* Gradient accent at top */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-orange-500 to-yellow-500" />
 
-          {/* Step indicators */}
-          <div className="flex gap-1 mt-4">
-            {steps.map((s, i) => (
-              <div
-                key={s}
-                className={cn(
-                  'flex-1 h-1 rounded-full transition-colors',
-                  i <= stepIndex ? 'bg-orange-500' : 'bg-zinc-700'
-                )}
-              />
-            ))}
-          </div>
-          <p className="text-sm text-zinc-500 mt-2">
-            Step {stepIndex + 1} of {steps.length}: {stepLabels[step]}
+        {/* Header */}
+        <div className="relative px-6 pt-6 pb-4">
+          <button
+            onClick={handleClose}
+            className="absolute right-4 top-4 p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <X className="w-4 h-4 text-white/60" />
+          </button>
+
+          <h2 className="text-xl font-semibold text-white">Configure Sniper</h2>
+          <p className="text-sm text-white/40 mt-1">
+            Set up your automated trading bot
           </p>
-        </CardHeader>
+        </div>
 
-        <CardContent className="flex-1 overflow-y-auto p-4">
+        {/* Step Navigation - Horizontal pills */}
+        <div className="px-6 pb-4">
+          <div className="flex items-center gap-2 p-1.5 bg-white/[0.03] rounded-2xl">
+            {steps.map((s, i) => {
+              const StepIcon = stepConfig[s].icon;
+              const isActive = s === step;
+              const isCompleted = i < stepIndex;
+
+              return (
+                <button
+                  key={s}
+                  onClick={() => i <= stepIndex && setStep(s)}
+                  disabled={i > stepIndex}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all text-sm font-medium",
+                    isActive
+                      ? "bg-white/10 text-white"
+                      : isCompleted
+                        ? "text-white/60 hover:text-white/80 cursor-pointer"
+                        : "text-white/30 cursor-not-allowed"
+                  )}
+                >
+                  <StepIcon className={cn("w-4 h-4", isActive && stepConfig[s].color)} />
+                  <span className="hidden sm:inline">{stepConfig[s].label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className={cn(
+          "px-6 overflow-y-auto",
+          step === 'filters' ? 'max-h-[50vh]' : 'max-h-[45vh]'
+        )}>
+
           {/* Step 1: Basics */}
           {step === 'basics' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Sniper Name</Label>
-                <Input
-                  id="name"
+            <div className="space-y-6 py-2">
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-white/70">Sniper Name</label>
+                <input
+                  type="text"
                   placeholder="e.g., Alpha Sniper"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="bg-zinc-800 border-zinc-700"
+                  className="w-full px-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
                 />
-                <p className="text-xs text-zinc-500">
-                  Give your sniper a memorable name
-                </p>
               </div>
 
-              <div className="bg-zinc-800/50 rounded-lg p-4 mt-4">
-                <h4 className="font-medium text-sm mb-2">What is a Sniper?</h4>
-                <p className="text-zinc-400 text-sm">
-                  A sniper automatically buys tokens the moment they migrate from PumpFun to Raydium.
-                  You configure the parameters, and it executes trades automatically for you, around the clock.
-                </p>
+              <div className="p-5 bg-gradient-to-br from-purple-500/10 via-transparent to-orange-500/10 rounded-2xl border border-white/5">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-orange-500/20 rounded-xl">
+                    <Target className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-white mb-1">What is a Sniper?</h4>
+                    <p className="text-sm text-white/50 leading-relaxed">
+                      Your sniper automatically buys tokens the moment they migrate from PumpFun to Raydium.
+                      Configure it once, and it trades 24/7.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Step 2: Exit Strategy (Selling Options) */}
-          {step === 'selling' && (
-            <div className="space-y-4">
-              {/* Take Profit - Required */}
+          {/* Step 2: Buying */}
+          {step === 'buying' && (
+            <div className="space-y-5 py-2">
+              {/* Amount */}
               <div className="space-y-2">
-                <Label htmlFor="takeProfit">
-                  Take Profit (%) <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="takeProfit"
-                  type="text"
-                  inputMode="decimal"
-                  value={takeProfitInput}
-                  onChange={(e) => {
-                    // Allow free typing - validation happens on Next
-                    setTakeProfitInput(e.target.value);
-                  }}
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Automatically sell when profit reaches this % (100% = 2x, 200% = 3x)
-                </p>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-white/70">Snipe Amount</label>
+                  <span className="text-xs text-white/40">Min: 0.1 SOL</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={snipeAmountInput}
+                    onChange={(e) => {
+                      setSnipeAmountInput(e.target.value);
+                      if (validationErrors.snipeAmountSol) {
+                        setValidationErrors(prev => ({ ...prev, snipeAmountSol: false }));
+                      }
+                    }}
+                    className={cn(
+                      "w-full px-4 py-3.5 bg-white/[0.03] border rounded-xl text-white placeholder-white/30 focus:outline-none transition-all pr-16",
+                      validationErrors.snipeAmountSol
+                        ? "border-red-500/50 focus:border-red-500"
+                        : "border-white/10 focus:border-blue-500/50"
+                    )}
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-white/40">SOL</span>
+                </div>
+                {validationErrors.snipeAmountSol && (
+                  <p className="text-xs text-red-400">Minimum 0.1 SOL required</p>
+                )}
               </div>
 
-              {/* Cover Initials Checkbox */}
-              <label className="flex items-start gap-3 cursor-pointer group p-3 bg-zinc-800/50 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors">
-                <div className="relative mt-0.5">
+              {/* Slippage */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-white/70">Slippage Tolerance</label>
+                  <span className="text-xs text-white/40">Min: 10%</span>
+                </div>
+                <div className="relative">
                   <input
-                    type="checkbox"
-                    checked={config.coverInitials ?? false}
-                    onChange={(e) => updateConfig({ coverInitials: e.target.checked })}
-                    className="sr-only"
+                    type="text"
+                    inputMode="decimal"
+                    value={slippageInput}
+                    onChange={(e) => {
+                      setSlippageInput(e.target.value);
+                      if (validationErrors.slippageBps) {
+                        setValidationErrors(prev => ({ ...prev, slippageBps: false }));
+                      }
+                    }}
+                    className={cn(
+                      "w-full px-4 py-3.5 bg-white/[0.03] border rounded-xl text-white placeholder-white/30 focus:outline-none transition-all pr-12",
+                      validationErrors.slippageBps
+                        ? "border-red-500/50 focus:border-red-500"
+                        : "border-white/10 focus:border-blue-500/50"
+                    )}
                   />
-                  <div className={cn(
-                    'w-5 h-5 rounded border-2 transition-colors flex items-center justify-center',
-                    config.coverInitials
-                      ? 'bg-orange-600 border-orange-600'
-                      : 'border-zinc-600 group-hover:border-zinc-500'
-                  )}>
-                    {config.coverInitials && <Check className="w-3 h-3 text-white" />}
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-white/40">%</span>
+                </div>
+                {validationErrors.slippageBps && (
+                  <p className="text-xs text-red-400">Minimum 10% slippage required</p>
+                )}
+              </div>
+
+              {/* Priority Fee */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-white/70">Priority Fee (Jito Tip)</label>
+                  <span className="text-xs text-white/40">Min: 0.003 SOL</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={priorityFeeInput}
+                    onChange={(e) => {
+                      setPriorityFeeInput(e.target.value);
+                      if (validationErrors.priorityFeeSol) {
+                        setValidationErrors(prev => ({ ...prev, priorityFeeSol: false }));
+                      }
+                    }}
+                    placeholder="0.003"
+                    className={cn(
+                      "w-full px-4 py-3.5 bg-white/[0.03] border rounded-xl text-white placeholder-white/30 focus:outline-none transition-all pr-16",
+                      validationErrors.priorityFeeSol
+                        ? "border-red-500/50 focus:border-red-500"
+                        : "border-white/10 focus:border-blue-500/50"
+                    )}
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-white/40">SOL</span>
+                </div>
+                {validationErrors.priorityFeeSol && (
+                  <p className="text-xs text-red-400">Minimum 0.003 SOL required</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Selling */}
+          {step === 'selling' && (
+            <div className="space-y-5 py-2">
+              {/* Take Profit */}
+              <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-green-400" />
+                  <label className="text-sm font-medium text-white">Take Profit</label>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={takeProfitInput}
+                    onChange={(e) => setTakeProfitInput(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white focus:outline-none focus:border-green-500/50 pr-12"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-white/40">%</span>
+                </div>
+                <p className="text-xs text-white/40">100% = 2x, 200% = 3x your investment</p>
+              </div>
+
+              {/* Cover Initials */}
+              <button
+                type="button"
+                onClick={() => updateConfig({ coverInitials: !config.coverInitials })}
+                className={cn(
+                  "w-full p-4 rounded-2xl border transition-all text-left",
+                  config.coverInitials
+                    ? "bg-blue-500/10 border-blue-500/30"
+                    : "bg-white/[0.02] border-white/10 hover:border-white/20"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors",
+                      config.coverInitials ? "bg-blue-500 border-blue-500" : "border-white/30"
+                    )}>
+                      {config.coverInitials && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className="text-sm font-medium text-white">Cover Initials</span>
                   </div>
                 </div>
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-white">Cover Initials</span>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Sell 50% at 2x to recover your initial investment, then let the rest ride to take profit.
-                  </p>
-                </div>
-              </label>
-
-              {/* Stop Loss - Required */}
-              <div className="space-y-2">
-                <Label htmlFor="stopLoss">
-                  Stop Loss (%) <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="stopLoss"
-                  type="text"
-                  inputMode="decimal"
-                  value={stopLossInput}
-                  onChange={(e) => {
-                    // Allow free typing - validation happens on Next
-                    setStopLossInput(e.target.value);
-                  }}
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Sell when market cap drops this % from your entry (e.g., 50% = sell at half the MCAP you bought at)
+                <p className="text-xs text-white/40 mt-2 ml-8">
+                  Sell 50% at 2x to recover your initial investment
                 </p>
+              </button>
+
+              {/* Stop Loss */}
+              <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="w-4 h-4 text-red-400" />
+                  <label className="text-sm font-medium text-white">Stop Loss</label>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={stopLossInput}
+                    onChange={(e) => setStopLossInput(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white focus:outline-none focus:border-red-500/50 pr-12"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-white/40">%</span>
+                </div>
+                <p className="text-xs text-white/40">Sell when MCAP drops this % from entry</p>
               </div>
 
-              {/* Trailing Stop - Optional */}
+              {/* Trailing Stop */}
               <div className="space-y-2">
-                <Label htmlFor="trailingStop" className="text-zinc-400">
-                  Trailing Stop (%) <span className="text-zinc-500 text-xs font-normal">— optional</span>
-                </Label>
-                <Input
-                  id="trailingStop"
-                  type="text"
-                  inputMode="decimal"
-                  value={trailingStopInput}
-                  onChange={(e) => {
-                    // Allow free typing - validation happens on Next
-                    setTrailingStopInput(e.target.value);
-                  }}
-                  placeholder="Leave empty to disable"
-                  className="bg-zinc-800 border-zinc-700"
-                />
-                <p className="text-xs text-zinc-500">
-                  Sell when price drops this % from its highest point
-                </p>
+                <label className="text-sm font-medium text-white/50">Trailing Stop (optional)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={trailingStopInput}
+                    onChange={(e) => setTrailingStopInput(e.target.value)}
+                    placeholder="Leave empty to disable"
+                    className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-yellow-500/50 pr-12"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-white/40">%</span>
+                </div>
               </div>
 
               {/* MEV Protection */}
-              <div className="mt-4 pt-4 border-t border-zinc-700/50">
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <div className="relative mt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={config.mevProtection ?? true}
-                      onChange={(e) => updateConfig({ mevProtection: e.target.checked })}
-                      className="sr-only"
-                    />
-                    <div className={cn(
-                      'w-5 h-5 rounded border-2 transition-colors flex items-center justify-center',
-                      config.mevProtection ?? true
-                        ? 'bg-orange-600 border-orange-600'
-                        : 'border-zinc-600 group-hover:border-zinc-500'
-                    )}>
-                      {(config.mevProtection ?? true) && <Check className="w-3 h-3 text-white" />}
-                    </div>
+              <button
+                type="button"
+                onClick={() => updateConfig({ mevProtection: !config.mevProtection })}
+                className={cn(
+                  "w-full p-4 rounded-2xl border transition-all text-left",
+                  config.mevProtection
+                    ? "bg-orange-500/10 border-orange-500/30"
+                    : "bg-white/[0.02] border-white/10 hover:border-white/20"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Shield className={cn("w-5 h-5", config.mevProtection ? "text-orange-400" : "text-white/40")} />
+                    <span className="text-sm font-medium text-white">MEV Protection</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-orange-400" />
-                      <span className="text-sm font-medium text-white">MEV Protection</span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      Uses Jito bundles to protect your transactions from sandwich attacks and front-running bots.
-                    </p>
+                  <div className={cn(
+                    "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors",
+                    config.mevProtection ? "bg-orange-500 border-orange-500" : "border-white/30"
+                  )}>
+                    {config.mevProtection && <Check className="w-3 h-3 text-white" />}
                   </div>
-                </label>
-              </div>
+                </div>
+                <p className="text-xs text-white/40 mt-2">
+                  Uses Jito bundles to protect from sandwich attacks
+                </p>
+              </button>
             </div>
           )}
 
-          {/* Step 2: Buy Settings */}
-          {step === 'buying' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="snipeAmount">
-                  Snipe Amount (SOL) <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="snipeAmount"
-                  type="text"
-                  inputMode="decimal"
-                  value={snipeAmountInput}
-                  onChange={(e) => {
-                    // Allow free typing - validation happens on Next
-                    setSnipeAmountInput(e.target.value);
-                    if (validationErrors.snipeAmountSol) {
-                      setValidationErrors(prev => ({ ...prev, snipeAmountSol: false }));
-                    }
-                  }}
-                  className={cn(
-                    "bg-zinc-800 border-zinc-700",
-                    validationErrors.snipeAmountSol && "border-red-500 focus:border-red-500 focus:ring-red-500"
-                  )}
-                />
-                <p className={cn(
-                  "text-xs",
-                  validationErrors.snipeAmountSol ? "text-red-400" : "text-zinc-500"
-                )}>
-                  {validationErrors.snipeAmountSol
-                    ? "Minimum 0.1 SOL required"
-                    : "Amount of SOL to spend per snipe (minimum 0.1 SOL)"}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="slippage">
-                  Slippage Tolerance (%) <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="slippage"
-                  type="text"
-                  inputMode="decimal"
-                  value={slippageInput}
-                  onChange={(e) => {
-                    // Allow free typing - validation happens on Next
-                    setSlippageInput(e.target.value);
-                    if (validationErrors.slippageBps) {
-                      setValidationErrors(prev => ({ ...prev, slippageBps: false }));
-                    }
-                  }}
-                  className={cn(
-                    "bg-zinc-800 border-zinc-700",
-                    validationErrors.slippageBps && "border-red-500 focus:border-red-500 focus:ring-red-500"
-                  )}
-                />
-                <p className={cn(
-                  "text-xs",
-                  validationErrors.slippageBps ? "text-red-400" : "text-zinc-500"
-                )}>
-                  {validationErrors.slippageBps
-                    ? "Minimum 10% slippage required for reliable execution"
-                    : "Maximum price slippage allowed (minimum 10%)"}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="priorityFee">
-                  Priority Fee (SOL) <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="priorityFee"
-                  type="text"
-                  inputMode="decimal"
-                  value={priorityFeeInput}
-                  onChange={(e) => {
-                    // Allow free typing - validation happens on Next
-                    setPriorityFeeInput(e.target.value);
-                    if (validationErrors.priorityFeeSol) {
-                      setValidationErrors(prev => ({ ...prev, priorityFeeSol: false }));
-                    }
-                  }}
-                  placeholder="0.003"
-                  className={cn(
-                    "bg-zinc-800 border-zinc-700",
-                    validationErrors.priorityFeeSol && "border-red-500 focus:border-red-500 focus:ring-red-500"
-                  )}
-                />
-                <p className={cn(
-                  "text-xs",
-                  validationErrors.priorityFeeSol ? "text-red-400" : "text-zinc-500"
-                )}>
-                  {validationErrors.priorityFeeSol
-                    ? "Minimum 0.003 SOL required for reliable execution"
-                    : "Jito tip for faster execution (minimum 0.003 SOL)"}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Filters - Compact 2-column layout */}
+          {/* Step 4: Filters */}
           {step === 'filters' && (
-            <div className="space-y-4">
-              {/* Token Type Badge */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-900/30 border border-orange-700/50 rounded-full w-fit">
-                <div className="w-2 h-2 rounded-full bg-orange-500" />
-                <span className="text-xs font-medium text-orange-400">Newly Migrated Tokens</span>
+            <div className="py-2">
+              {/* Token type indicator */}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                <span className="text-sm text-orange-400 font-medium">Targeting: New Migrations</span>
               </div>
 
-              {/* 2-Column Grid for Filters */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Left Column */}
-                <div className="space-y-4">
-                  {/* Migration Speed Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-xs font-medium text-zinc-300">Migration Speed</Label>
-                      {config.maxMigrationTimeMinutes && (
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ maxMigrationTimeMinutes: undefined })}
-                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Time from bonding curve to migration</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[
-                        { value: 5, label: '5m' },
-                        { value: 15, label: '15m' },
-                        { value: 60, label: '1h' },
-                        { value: 360, label: '6h' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => updateConfig({ maxMigrationTimeMinutes: opt.value })}
-                          className={cn(
-                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                            config.maxMigrationTimeMinutes === opt.value
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          {'<'}{opt.label}
-                        </button>
-                      ))}
-                    </div>
+              {/* Filters Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Migration Speed */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Migration Speed</span>
+                    {config.maxMigrationTimeMinutes && (
+                      <button onClick={() => updateConfig({ maxMigrationTimeMinutes: undefined })} className="text-xs text-white/40 hover:text-white">Clear</button>
+                    )}
                   </div>
-
-                  {/* Volume Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-xs font-medium text-zinc-300">Min Volume</Label>
-                      {config.minVolumeUsd && (
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ minVolumeUsd: undefined })}
-                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">24h trading volume on Raydium</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[
-                        { value: 10000, label: '$10k' },
-                        { value: 25000, label: '$25k' },
-                        { value: 50000, label: '$50k' },
-                        { value: 100000, label: '$100k' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => updateConfig({ minVolumeUsd: opt.value })}
-                          className={cn(
-                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                            config.minVolumeUsd === opt.value
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          {opt.label}+
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Holder Count Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-xs font-medium text-zinc-300">Min Holders</Label>
-                      {config.minHolderCount && (
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ minHolderCount: undefined })}
-                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Unique wallets holding the token</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[
-                        { value: 25, label: '25' },
-                        { value: 50, label: '50' },
-                        { value: 100, label: '100' },
-                        { value: 250, label: '250' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => updateConfig({ minHolderCount: opt.value })}
-                          className={cn(
-                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                            config.minHolderCount === opt.value
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          {opt.label}+
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Min Twitter Followers Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-xs font-medium text-zinc-300">Min X Followers</Label>
-                      {config.minTwitterFollowers && (
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ minTwitterFollowers: undefined })}
-                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Minimum followers on token's X account</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[
-                        { value: 100, label: '100' },
-                        { value: 500, label: '500' },
-                        { value: 1000, label: '1K' },
-                        { value: 5000, label: '5K' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => updateConfig({ minTwitterFollowers: opt.value })}
-                          className={cn(
-                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                            config.minTwitterFollowers === opt.value
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          {opt.label}+
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* LP Locked Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <Label className="text-xs font-medium text-zinc-300 block mb-1">LP Locked</Label>
-                    <p className="text-[10px] text-zinc-500 mb-2">Require liquidity to be locked</p>
-                    <div className="grid grid-cols-2 gap-1">
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[{ v: 5, l: '5m' }, { v: 15, l: '15m' }, { v: 60, l: '1h' }, { v: 360, l: '6h' }].map(o => (
                       <button
-                        type="button"
-                        onClick={() => updateConfig({ requireLiquidityLock: false })}
+                        key={o.v}
+                        onClick={() => updateConfig({ maxMigrationTimeMinutes: o.v })}
                         className={cn(
-                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                          !config.requireLiquidityLock
-                            ? 'bg-zinc-600 text-white'
-                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                          "py-2 rounded-lg text-xs font-medium transition-all",
+                          config.maxMigrationTimeMinutes === o.v
+                            ? "bg-orange-500 text-white"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
                         )}
                       >
-                        No
+                        {'<'}{o.l}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => updateConfig({ requireLiquidityLock: true })}
-                        className={cn(
-                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                          config.requireLiquidityLock
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                        )}
-                      >
-                        Yes
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Right Column */}
-                <div className="space-y-4">
-                  {/* Dev Holdings Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-xs font-medium text-zinc-300">Max Dev Holdings</Label>
-                      {config.maxDevHoldingsPct && (
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ maxDevHoldingsPct: undefined })}
-                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                        >
-                          Clear
-                        </button>
+                {/* Volume */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Min Volume</span>
+                    {config.minVolumeUsd && (
+                      <button onClick={() => updateConfig({ minVolumeUsd: undefined })} className="text-xs text-white/40 hover:text-white">Clear</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[{ v: 10000, l: '$10k' }, { v: 25000, l: '$25k' }, { v: 50000, l: '$50k' }, { v: 100000, l: '$100k' }].map(o => (
+                      <button
+                        key={o.v}
+                        onClick={() => updateConfig({ minVolumeUsd: o.v })}
+                        className={cn(
+                          "py-2 rounded-lg text-xs font-medium transition-all",
+                          config.minVolumeUsd === o.v
+                            ? "bg-orange-500 text-white"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
+                        )}
+                      >
+                        {o.l}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Holders */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Min Holders</span>
+                    {config.minHolderCount && (
+                      <button onClick={() => updateConfig({ minHolderCount: undefined })} className="text-xs text-white/40 hover:text-white">Clear</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[25, 50, 100, 250].map(v => (
+                      <button
+                        key={v}
+                        onClick={() => updateConfig({ minHolderCount: v })}
+                        className={cn(
+                          "py-2 rounded-lg text-xs font-medium transition-all",
+                          config.minHolderCount === v
+                            ? "bg-orange-500 text-white"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
+                        )}
+                      >
+                        {v}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dev Holdings */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Max Dev Holdings</span>
+                    {config.maxDevHoldingsPct && (
+                      <button onClick={() => updateConfig({ maxDevHoldingsPct: undefined })} className="text-xs text-white/40 hover:text-white">Clear</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[5, 15, 30, 50].map(v => (
+                      <button
+                        key={v}
+                        onClick={() => updateConfig({ maxDevHoldingsPct: v })}
+                        className={cn(
+                          "py-2 rounded-lg text-xs font-medium transition-all",
+                          config.maxDevHoldingsPct === v
+                            ? "bg-orange-500 text-white"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
+                        )}
+                      >
+                        ≤{v}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top 10 */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Max Top 10</span>
+                    {config.maxTop10HoldingsPct && (
+                      <button onClick={() => updateConfig({ maxTop10HoldingsPct: undefined })} className="text-xs text-white/40 hover:text-white">Clear</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[30, 50, 70, 90].map(v => (
+                      <button
+                        key={v}
+                        onClick={() => updateConfig({ maxTop10HoldingsPct: v })}
+                        className={cn(
+                          "py-2 rounded-lg text-xs font-medium transition-all",
+                          config.maxTop10HoldingsPct === v
+                            ? "bg-orange-500 text-white"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
+                        )}
+                      >
+                        ≤{v}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* X Followers */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Min X Followers</span>
+                    {config.minTwitterFollowers && (
+                      <button onClick={() => updateConfig({ minTwitterFollowers: undefined })} className="text-xs text-white/40 hover:text-white">Clear</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[{ v: 100, l: '100' }, { v: 500, l: '500' }, { v: 1000, l: '1K' }, { v: 5000, l: '5K' }].map(o => (
+                      <button
+                        key={o.v}
+                        onClick={() => updateConfig({ minTwitterFollowers: o.v })}
+                        className={cn(
+                          "py-2 rounded-lg text-xs font-medium transition-all",
+                          config.minTwitterFollowers === o.v
+                            ? "bg-orange-500 text-white"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
+                        )}
+                      >
+                        {o.l}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Socials */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <span className="text-sm font-medium text-white">Require Socials</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      onClick={() => updateConfig({ requireTwitter: !config.requireTwitter })}
+                      className={cn(
+                        "py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                        config.requireTwitter
+                          ? "bg-orange-500 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
                       )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Max % supply held by creator</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[
-                        { value: 5, label: '5%' },
-                        { value: 15, label: '15%' },
-                        { value: 30, label: '30%' },
-                        { value: 50, label: '50%' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => updateConfig({ maxDevHoldingsPct: opt.value })}
-                          className={cn(
-                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                            config.maxDevHoldingsPct === opt.value
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          ≤{opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Top 10 Concentration Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-xs font-medium text-zinc-300">Max Top 10</Label>
-                      {config.maxTop10HoldingsPct && (
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ maxTop10HoldingsPct: undefined })}
-                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                        >
-                          Clear
-                        </button>
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                      X
+                    </button>
+                    <button
+                      onClick={() => updateConfig({ requireTelegram: !config.requireTelegram })}
+                      className={cn(
+                        "py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                        config.requireTelegram
+                          ? "bg-orange-500 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
                       )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Max % held by top 10 wallets</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[
-                        { value: 30, label: '30%' },
-                        { value: 50, label: '50%' },
-                        { value: 70, label: '70%' },
-                        { value: 90, label: '90%' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => updateConfig({ maxTop10HoldingsPct: opt.value })}
-                          className={cn(
-                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                            config.maxTop10HoldingsPct === opt.value
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          ≤{opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Social Presence Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <Label className="text-xs font-medium text-zinc-300 block mb-1">Require Socials</Label>
-                    <p className="text-[10px] text-zinc-500 mb-2">Token must have these linked</p>
-                    <div className="grid grid-cols-3 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => updateConfig({ requireTwitter: !config.requireTwitter })}
-                        className={cn(
-                          'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                          config.requireTwitter
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                        )}
-                      >
-                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                        </svg>
-                        X
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateConfig({ requireTelegram: !config.requireTelegram })}
-                        className={cn(
-                          'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                          config.requireTelegram
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                        )}
-                      >
-                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                        </svg>
-                        TG
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateConfig({ requireWebsite: !config.requireWebsite })}
-                        className={cn(
-                          'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                          config.requireWebsite
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                        )}
-                      >
-                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10" />
-                          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                        </svg>
-                        Web
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Creator Score Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <Label className="text-xs font-medium text-zinc-300">Min Creator Score</Label>
-                      {config.minCreatorScore && (
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ minCreatorScore: undefined })}
-                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                        >
-                          Clear
-                        </button>
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                      </svg>
+                      TG
+                    </button>
+                    <button
+                      onClick={() => updateConfig({ requireWebsite: !config.requireWebsite })}
+                      className={cn(
+                        "py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                        config.requireWebsite
+                          ? "bg-orange-500 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
                       )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mb-2">Trust score based on creator history</p>
-                    <div className="grid grid-cols-3 gap-1">
-                      {[
-                        { value: 25, label: '25' },
-                        { value: 50, label: '50' },
-                        { value: 75, label: '75' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => updateConfig({ minCreatorScore: opt.value })}
-                          className={cn(
-                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                            config.minCreatorScore === opt.value
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          {opt.label}+
-                        </button>
-                      ))}
-                    </div>
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                      </svg>
+                      Web
+                    </button>
                   </div>
+                </div>
 
-                  {/* DexScreener Paid Filter */}
-                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                    <Label className="text-xs font-medium text-zinc-300 block mb-1">DexScreener Paid</Label>
-                    <p className="text-[10px] text-zinc-500 mb-2">Require paid DexScreener promotion</p>
-                    <div className="grid grid-cols-2 gap-1">
+                {/* Creator Score */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Min Creator Score</span>
+                    {config.minCreatorScore && (
+                      <button onClick={() => updateConfig({ minCreatorScore: undefined })} className="text-xs text-white/40 hover:text-white">Clear</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[25, 50, 75].map(v => (
                       <button
-                        type="button"
-                        onClick={() => updateConfig({ requireDexScreenerPaid: false })}
+                        key={v}
+                        onClick={() => updateConfig({ minCreatorScore: v })}
                         className={cn(
-                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                          !config.requireDexScreenerPaid
-                            ? 'bg-zinc-600 text-white'
-                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                          "py-2 rounded-lg text-xs font-medium transition-all",
+                          config.minCreatorScore === v
+                            ? "bg-orange-500 text-white"
+                            : "bg-white/5 text-white/50 hover:bg-white/10"
                         )}
                       >
-                        No
+                        {v}+
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => updateConfig({ requireDexScreenerPaid: true })}
-                        className={cn(
-                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
-                          config.requireDexScreenerPaid
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                        )}
-                      >
-                        Yes
-                      </button>
-                    </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* LP Locked */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <span className="text-sm font-medium text-white">LP Locked</span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => updateConfig({ requireLiquidityLock: false })}
+                      className={cn(
+                        "py-2 rounded-lg text-xs font-medium transition-all",
+                        !config.requireLiquidityLock
+                          ? "bg-white/20 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                      )}
+                    >
+                      No
+                    </button>
+                    <button
+                      onClick={() => updateConfig({ requireLiquidityLock: true })}
+                      className={cn(
+                        "py-2 rounded-lg text-xs font-medium transition-all",
+                        config.requireLiquidityLock
+                          ? "bg-orange-500 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                      )}
+                    >
+                      Yes
+                    </button>
+                  </div>
+                </div>
+
+                {/* DexScreener Paid */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 space-y-3">
+                  <span className="text-sm font-medium text-white">DexScreener Paid</span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => updateConfig({ requireDexScreenerPaid: false })}
+                      className={cn(
+                        "py-2 rounded-lg text-xs font-medium transition-all",
+                        !config.requireDexScreenerPaid
+                          ? "bg-white/20 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                      )}
+                    >
+                      No
+                    </button>
+                    <button
+                      onClick={() => updateConfig({ requireDexScreenerPaid: true })}
+                      className={cn(
+                        "py-2 rounded-lg text-xs font-medium transition-all",
+                        config.requireDexScreenerPaid
+                          ? "bg-orange-500 text-white"
+                          : "bg-white/5 text-white/50 hover:bg-white/10"
+                      )}
+                    >
+                      Yes
+                    </button>
                   </div>
                 </div>
               </div>
@@ -947,58 +840,35 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 config.requireTwitter || config.requireTelegram || config.requireWebsite ||
                 config.minTwitterFollowers || config.minCreatorScore ||
                 config.requireLiquidityLock || config.requireDexScreenerPaid) && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-zinc-700/50">
-                  <span className="text-[10px] text-zinc-500 mr-1">Active:</span>
-                  {config.maxMigrationTimeMinutes && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
-                      Speed {'<'}{config.maxMigrationTimeMinutes}m
-                    </span>
-                  )}
-                  {config.minVolumeUsd && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
-                      Vol ${(config.minVolumeUsd / 1000)}k+
-                    </span>
-                  )}
-                  {config.minHolderCount && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
-                      {config.minHolderCount}+ holders
-                    </span>
-                  )}
-                  {config.maxDevHoldingsPct && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
-                      Dev ≤{config.maxDevHoldingsPct}%
-                    </span>
-                  )}
-                  {config.maxTop10HoldingsPct && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
-                      Top10 ≤{config.maxTop10HoldingsPct}%
-                    </span>
-                  )}
-                  {config.requireTwitter && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">X</span>
-                  )}
-                  {config.requireTelegram && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">TG</span>
-                  )}
-                  {config.requireWebsite && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">Web</span>
-                  )}
-                  {config.minTwitterFollowers && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
-                      {config.minTwitterFollowers >= 1000 ? `${config.minTwitterFollowers / 1000}K` : config.minTwitterFollowers}+ followers
-                    </span>
-                  )}
-                  {config.minCreatorScore && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
-                      Creator {config.minCreatorScore}+
-                    </span>
-                  )}
-                  {config.requireLiquidityLock && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">LP Lock</span>
-                  )}
-                  {config.requireDexScreenerPaid && (
-                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">DexPaid</span>
-                  )}
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <div className="flex flex-wrap gap-2">
+                    {config.maxMigrationTimeMinutes && (
+                      <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">Speed {'<'}{config.maxMigrationTimeMinutes}m</span>
+                    )}
+                    {config.minVolumeUsd && (
+                      <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">Vol ${(config.minVolumeUsd / 1000)}k+</span>
+                    )}
+                    {config.minHolderCount && (
+                      <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">{config.minHolderCount}+ holders</span>
+                    )}
+                    {config.maxDevHoldingsPct && (
+                      <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">Dev ≤{config.maxDevHoldingsPct}%</span>
+                    )}
+                    {config.maxTop10HoldingsPct && (
+                      <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">Top10 ≤{config.maxTop10HoldingsPct}%</span>
+                    )}
+                    {config.requireTwitter && <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">X</span>}
+                    {config.requireTelegram && <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">TG</span>}
+                    {config.requireWebsite && <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">Web</span>}
+                    {config.minTwitterFollowers && (
+                      <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">{config.minTwitterFollowers >= 1000 ? `${config.minTwitterFollowers / 1000}K` : config.minTwitterFollowers}+ followers</span>
+                    )}
+                    {config.minCreatorScore && (
+                      <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">Creator {config.minCreatorScore}+</span>
+                    )}
+                    {config.requireLiquidityLock && <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">LP Lock</span>}
+                    {config.requireDexScreenerPaid && <span className="px-2.5 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-xs">DexPaid</span>}
+                  </div>
                 </div>
               )}
             </div>
@@ -1006,258 +876,199 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
 
           {/* Step 5: Review */}
           {step === 'review' && (
-            <div className="space-y-2">
-              {/* Sniper Name + Token Type combined */}
-              <div className="bg-zinc-800/50 rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 text-xs">Sniper</span>
-                  <div className="flex items-center gap-2">
-                    <Crosshair className="w-4 h-4 text-orange-400" />
-                    <span className="font-medium text-white text-sm">{name || 'My First Sniper'}</span>
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-900/30 rounded text-xs text-orange-400">
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                      New Migrations
+            <div className="py-2 space-y-4">
+              {/* Header Card */}
+              <div className="p-5 bg-gradient-to-br from-orange-500/10 via-transparent to-purple-500/10 rounded-2xl border border-white/10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                    <Target className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">{name || 'My First Sniper'}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                      <span className="text-sm text-white/50">New Migrations</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Buy Settings + Exit Strategy side by side */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Settings Grid */}
+              <div className="grid grid-cols-2 gap-3">
                 {/* Buy Settings */}
-                <div className="bg-zinc-800/50 rounded-lg p-3 space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Buy</p>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Amount</span>
-                    <span className="font-medium text-white">{config.snipeAmountSol} SOL</span>
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Buy</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Slippage</span>
-                    <span className="font-medium text-white">{config.slippageBps / 100}%</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Priority</span>
-                    <span className="font-medium text-white">{config.priorityFeeSol} SOL</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/50">Amount</span>
+                      <span className="text-sm font-medium text-white">{config.snipeAmountSol} SOL</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/50">Slippage</span>
+                      <span className="text-sm font-medium text-white">{config.slippageBps / 100}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/50">Priority</span>
+                      <span className="text-sm font-medium text-white">{config.priorityFeeSol} SOL</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Exit Strategy */}
-                <div className="bg-zinc-800/50 rounded-lg p-3 space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Exit</p>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">TP</span>
-                    <span className="font-medium text-orange-400">
-                      +{config.takeProfitPct}%
-                    </span>
+                {/* Exit Settings */}
+                <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target className="w-4 h-4 text-green-400" />
+                    <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Exit</span>
                   </div>
-                  {config.coverInitials && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-400">Cover</span>
-                      <span className="font-medium text-blue-400">50% @ 2x</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/50">Take Profit</span>
+                      <span className="text-sm font-medium text-green-400">+{config.takeProfitPct}%</span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">SL</span>
-                    <span className="font-medium text-red-400">
-                      -{config.stopLossPct}%
-                    </span>
-                  </div>
-                  {config.trailingStopPct && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-400">Trail</span>
-                      <span className="font-medium text-yellow-400">
-                        {config.trailingStopPct}%
+                    {config.coverInitials && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-white/50">Cover</span>
+                        <span className="text-sm font-medium text-blue-400">50% @ 2x</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/50">Stop Loss</span>
+                      <span className="text-sm font-medium text-red-400">-{config.stopLossPct}%</span>
+                    </div>
+                    {config.trailingStopPct && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-white/50">Trailing</span>
+                        <span className="text-sm font-medium text-yellow-400">{config.trailingStopPct}%</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/50">MEV</span>
+                      <span className={cn("text-sm font-medium", config.mevProtection ? "text-orange-400" : "text-white/30")}>
+                        {config.mevProtection ? 'On' : 'Off'}
                       </span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400 flex items-center gap-1">
-                      <Shield className="w-3 h-3" />
-                      MEV
-                    </span>
-                    <span className={cn(
-                      'font-medium',
-                      config.mevProtection ?? true ? 'text-orange-400' : 'text-zinc-500'
-                    )}>
-                      {config.mevProtection ?? true ? 'On' : 'Off'}
-                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Filters */}
-              <div className="bg-zinc-800/50 rounded-lg p-3">
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Filters</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Speed</span>
-                    <span className="font-medium text-white">
-                      {config.maxMigrationTimeMinutes
-                        ? config.maxMigrationTimeMinutes < 60
-                          ? `< ${config.maxMigrationTimeMinutes}m`
-                          : `< ${config.maxMigrationTimeMinutes / 60}h`
-                        : 'Any'}
-                    </span>
+              {/* Filters Summary */}
+              <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Filter className="w-4 h-4 text-yellow-400" />
+                  <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Filters</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Speed</span>
+                    <span className="text-white">{config.maxMigrationTimeMinutes ? (config.maxMigrationTimeMinutes < 60 ? `<${config.maxMigrationTimeMinutes}m` : `<${config.maxMigrationTimeMinutes / 60}h`) : 'Any'}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Dev %</span>
-                    <span className="font-medium text-white">
-                      {config.maxDevHoldingsPct ? `≤${config.maxDevHoldingsPct}%` : 'Any'}
-                    </span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Dev %</span>
+                    <span className="text-white">{config.maxDevHoldingsPct ? `≤${config.maxDevHoldingsPct}%` : 'Any'}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Volume</span>
-                    <span className="font-medium text-white">
-                      {config.minVolumeUsd ? `$${(config.minVolumeUsd / 1000).toFixed(0)}k+` : 'Any'}
-                    </span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Volume</span>
+                    <span className="text-white">{config.minVolumeUsd ? `$${(config.minVolumeUsd / 1000).toFixed(0)}k+` : 'Any'}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Top 10 %</span>
-                    <span className="font-medium text-white">
-                      {config.maxTop10HoldingsPct ? `≤${config.maxTop10HoldingsPct}%` : 'Any'}
-                    </span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Top 10</span>
+                    <span className="text-white">{config.maxTop10HoldingsPct ? `≤${config.maxTop10HoldingsPct}%` : 'Any'}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Holders</span>
-                    <span className="font-medium text-white">
-                      {config.minHolderCount ? `${config.minHolderCount}+` : 'Any'}
-                    </span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Holders</span>
+                    <span className="text-white">{config.minHolderCount ? `${config.minHolderCount}+` : 'Any'}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Socials</span>
-                    <span className="font-medium text-white">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Socials</span>
+                    <span className="text-white">
                       {config.requireTwitter || config.requireTelegram || config.requireWebsite
-                        ? [
-                            config.requireTwitter && 'X',
-                            config.requireTelegram && 'TG',
-                            config.requireWebsite && 'Web'
-                          ].filter(Boolean).join(', ')
+                        ? [config.requireTwitter && 'X', config.requireTelegram && 'TG', config.requireWebsite && 'Web'].filter(Boolean).join(', ')
                         : 'Any'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">X Followers</span>
-                    <span className="font-medium text-white">
-                      {config.minTwitterFollowers
-                        ? config.minTwitterFollowers >= 1000
-                          ? `${config.minTwitterFollowers / 1000}K+`
-                          : `${config.minTwitterFollowers}+`
-                        : 'Any'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">Creator Score</span>
-                    <span className="font-medium text-white">
-                      {config.minCreatorScore ? `${config.minCreatorScore}+` : 'Any'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">LP Lock</span>
-                    <span className={cn(
-                      'font-medium',
-                      config.requireLiquidityLock ? 'text-orange-400' : 'text-white'
-                    )}>
-                      {config.requireLiquidityLock ? 'Required' : 'Any'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-400">DexScreener</span>
-                    <span className={cn(
-                      'font-medium',
-                      config.requireDexScreenerPaid ? 'text-orange-400' : 'text-white'
-                    )}>
-                      {config.requireDexScreenerPaid ? 'Paid' : 'Any'}
                     </span>
                   </div>
                 </div>
               </div>
 
+              {/* Status */}
               {hasExistingWallet && existingGeneratedWallet ? (
-                // Show existing wallet info for authenticated users with generated wallet
-                <div className="bg-orange-900/20 border-2 border-orange-700/60 rounded-xl p-4 mt-2">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <Check className="w-5 h-5 text-orange-400" />
-                    <p className="text-orange-400 font-medium text-sm">Ready to Create</p>
-                  </div>
-                  <p className="text-orange-400/70 text-xs text-center">
-                    Using trading wallet: {existingGeneratedWallet.publicKey?.slice(0, 4)}...{existingGeneratedWallet.publicKey?.slice(-4)}
-                  </p>
-                </div>
-              ) : (
-                // New user flow - explain what happens next
-                <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 mt-2">
+                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-orange-900/30 rounded-full flex items-center justify-center shrink-0">
-                      <ArrowRight className="w-5 h-5 text-orange-400" />
+                    <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-green-400" />
                     </div>
                     <div>
-                      <p className="text-white font-medium text-sm">Next: Quick Setup</p>
-                      <p className="text-zinc-400 text-xs mt-0.5">
-                        Connect wallet → Get secure trading wallet → Done!
+                      <p className="text-sm font-medium text-white">Ready to Create</p>
+                      <p className="text-xs text-white/40">
+                        Using: {existingGeneratedWallet.publicKey?.slice(0, 6)}...{existingGeneratedWallet.publicKey?.slice(-4)}
                       </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                      <ChevronRight className="w-4 h-4 text-orange-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Next: Quick Setup</p>
+                      <p className="text-xs text-white/40">Connect wallet, get trading wallet, done!</p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
           )}
+        </div>
 
-        </CardContent>
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-white/5 flex gap-3">
+          {step !== 'basics' && (
+            <button
+              onClick={handleBack}
+              disabled={isCreatingSniper}
+              className="px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-medium transition-all flex items-center gap-2"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </button>
+          )}
 
-        {/* Navigation - Fixed at bottom */}
-        <div className="flex gap-3 p-4 border-t border-zinc-800 shrink-0">
           {step === 'review' ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                disabled={isCreatingSniper}
+            hasExistingWallet ? (
+              <button
+                onClick={handleCreateSniperDirect}
+                disabled={!name || isCreatingSniper}
+                className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-xl text-white font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                Back
-              </Button>
-              {hasExistingWallet ? (
-                // User has a generated wallet - create sniper directly
-                <Button
-                  className="flex-1 bg-orange-600 hover:bg-orange-700"
-                  onClick={handleCreateSniperDirect}
-                  disabled={!name || isCreatingSniper}
-                >
-                  <Crosshair className="w-4 h-4 mr-2" />
-                  {isCreatingSniper ? 'Creating...' : 'Create Sniper'}
-                </Button>
-              ) : (
-                // New user - continue to onboarding for wallet setup
-                <Button
-                  className="flex-1 bg-orange-600 hover:bg-orange-700"
-                  onClick={handleContinueToOnboarding}
-                  disabled={!name}
-                >
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  Continue to Setup
-                </Button>
-              )}
-            </>
+                <Rocket className="w-4 h-4" />
+                {isCreatingSniper ? 'Creating...' : 'Create Sniper'}
+              </button>
+            ) : (
+              <button
+                onClick={handleContinueToOnboarding}
+                disabled={!name}
+                className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-xl text-white font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                Continue to Setup
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )
           ) : (
-            <>
-              {step !== 'basics' && (
-                <Button
-                  variant="outline"
-                  onClick={handleBack}
-                >
-                  Back
-                </Button>
-              )}
-              <Button
-                className="flex-1 bg-orange-600 hover:bg-orange-700"
-                onClick={handleNext}
-                disabled={step === 'basics' && !name}
-              >
-                Continue
-              </Button>
-            </>
+            <button
+              onClick={handleNext}
+              disabled={step === 'basics' && !name}
+              className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-xl text-white font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              Continue
+              <ChevronRight className="w-4 h-4" />
+            </button>
           )}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
