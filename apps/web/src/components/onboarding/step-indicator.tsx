@@ -21,9 +21,9 @@ export function StepIndicator({
             className={cn(
               'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
               index < currentStep
-                ? 'bg-green-500 text-white'
+                ? 'bg-orange-500 text-white'
                 : index === currentStep
-                  ? 'bg-green-500/20 text-green-400 ring-2 ring-green-500'
+                  ? 'bg-orange-500/20 text-orange-400 ring-2 ring-orange-500'
                   : 'bg-zinc-800 text-zinc-500'
             )}
           >
@@ -49,7 +49,7 @@ export function StepIndicator({
             <div
               className={cn(
                 'w-12 h-0.5 mx-1',
-                index < currentStep ? 'bg-green-500' : 'bg-zinc-700'
+                index < currentStep ? 'bg-orange-500' : 'bg-zinc-700'
               )}
             />
           )}

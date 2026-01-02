@@ -119,7 +119,7 @@ export function WalletBalanceCard() {
               href={res.data.explorerUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-green-400 underline text-xs"
+              className="text-orange-400 underline text-xs"
             >
               View transaction
             </a>
@@ -163,7 +163,7 @@ export function WalletBalanceCard() {
       <Card className="bg-zinc-900/50 border-zinc-800">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-green-400" />
+            <Wallet className="h-5 w-5 text-orange-400" />
             Trading Wallets
           </CardTitle>
         </CardHeader>
@@ -181,7 +181,7 @@ export function WalletBalanceCard() {
       <Card className="bg-zinc-900/50 border-zinc-800">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-green-400" />
+            <Wallet className="h-5 w-5 text-orange-400" />
             Trading Wallets
           </CardTitle>
         </CardHeader>
@@ -199,7 +199,7 @@ export function WalletBalanceCard() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Bot className="h-5 w-5 text-green-400" />
+            <Bot className="h-5 w-5 text-orange-400" />
             Trading Wallets
             <TooltipProvider>
               <Tooltip>
@@ -208,7 +208,7 @@ export function WalletBalanceCard() {
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-xs bg-zinc-800 border-zinc-700">
                   <p className="text-xs text-zinc-300">
-                    <span className="font-semibold text-green-400">Server-controlled wallet</span> for automated trading.
+                    <span className="font-semibold text-orange-400">Server-controlled wallet</span> for automated trading.
                     Fund this wallet with SOL — the server uses it to execute snipes automatically when migrations are detected.
                   </p>
                 </TooltipContent>
@@ -242,7 +242,7 @@ export function WalletBalanceCard() {
                 {wallet.label || 'Trading Wallet'}
               </span>
               <span className={`text-lg font-bold ${
-                wallet.balanceSol > 0 ? 'text-green-400' : 'text-zinc-400'
+                wallet.balanceSol > 0 ? 'text-orange-400' : 'text-zinc-400'
               }`}>
                 {wallet.balanceSol.toFixed(4)} SOL
               </span>
@@ -260,7 +260,7 @@ export function WalletBalanceCard() {
                 title="Copy address"
               >
                 {copiedAddress === wallet.publicKey ? (
-                  <Check className="h-3.5 w-3.5 text-green-400" />
+                  <Check className="h-3.5 w-3.5 text-orange-400" />
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}
@@ -311,7 +311,7 @@ export function WalletBalanceCard() {
                       placeholder="Destination address"
                       value={withdrawAddress}
                       onChange={(e) => setWithdrawAddress(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-green-600"
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-orange-600"
                     />
                     <div className="flex gap-2">
                       <div className="relative flex-1">
@@ -323,11 +323,11 @@ export function WalletBalanceCard() {
                           step="0.0001"
                           min="0"
                           max={wallet.balanceSol}
-                          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-green-600 pr-14"
+                          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-orange-600 pr-14"
                         />
                         <button
                           onClick={() => handleMaxAmount(wallet.balanceSol)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-green-400 hover:text-green-300 font-medium"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-orange-400 hover:text-orange-300 font-medium"
                         >
                           MAX
                         </button>
@@ -336,7 +336,7 @@ export function WalletBalanceCard() {
                         size="sm"
                         onClick={() => handleWithdraw(wallet.walletId)}
                         disabled={isWithdrawing || !withdrawAddress || !withdrawAmount}
-                        className="h-7 px-3 bg-green-600 hover:bg-green-700 text-xs"
+                        className="h-7 px-3 bg-orange-600 hover:bg-orange-700 text-xs"
                       >
                         {isWithdrawing ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -354,7 +354,7 @@ export function WalletBalanceCard() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setWithdrawWalletId(wallet.walletId)}
-                    className="w-full mt-2 h-7 text-xs text-zinc-400 hover:text-green-400 hover:bg-zinc-700/50 gap-1.5"
+                    className="w-full mt-2 h-7 text-xs text-zinc-400 hover:text-orange-400 hover:bg-zinc-700/50 gap-1.5"
                   >
                     <ArrowUpRight className="h-3 w-3" />
                     Withdraw

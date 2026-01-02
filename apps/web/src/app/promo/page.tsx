@@ -165,13 +165,13 @@ export default function PromoPage() {
                 <Logo size="md" />
                 <LogoText size="md" />
               </Link>
-              <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">
+              <span className="px-2 py-1 bg-orange-900/30 text-orange-400 text-xs rounded">
                 Beta
               </span>
             </div>
             {/* Navigation Tabs */}
             <nav className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="text-green-400 bg-green-900/20">
+              <Button variant="ghost" size="sm" className="text-orange-400 bg-orange-900/20">
                 Sniper Dashboard
               </Button>
               <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
@@ -185,7 +185,7 @@ export default function PromoPage() {
           <div className="flex items-center gap-4">
             {/* Auth indicator */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <div className="w-2 h-2 rounded-full bg-orange-500" />
               <span className="text-xs text-zinc-400">Signed in:</span>
               <code className="text-xs text-zinc-300 font-mono">7xKX...AsU</code>
             </div>
@@ -205,7 +205,7 @@ export default function PromoPage() {
             <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
               <CardContent className="p-3">
                 <p className="text-zinc-500 text-xs mb-0.5">Total P&L</p>
-                <p className={cn('text-lg font-bold', isProfitable ? 'text-green-400' : 'text-red-400')}>
+                <p className={cn('text-lg font-bold', isProfitable ? 'text-orange-400' : 'text-red-400')}>
                   +{MOCK_STATS.totalPnlSol.toFixed(4)}
                 </p>
                 <p className="text-zinc-500 text-[10px]">
@@ -225,7 +225,7 @@ export default function PromoPage() {
             <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
               <CardContent className="p-3">
                 <p className="text-zinc-500 text-xs mb-0.5">Active Snipers</p>
-                <p className="text-lg font-bold text-green-400">{MOCK_STATS.activeSnipers}</p>
+                <p className="text-lg font-bold text-orange-400">{MOCK_STATS.activeSnipers}</p>
                 <p className="text-zinc-500 text-[10px]">Watching</p>
               </CardContent>
             </Card>
@@ -250,8 +250,8 @@ export default function PromoPage() {
               <CardContent className="p-3">
                 <p className="text-zinc-500 text-xs mb-0.5">Status</p>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <p className="text-sm font-medium text-green-400">Connected</p>
+                  <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
+                  <p className="text-sm font-medium text-orange-400">Connected</p>
                 </div>
                 <p className="text-zinc-500 text-[10px]">Real-time</p>
               </CardContent>
@@ -263,7 +263,7 @@ export default function PromoPage() {
             <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
               <CardContent className="p-3">
                 <p className="text-zinc-500 text-xs mb-0.5">Best Trade</p>
-                <p className="text-lg font-bold text-green-400">+{MOCK_STATS.bestTradeSol.toFixed(2)}</p>
+                <p className="text-lg font-bold text-orange-400">+{MOCK_STATS.bestTradeSol.toFixed(2)}</p>
                 <p className="text-zinc-500 text-[10px]">+{MOCK_STATS.bestTradePct}%</p>
               </CardContent>
             </Card>
@@ -279,7 +279,7 @@ export default function PromoPage() {
             <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
               <CardContent className="p-3">
                 <p className="text-zinc-500 text-xs mb-0.5">Tokens Caught</p>
-                <p className="text-lg font-bold text-green-400">{MOCK_STATS.tokensCaught}</p>
+                <p className="text-lg font-bold text-orange-400">{MOCK_STATS.tokensCaught}</p>
                 <p className="text-zinc-500 text-[10px]">Sniped</p>
               </CardContent>
             </Card>
@@ -301,14 +301,14 @@ export default function PromoPage() {
             </Card>
 
             <Card
-              className="bg-zinc-900/50 border-zinc-800 hover:border-green-800/50 transition-colors cursor-pointer group col-span-2"
+              className="bg-zinc-900/50 border-zinc-800 hover:border-orange-800/50 transition-colors cursor-pointer group col-span-2"
               onClick={() => setShowComingSoon(true)}
             >
               <CardContent className="p-3 flex flex-col items-center justify-center h-full">
-                <div className="w-8 h-8 rounded-full bg-green-900/30 flex items-center justify-center mb-1 group-hover:bg-green-900/50 transition-colors">
-                  <ImageIcon className="w-4 h-4 text-green-400" />
+                <div className="w-8 h-8 rounded-full bg-orange-900/30 flex items-center justify-center mb-1 group-hover:bg-orange-900/50 transition-colors">
+                  <ImageIcon className="w-4 h-4 text-orange-400" />
                 </div>
-                <p className="text-xs font-medium text-green-400">Share Results</p>
+                <p className="text-xs font-medium text-orange-400">Share Results</p>
                 <p className="text-zinc-500 text-[10px]">Show off gains</p>
               </CardContent>
             </Card>
@@ -345,7 +345,7 @@ export default function PromoPage() {
                       className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-3 items-center text-sm border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
                           {position.tokenSymbol.charAt(0)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -376,8 +376,8 @@ export default function PromoPage() {
                         <p className="font-medium text-zinc-300">{formatMcap(position.currentMarketCap)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-green-400">+{position.pnlPct.toFixed(1)}%</p>
-                        <p className="text-[10px] text-green-400/70">+{position.pnlSol.toFixed(4)} SOL</p>
+                        <p className="font-bold text-orange-400">+{position.pnlPct.toFixed(1)}%</p>
+                        <p className="text-[10px] text-orange-400/70">+{position.pnlSol.toFixed(4)} SOL</p>
                       </div>
                       <div className="text-right">
                         <p className="text-zinc-400 text-xs">
@@ -416,16 +416,16 @@ export default function PromoPage() {
                       key={sniper.id}
                       className={cn(
                         'bg-zinc-800/30 rounded-xl border p-4',
-                        sniper.isActive ? 'border-green-500/30' : 'border-zinc-700/50'
+                        sniper.isActive ? 'border-orange-500/30' : 'border-zinc-700/50'
                       )}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className={cn(
                             'w-10 h-10 rounded-lg flex items-center justify-center',
-                            sniper.isActive ? 'bg-green-500/20' : 'bg-zinc-700/30'
+                            sniper.isActive ? 'bg-orange-500/20' : 'bg-zinc-700/30'
                           )}>
-                            <Crosshair className={cn('w-5 h-5', sniper.isActive ? 'text-green-400' : 'text-zinc-500')} />
+                            <Crosshair className={cn('w-5 h-5', sniper.isActive ? 'text-orange-400' : 'text-zinc-500')} />
                           </div>
                           <div>
                             <h3 className="font-semibold text-white">{sniper.name}</h3>
@@ -433,10 +433,10 @@ export default function PromoPage() {
                               <span className={cn(
                                 'px-2 py-0.5 text-xs rounded-full flex items-center gap-1',
                                 sniper.isActive
-                                  ? 'bg-green-500/20 text-green-400'
+                                  ? 'bg-orange-500/20 text-orange-400'
                                   : 'bg-zinc-700/50 text-zinc-400'
                               )}>
-                                {sniper.isActive && <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />}
+                                {sniper.isActive && <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse" />}
                                 {sniper.isActive ? 'Active' : 'Paused'}
                               </span>
                               <span className="text-xs text-zinc-500">
@@ -448,7 +448,7 @@ export default function PromoPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className={sniper.isActive ? 'border-red-800 text-red-400' : 'border-green-800 text-green-400'}
+                          className={sniper.isActive ? 'border-red-800 text-red-400' : 'border-orange-800 text-orange-400'}
                         >
                           {sniper.isActive ? 'Pause' : 'Start'}
                         </Button>
@@ -462,7 +462,7 @@ export default function PromoPage() {
                         </div>
                         <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
                           <p className="text-zinc-500 text-[10px] mb-0.5">Win Rate</p>
-                          <p className="font-medium text-green-400 text-sm">
+                          <p className="font-medium text-orange-400 text-sm">
                             {Math.round((sniper.stats.successfulSnipes / sniper.stats.totalSnipes) * 100)}%
                           </p>
                         </div>
@@ -480,14 +480,14 @@ export default function PromoPage() {
                         <span className="px-2 py-1 bg-zinc-800 rounded text-zinc-400">
                           {(sniper.config.slippageBps / 100)}% slip
                         </span>
-                        <span className="px-2 py-1 bg-zinc-800 rounded text-green-400">
+                        <span className="px-2 py-1 bg-zinc-800 rounded text-orange-400">
                           TP: +{sniper.config.takeProfitPct}%
                         </span>
                         <span className="px-2 py-1 bg-zinc-800 rounded text-red-400">
                           SL: -{sniper.config.stopLossPct}%
                         </span>
                         {sniper.config.mevProtection && (
-                          <span className="px-2 py-1 bg-green-900/30 rounded text-green-400 flex items-center gap-1">
+                          <span className="px-2 py-1 bg-orange-900/30 rounded text-orange-400 flex items-center gap-1">
                             <Shield className="w-2.5 h-2.5" /> Jito
                           </span>
                         )}
@@ -506,7 +506,7 @@ export default function PromoPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                    <Bot className="h-5 w-5 text-green-400" />
+                    <Bot className="h-5 w-5 text-orange-400" />
                     Trading Wallets
                     <Info className="h-3.5 w-3.5 text-zinc-500 cursor-help" />
                   </CardTitle>
@@ -519,7 +519,7 @@ export default function PromoPage() {
                 <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-zinc-300">Trading Wallet</span>
-                    <span className="text-lg font-bold text-green-400">1.847 SOL</span>
+                    <span className="text-lg font-bold text-orange-400">1.847 SOL</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 text-xs font-mono text-zinc-500 truncate">
@@ -540,7 +540,7 @@ export default function PromoPage() {
             <Card className="bg-zinc-900/50 border-zinc-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <Radio className="w-5 h-5 text-green-400" />
+                  <Radio className="w-5 h-5 text-orange-400" />
                   Activity Log
                 </CardTitle>
                 {/* Tabs */}
@@ -550,7 +550,7 @@ export default function PromoPage() {
                     className={cn(
                       'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
                       activeTab === 'migrations'
-                        ? 'bg-green-900/30 text-green-400 border border-green-700/50'
+                        ? 'bg-orange-900/30 text-orange-400 border border-orange-700/50'
                         : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                     )}
                   >
@@ -564,7 +564,7 @@ export default function PromoPage() {
                     className={cn(
                       'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
                       activeTab === 'trades'
-                        ? 'bg-green-900/30 text-green-400 border border-green-700/50'
+                        ? 'bg-orange-900/30 text-orange-400 border border-orange-700/50'
                         : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                     )}
                   >
@@ -584,13 +584,13 @@ export default function PromoPage() {
                         key={m.id}
                         className={cn(
                           'flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg transition-all',
-                          i === 0 ? 'bg-green-900/20' : 'bg-zinc-800/50 hover:bg-zinc-800'
+                          i === 0 ? 'bg-orange-900/20' : 'bg-zinc-800/50 hover:bg-zinc-800'
                         )}
                       >
                         {/* Ticker with copy + Solscan */}
                         <div className="flex items-center gap-2 min-w-0">
                           {i === 0 && (
-                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0" />
+                            <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse flex-shrink-0" />
                           )}
                           <code className="text-sm font-medium text-zinc-200 truncate">
                             ${m.symbol}
@@ -616,8 +616,8 @@ export default function PromoPage() {
                           <span className="text-xs text-zinc-500">{m.time}</span>
                           {m.sniped ? (
                             m.success ? (
-                              <div className="w-5 h-5 rounded-full bg-green-900/50 flex items-center justify-center">
-                                <Check className="w-3 h-3 text-green-400" />
+                              <div className="w-5 h-5 rounded-full bg-orange-900/50 flex items-center justify-center">
+                                <Check className="w-3 h-3 text-orange-400" />
                               </div>
                             ) : m.success === false ? (
                               <div className="w-5 h-5 rounded-full bg-red-900/50 flex items-center justify-center">
@@ -645,16 +645,16 @@ export default function PromoPage() {
                       >
                         <Crosshair className={cn(
                           'w-4 h-4 flex-shrink-0',
-                          trade.action === 'Bought' ? 'text-green-400' :
-                          trade.action === 'TP Hit' ? 'text-green-400' :
+                          trade.action === 'Bought' ? 'text-orange-400' :
+                          trade.action === 'TP Hit' ? 'text-orange-400' :
                           trade.action === 'SL Hit' ? 'text-red-400' : 'text-red-400'
                         )} />
                         <div className="flex-1 min-w-0 flex items-center gap-1.5">
                           <span className="text-zinc-200 font-medium truncate">{trade.sniperName}</span>
                           <span className={cn(
                             'font-medium',
-                            trade.action === 'Bought' ? 'text-green-400' :
-                            trade.action === 'TP Hit' ? 'text-green-400' :
+                            trade.action === 'Bought' ? 'text-orange-400' :
+                            trade.action === 'TP Hit' ? 'text-orange-400' :
                             trade.action === 'SL Hit' ? 'text-red-400' : 'text-red-400'
                           )}>{trade.action}</span>
                           <span className="text-zinc-300">${trade.token}</span>
@@ -672,7 +672,7 @@ export default function PromoPage() {
 
       {/* Floating badge for screenshots */}
       <div className="fixed bottom-4 right-4 px-4 py-2 bg-zinc-900/90 border border-zinc-700 rounded-full text-sm flex items-center gap-2 backdrop-blur">
-        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+        <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
         <span className="text-zinc-400">migratorrr.xyz</span>
       </div>
 
@@ -687,15 +687,15 @@ export default function PromoPage() {
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="w-16 h-16 rounded-full bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-                <ImageIcon className="w-8 h-8 text-green-400" />
+              <div className="w-16 h-16 rounded-full bg-orange-900/30 flex items-center justify-center mx-auto mb-4">
+                <ImageIcon className="w-8 h-8 text-orange-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Coming Soon</h3>
               <p className="text-zinc-400 text-sm">
                 Share your trading results with a beautiful card image. This feature is under development.
               </p>
               <Button
-                className="mt-4 bg-green-600 hover:bg-green-700"
+                className="mt-4 bg-orange-600 hover:bg-orange-700"
                 onClick={() => setShowComingSoon(false)}
               >
                 Got it

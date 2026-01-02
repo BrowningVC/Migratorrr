@@ -98,7 +98,7 @@ export default function LandingPage() {
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Logo size="md" />
             <LogoText size="md" />
-            <span className="hidden sm:inline-block text-xs text-green-500/70 border-l border-green-800/50 pl-2 ml-1 font-mono">
+            <span className="hidden sm:inline-block text-xs text-orange-500/70 border-l border-orange-800/50 pl-2 ml-1 font-mono">
               {TAGLINE.slice(0, taglineIndex)}
               <span className="animate-pulse">|</span>
             </span>
@@ -120,7 +120,7 @@ export default function LandingPage() {
       {/* Hero Section - Technical Design */}
       <section className="relative overflow-hidden border-b border-border">
         {/* Background grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(249,115,22,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(249,115,22,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
 
         <div className="container mx-auto px-4 py-16 relative">
@@ -130,13 +130,13 @@ export default function LandingPage() {
               {/* Main heading with code styling */}
               <div className="space-y-2">
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-                  <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">Automated Sniping</span>
+                  <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">Automated Sniping</span>
                   <span className="text-zinc-100"> on </span>
-                  <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">Migrations</span>
+                  <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">Migrations</span>
                   <span className="text-zinc-100"> With</span>
                 </h1>
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-zinc-100">
-                  Custom Filters in <span className="font-mono text-green-400">&lt;100ms</span>
+                  Custom Filters in <span className="font-mono text-orange-400">&lt;100ms</span>
                 </h1>
               </div>
 
@@ -159,7 +159,7 @@ export default function LandingPage() {
                 </div>
                 <div className="w-px bg-zinc-800" />
                 <div className="space-y-1">
-                  <div className="text-2xl font-mono font-bold text-green-400">24/7</div>
+                  <div className="text-2xl font-mono font-bold text-orange-400">24/7</div>
                   <div className="text-xs text-zinc-500 uppercase tracking-wider">Automated</div>
                 </div>
               </div>
@@ -168,7 +168,7 @@ export default function LandingPage() {
               <div className="flex flex-wrap gap-3 pt-2">
                 <Button
                   size="lg"
-                  className="gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-6"
+                  className="gap-2 bg-orange-600 hover:bg-orange-700 text-white font-medium px-6"
                   onClick={() => setIsSniperModalOpen(true)}
                 >
                   <Crosshair className="h-4 w-4" />
@@ -206,8 +206,8 @@ export default function LandingPage() {
                               className={cn(
                                 "w-full transition-all duration-700 ease-out rounded-full",
                                 isActive
-                                  ? "h-full bg-gradient-to-b from-green-400 to-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
-                                  : "h-0 bg-green-500"
+                                  ? "h-full bg-gradient-to-b from-orange-400 to-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"
+                                  : "h-0 bg-orange-500"
                               )}
                             />
                           </div>
@@ -217,8 +217,8 @@ export default function LandingPage() {
                         <div
                           className={cn(
                             "flex items-center gap-4 p-4 rounded-xl border transition-all duration-300",
-                            isCurrent && "border-green-500/50 bg-green-500/5 scale-[1.02]",
-                            isActive && !isCurrent && "border-green-500/30 bg-zinc-900/50",
+                            isCurrent && "border-orange-500/50 bg-orange-500/5 scale-[1.02]",
+                            isActive && !isCurrent && "border-orange-500/30 bg-zinc-900/50",
                             !isActive && "border-zinc-800 bg-zinc-900/30"
                           )}
                         >
@@ -226,20 +226,20 @@ export default function LandingPage() {
                           <div
                             className={cn(
                               "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
-                              isActive ? "bg-green-500/20" : "bg-zinc-800"
+                              isActive ? "bg-orange-500/20" : "bg-zinc-800"
                             )}
                           >
                             {step.icon === 'migration' && (
-                              <ArrowRight className={cn("w-5 h-5 transition-colors", isActive ? "text-green-400" : "text-zinc-500")} />
+                              <ArrowRight className={cn("w-5 h-5 transition-colors", isActive ? "text-orange-400" : "text-zinc-500")} />
                             )}
                             {step.icon === 'detect' && (
-                              <Radio className={cn("w-5 h-5 transition-colors", isActive ? "text-green-400" : "text-zinc-500", isCurrent && "animate-pulse")} />
+                              <Radio className={cn("w-5 h-5 transition-colors", isActive ? "text-orange-400" : "text-zinc-500", isCurrent && "animate-pulse")} />
                             )}
                             {step.icon === 'buy' && (
-                              <Wallet className={cn("w-5 h-5 transition-colors", isActive ? "text-green-400" : "text-zinc-500")} />
+                              <Wallet className={cn("w-5 h-5 transition-colors", isActive ? "text-orange-400" : "text-zinc-500")} />
                             )}
                             {step.icon === 'profit' && (
-                              <DollarSign className={cn("w-5 h-5 transition-colors", isActive ? "text-green-400" : "text-zinc-500")} />
+                              <DollarSign className={cn("w-5 h-5 transition-colors", isActive ? "text-orange-400" : "text-zinc-500")} />
                             )}
                           </div>
 
@@ -262,7 +262,7 @@ export default function LandingPage() {
                           {/* Check mark */}
                           <div className={cn(
                             "w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300",
-                            isActive ? "bg-green-500" : "bg-zinc-800"
+                            isActive ? "bg-orange-500" : "bg-zinc-800"
                           )}>
                             {isActive && <Check className="w-3.5 h-3.5 text-white" />}
                           </div>
@@ -276,13 +276,13 @@ export default function LandingPage() {
                 <div className={cn(
                   "mt-4 flex items-center gap-3 p-3 rounded-lg border transition-all duration-500",
                   activeStep > WORKFLOW_STEPS.length
-                    ? "border-green-500/30 bg-green-500/5 opacity-100"
+                    ? "border-orange-500/30 bg-orange-500/5 opacity-100"
                     : "border-transparent bg-transparent opacity-0"
                 )}>
-                  <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-                    <Radio className="w-4 h-4 text-green-400 animate-pulse" />
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                    <Radio className="w-4 h-4 text-orange-400 animate-pulse" />
                   </div>
-                  <div className="text-sm text-green-400">
+                  <div className="text-sm text-orange-400">
                     Continues searching for next migration...
                   </div>
                 </div>
@@ -292,7 +292,7 @@ export default function LandingPage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-zinc-100">$MIGRATOR</span>
-                      <span className="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-400 rounded">
+                      <span className="px-2 py-0.5 text-xs font-medium bg-orange-500/20 text-orange-400 rounded">
                         Live
                       </span>
                     </div>
@@ -304,7 +304,7 @@ export default function LandingPage() {
                     <button
                       className={cn(
                         "p-2 rounded transition-colors",
-                        copied ? "bg-green-500/20 text-green-400" : "hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300"
+                        copied ? "bg-orange-500/20 text-orange-400" : "hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300"
                       )}
                       onClick={() => {
                         navigator.clipboard.writeText(MIGRATOR_TOKEN_ADDRESS);
@@ -383,7 +383,7 @@ export default function LandingPage() {
           </p>
           <Button
             size="lg"
-            className="gap-2 bg-green-600 hover:bg-green-700"
+            className="gap-2 bg-orange-600 hover:bg-orange-700"
             onClick={() => setIsSniperModalOpen(true)}
           >
             Configure Your Sniper <ArrowRight className="h-4 w-4" />

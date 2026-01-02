@@ -119,9 +119,9 @@ const TradeRow = memo(function TradeRow({ entry }: { entry: ActivityEntry }) {
   const getAction = () => {
     switch (entry.eventType) {
       case 'snipe:success':
-        return { label: 'Bought', color: 'text-green-400' };
+        return { label: 'Bought', color: 'text-orange-400' };
       case 'position:take_profit':
-        return { label: 'TP Hit', color: 'text-green-400' };
+        return { label: 'TP Hit', color: 'text-orange-400' };
       case 'position:stop_loss':
         return { label: 'SL Hit', color: 'text-red-400' };
       case 'position:trailing_stop':
@@ -174,13 +174,13 @@ const MigrationRow = memo(function MigrationRow({
     <div
       className={cn(
         'flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg transition-all',
-        isNew ? 'bg-green-900/20' : 'bg-zinc-800/50 hover:bg-zinc-800'
+        isNew ? 'bg-orange-900/20' : 'bg-zinc-800/50 hover:bg-zinc-800'
       )}
     >
       {/* Ticker with copy + Solscan */}
       <div className="flex items-center gap-2 min-w-0">
         {isNew && (
-          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0" title="New" />
+          <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse flex-shrink-0" title="New" />
         )}
         <code className="text-sm font-medium text-zinc-200 truncate">
           {migration.tokenSymbol
@@ -194,7 +194,7 @@ const MigrationRow = memo(function MigrationRow({
             title="Copy token address"
           >
             {copiedId === `token-${migration.id}` ? (
-              <Check className="w-3.5 h-3.5 text-green-400" />
+              <Check className="w-3.5 h-3.5 text-orange-400" />
             ) : (
               <Copy className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300" />
             )}
@@ -230,8 +230,8 @@ const MigrationRow = memo(function MigrationRow({
         </span>
         {migration.sniped ? (
           migration.snipeSuccess ? (
-            <div className="w-5 h-5 rounded-full bg-green-900/50 flex items-center justify-center" title="Sniped successfully">
-              <Check className="w-3 h-3 text-green-400" />
+            <div className="w-5 h-5 rounded-full bg-orange-900/50 flex items-center justify-center" title="Sniped successfully">
+              <Check className="w-3 h-3 text-orange-400" />
             </div>
           ) : migration.snipeSuccess === false ? (
             <div className="w-5 h-5 rounded-full bg-red-900/50 flex items-center justify-center" title={migration.snipeError || 'Failed'}>
@@ -402,7 +402,7 @@ export function ActivityLog() {
     <Card className="bg-zinc-900/50 border-zinc-800">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Radio className="w-5 h-5 text-green-400" />
+          <Radio className="w-5 h-5 text-orange-400" />
           Activity Log
         </CardTitle>
         {/* Tabs */}
@@ -412,7 +412,7 @@ export function ActivityLog() {
             className={cn(
               'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
               activeTab === 'migrations'
-                ? 'bg-green-900/30 text-green-400 border border-green-700/50'
+                ? 'bg-orange-900/30 text-orange-400 border border-orange-700/50'
                 : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
             )}
           >
@@ -428,7 +428,7 @@ export function ActivityLog() {
             className={cn(
               'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
               activeTab === 'activity'
-                ? 'bg-green-900/30 text-green-400 border border-green-700/50'
+                ? 'bg-orange-900/30 text-orange-400 border border-orange-700/50'
                 : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
             )}
           >

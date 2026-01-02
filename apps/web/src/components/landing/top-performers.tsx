@@ -60,7 +60,7 @@ function formatDate(dateString: string): string {
 
 function getMultiplierColor(multiplier: number): string {
   if (multiplier >= 1000) return 'text-yellow-400';
-  if (multiplier >= 100) return 'text-green-400';
+  if (multiplier >= 100) return 'text-orange-400';
   if (multiplier >= 10) return 'text-emerald-400';
   return 'text-primary';
 }

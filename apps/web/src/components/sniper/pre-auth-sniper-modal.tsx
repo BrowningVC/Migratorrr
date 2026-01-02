@@ -270,7 +270,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 key={s}
                 className={cn(
                   'flex-1 h-1 rounded-full transition-colors',
-                  i <= stepIndex ? 'bg-green-500' : 'bg-zinc-700'
+                  i <= stepIndex ? 'bg-orange-500' : 'bg-zinc-700'
                 )}
               />
             ))}
@@ -344,7 +344,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   <div className={cn(
                     'w-5 h-5 rounded border-2 transition-colors flex items-center justify-center',
                     config.coverInitials
-                      ? 'bg-green-600 border-green-600'
+                      ? 'bg-orange-600 border-orange-600'
                       : 'border-zinc-600 group-hover:border-zinc-500'
                   )}>
                     {config.coverInitials && <Check className="w-3 h-3 text-white" />}
@@ -414,7 +414,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                     <div className={cn(
                       'w-5 h-5 rounded border-2 transition-colors flex items-center justify-center',
                       config.mevProtection ?? true
-                        ? 'bg-green-600 border-green-600'
+                        ? 'bg-orange-600 border-orange-600'
                         : 'border-zinc-600 group-hover:border-zinc-500'
                     )}>
                       {(config.mevProtection ?? true) && <Check className="w-3 h-3 text-white" />}
@@ -422,7 +422,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-green-400" />
+                      <Shield className="w-4 h-4 text-orange-400" />
                       <span className="text-sm font-medium text-white">MEV Protection</span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1">
@@ -537,9 +537,9 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
           {step === 'filters' && (
             <div className="space-y-4">
               {/* Token Type Badge */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-900/30 border border-green-700/50 rounded-full w-fit">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="text-xs font-medium text-green-400">Newly Migrated Tokens</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-900/30 border border-orange-700/50 rounded-full w-fit">
+                <div className="w-2 h-2 rounded-full bg-orange-500" />
+                <span className="text-xs font-medium text-orange-400">Newly Migrated Tokens</span>
               </div>
 
               {/* 2-Column Grid for Filters */}
@@ -575,7 +575,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                           className={cn(
                             'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                             config.maxMigrationTimeMinutes === opt.value
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                           )}
                         >
@@ -614,7 +614,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                           className={cn(
                             'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                             config.minVolumeUsd === opt.value
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                           )}
                         >
@@ -653,7 +653,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                           className={cn(
                             'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                             config.minHolderCount === opt.value
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                           )}
                         >
@@ -692,7 +692,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                           className={cn(
                             'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                             config.minTwitterFollowers === opt.value
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                           )}
                         >
@@ -725,7 +725,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                         className={cn(
                           'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                           config.requireLiquidityLock
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-orange-600 text-white'
                             : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                         )}
                       >
@@ -766,7 +766,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                           className={cn(
                             'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                             config.maxDevHoldingsPct === opt.value
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                           )}
                         >
@@ -805,7 +805,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                           className={cn(
                             'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                             config.maxTop10HoldingsPct === opt.value
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                           )}
                         >
@@ -826,7 +826,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                         className={cn(
                           'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
                           config.requireTwitter
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-orange-600 text-white'
                             : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                         )}
                       >
@@ -841,7 +841,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                         className={cn(
                           'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
                           config.requireTelegram
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-orange-600 text-white'
                             : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                         )}
                       >
@@ -856,7 +856,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                         className={cn(
                           'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
                           config.requireWebsite
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-orange-600 text-white'
                             : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                         )}
                       >
@@ -897,7 +897,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                           className={cn(
                             'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                             config.minCreatorScore === opt.value
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-orange-600 text-white'
                               : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                           )}
                         >
@@ -930,7 +930,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                         className={cn(
                           'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
                           config.requireDexScreenerPaid
-                            ? 'bg-green-600 text-white'
+                            ? 'bg-orange-600 text-white'
                             : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
                         )}
                       >
@@ -950,54 +950,54 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-zinc-700/50">
                   <span className="text-[10px] text-zinc-500 mr-1">Active:</span>
                   {config.maxMigrationTimeMinutes && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
                       Speed {'<'}{config.maxMigrationTimeMinutes}m
                     </span>
                   )}
                   {config.minVolumeUsd && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
                       Vol ${(config.minVolumeUsd / 1000)}k+
                     </span>
                   )}
                   {config.minHolderCount && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
                       {config.minHolderCount}+ holders
                     </span>
                   )}
                   {config.maxDevHoldingsPct && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
                       Dev ≤{config.maxDevHoldingsPct}%
                     </span>
                   )}
                   {config.maxTop10HoldingsPct && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
                       Top10 ≤{config.maxTop10HoldingsPct}%
                     </span>
                   )}
                   {config.requireTwitter && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">X</span>
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">X</span>
                   )}
                   {config.requireTelegram && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">TG</span>
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">TG</span>
                   )}
                   {config.requireWebsite && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">Web</span>
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">Web</span>
                   )}
                   {config.minTwitterFollowers && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
                       {config.minTwitterFollowers >= 1000 ? `${config.minTwitterFollowers / 1000}K` : config.minTwitterFollowers}+ followers
                     </span>
                   )}
                   {config.minCreatorScore && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">
                       Creator {config.minCreatorScore}+
                     </span>
                   )}
                   {config.requireLiquidityLock && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">LP Lock</span>
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">LP Lock</span>
                   )}
                   {config.requireDexScreenerPaid && (
-                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">DexPaid</span>
+                    <span className="px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded text-[10px]">DexPaid</span>
                   )}
                 </div>
               )}
@@ -1012,10 +1012,10 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400 text-xs">Sniper</span>
                   <div className="flex items-center gap-2">
-                    <Crosshair className="w-4 h-4 text-green-400" />
+                    <Crosshair className="w-4 h-4 text-orange-400" />
                     <span className="font-medium text-white text-sm">{name || 'My First Sniper'}</span>
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-green-900/30 rounded text-xs text-green-400">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-900/30 rounded text-xs text-orange-400">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
                       New Migrations
                     </div>
                   </div>
@@ -1046,7 +1046,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Exit</p>
                   <div className="flex justify-between text-xs">
                     <span className="text-zinc-400">TP</span>
-                    <span className="font-medium text-green-400">
+                    <span className="font-medium text-orange-400">
                       +{config.takeProfitPct}%
                     </span>
                   </div>
@@ -1077,7 +1077,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                     </span>
                     <span className={cn(
                       'font-medium',
-                      config.mevProtection ?? true ? 'text-green-400' : 'text-zinc-500'
+                      config.mevProtection ?? true ? 'text-orange-400' : 'text-zinc-500'
                     )}>
                       {config.mevProtection ?? true ? 'On' : 'Off'}
                     </span>
@@ -1155,7 +1155,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                     <span className="text-zinc-400">LP Lock</span>
                     <span className={cn(
                       'font-medium',
-                      config.requireLiquidityLock ? 'text-green-400' : 'text-white'
+                      config.requireLiquidityLock ? 'text-orange-400' : 'text-white'
                     )}>
                       {config.requireLiquidityLock ? 'Required' : 'Any'}
                     </span>
@@ -1164,7 +1164,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                     <span className="text-zinc-400">DexScreener</span>
                     <span className={cn(
                       'font-medium',
-                      config.requireDexScreenerPaid ? 'text-green-400' : 'text-white'
+                      config.requireDexScreenerPaid ? 'text-orange-400' : 'text-white'
                     )}>
                       {config.requireDexScreenerPaid ? 'Paid' : 'Any'}
                     </span>
@@ -1174,12 +1174,12 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
 
               {hasExistingWallet && existingGeneratedWallet ? (
                 // Show existing wallet info for authenticated users with generated wallet
-                <div className="bg-green-900/20 border-2 border-green-700/60 rounded-xl p-4 mt-2">
+                <div className="bg-orange-900/20 border-2 border-orange-700/60 rounded-xl p-4 mt-2">
                   <div className="flex items-center justify-center gap-2 mb-1">
-                    <Check className="w-5 h-5 text-green-400" />
-                    <p className="text-green-400 font-medium text-sm">Ready to Create</p>
+                    <Check className="w-5 h-5 text-orange-400" />
+                    <p className="text-orange-400 font-medium text-sm">Ready to Create</p>
                   </div>
-                  <p className="text-green-400/70 text-xs text-center">
+                  <p className="text-orange-400/70 text-xs text-center">
                     Using trading wallet: {existingGeneratedWallet.publicKey?.slice(0, 4)}...{existingGeneratedWallet.publicKey?.slice(-4)}
                   </p>
                 </div>
@@ -1187,8 +1187,8 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 // New user flow - explain what happens next
                 <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 mt-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-900/30 rounded-full flex items-center justify-center shrink-0">
-                      <ArrowRight className="w-5 h-5 text-green-400" />
+                    <div className="w-10 h-10 bg-orange-900/30 rounded-full flex items-center justify-center shrink-0">
+                      <ArrowRight className="w-5 h-5 text-orange-400" />
                     </div>
                     <div>
                       <p className="text-white font-medium text-sm">Next: Quick Setup</p>
@@ -1218,7 +1218,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
               {hasExistingWallet ? (
                 // User has a generated wallet - create sniper directly
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
                   onClick={handleCreateSniperDirect}
                   disabled={!name || isCreatingSniper}
                 >
@@ -1228,7 +1228,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
               ) : (
                 // New user - continue to onboarding for wallet setup
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
                   onClick={handleContinueToOnboarding}
                   disabled={!name}
                 >
@@ -1248,7 +1248,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                 </Button>
               )}
               <Button
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-orange-600 hover:bg-orange-700"
                 onClick={handleNext}
                 disabled={step === 'basics' && !name}
               >

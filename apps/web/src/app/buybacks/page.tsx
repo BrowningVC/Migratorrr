@@ -59,7 +59,7 @@ export default function BuybacksPage() {
             mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
-          <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">$MIGRATOR</span>
+          <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">$MIGRATOR</span>
           <span className="text-zinc-100"> Buybacks</span>
         </h1>
 
@@ -214,12 +214,12 @@ export default function BuybacksPage() {
               {/* Factory processor */}
               <div className="relative">
                 {/* Top section with status */}
-                <div className="w-36 h-8 bg-gradient-to-b from-green-950/80 to-green-950/40 rounded-t-xl border-t border-l border-r border-green-700/50 flex items-center justify-center">
-                  <span className="text-[10px] text-green-400 uppercase tracking-wider font-medium">Revenue Spend</span>
+                <div className="w-36 h-8 bg-gradient-to-b from-orange-950/80 to-orange-950/40 rounded-t-xl border-t border-l border-r border-orange-700/50 flex items-center justify-center">
+                  <span className="text-[10px] text-orange-400 uppercase tracking-wider font-medium">Revenue Spend</span>
                 </div>
                 {/* Main body with logo */}
                 <div
-                  className="w-36 h-28 bg-gradient-to-br from-green-950/40 to-emerald-950/20 border border-green-700/40 rounded-b-xl relative overflow-hidden flex items-center justify-center"
+                  className="w-36 h-28 bg-gradient-to-br from-orange-950/40 to-amber-950/20 border border-orange-700/40 rounded-b-xl relative overflow-hidden flex items-center justify-center"
                   style={{
                     boxShadow: '0 0 50px rgba(34, 197, 94, 0.1), inset 0 0 30px rgba(34, 197, 94, 0.05)',
                   }}
@@ -229,7 +229,7 @@ export default function BuybacksPage() {
                   </div>
                   {/* Pulse ring */}
                   <div
-                    className="absolute inset-2 rounded-lg border border-green-500/20"
+                    className="absolute inset-2 rounded-lg border border-orange-500/20"
                     style={{ animation: mounted ? 'pulse-ring 2s ease-out infinite' : 'none' }}
                   />
                   {/* Burn particles rising */}
@@ -245,20 +245,20 @@ export default function BuybacksPage() {
                             animationDelay: `${i * 0.5}s`,
                           }}
                         >
-                          <Flame className="w-3 h-3 text-green-500/60" />
+                          <Flame className="w-3 h-3 text-orange-500/60" />
                         </div>
                       ))}
                     </div>
                   )}
                   {/* Inner glow */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-green-500/5 to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-orange-500/5 to-transparent pointer-events-none" />
                 </div>
                 {/* Input chute */}
                 <div className="absolute -left-1.5 top-1/2 w-3 h-5 bg-zinc-900 border border-zinc-800 rounded-l -translate-y-1/2" />
               </div>
               {/* Labels */}
               <div className="mt-4 flex flex-col items-center gap-1">
-                <span className="text-sm font-semibold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">$MIGRATOR</span>
+                <span className="text-sm font-semibold bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">$MIGRATOR</span>
                 <span className="text-xs text-zinc-500 uppercase tracking-wider">Buy Backs</span>
               </div>
             </div>
@@ -267,7 +267,7 @@ export default function BuybacksPage() {
           {/* Process label */}
           <div className="absolute left-1/2 -translate-x-1/2 -bottom-14">
             <div className="flex items-center gap-2 px-4 py-1.5 bg-zinc-900/90 border border-zinc-800 rounded-full backdrop-blur-sm">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
               <span className="text-xs text-zinc-400">Automatic Buyback & Burn</span>
             </div>
           </div>

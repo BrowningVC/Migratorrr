@@ -66,7 +66,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
             <p
               className={cn(
                 'text-lg font-bold',
-                isProfitable ? 'text-green-400' : 'text-red-400'
+                isProfitable ? 'text-orange-400' : 'text-red-400'
               )}
             >
               {totalPnlSol >= 0 ? '+' : ''}{totalPnlSol.toFixed(4)}
@@ -88,7 +88,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
         <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
           <CardContent className="p-3">
             <p className="text-zinc-500 text-xs mb-0.5">Active Snipers</p>
-            <p className="text-lg font-bold text-green-400">{activeSnipers}</p>
+            <p className="text-lg font-bold text-orange-400">{activeSnipers}</p>
             <p className="text-zinc-500 text-[10px]">Watching</p>
           </CardContent>
         </Card>
@@ -113,8 +113,8 @@ export function StatsCards({ stats }: StatsCardsProps) {
           <CardContent className="p-3">
             <p className="text-zinc-500 text-xs mb-0.5">Status</p>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              <p className="text-sm font-medium text-green-400">Connected</p>
+              <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
+              <p className="text-sm font-medium text-orange-400">Connected</p>
             </div>
             <p className="text-zinc-500 text-[10px]">Real-time</p>
           </CardContent>
@@ -128,7 +128,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
             <p className="text-zinc-500 text-xs mb-0.5">Best Trade</p>
             <p className={cn(
               'text-lg font-bold',
-              bestTradeSol > 0 ? 'text-green-400' : 'text-zinc-400'
+              bestTradeSol > 0 ? 'text-orange-400' : 'text-zinc-400'
             )}>
               {bestTradeSol > 0 ? `+${bestTradeSol.toFixed(2)}` : '—'}
             </p>
@@ -156,7 +156,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
         <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
           <CardContent className="p-3">
             <p className="text-zinc-500 text-xs mb-0.5">Tokens Caught</p>
-            <p className="text-lg font-bold text-green-400">{tokensCaught}</p>
+            <p className="text-lg font-bold text-orange-400">{tokensCaught}</p>
             <p className="text-zinc-500 text-[10px]">Sniped</p>
           </CardContent>
         </Card>
@@ -187,14 +187,14 @@ export function StatsCards({ stats }: StatsCardsProps) {
         </Card>
 
         <Card
-          className="bg-zinc-900/50 border-zinc-800 hover:border-green-800/50 transition-colors cursor-pointer group col-span-2"
+          className="bg-zinc-900/50 border-zinc-800 hover:border-orange-800/50 transition-colors cursor-pointer group col-span-2"
           onClick={() => setShowComingSoon(true)}
         >
           <CardContent className="p-3 flex flex-col items-center justify-center h-full">
-            <div className="w-8 h-8 rounded-full bg-green-900/30 flex items-center justify-center mb-1 group-hover:bg-green-900/50 transition-colors">
-              <ImageIcon className="w-4 h-4 text-green-400" />
+            <div className="w-8 h-8 rounded-full bg-orange-900/30 flex items-center justify-center mb-1 group-hover:bg-orange-900/50 transition-colors">
+              <ImageIcon className="w-4 h-4 text-orange-400" />
             </div>
-            <p className="text-xs font-medium text-green-400">Share Results</p>
+            <p className="text-xs font-medium text-orange-400">Share Results</p>
             <p className="text-zinc-500 text-[10px]">Show off gains</p>
           </CardContent>
         </Card>
@@ -211,15 +211,15 @@ export function StatsCards({ stats }: StatsCardsProps) {
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="w-16 h-16 rounded-full bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-                <ImageIcon className="w-8 h-8 text-green-400" />
+              <div className="w-16 h-16 rounded-full bg-orange-900/30 flex items-center justify-center mx-auto mb-4">
+                <ImageIcon className="w-8 h-8 text-orange-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Coming Soon</h3>
               <p className="text-zinc-400 text-sm">
                 Share your trading results with a beautiful card image. This feature is under development.
               </p>
               <Button
-                className="mt-4 bg-green-600 hover:bg-green-700"
+                className="mt-4 bg-orange-600 hover:bg-orange-700"
                 onClick={() => setShowComingSoon(false)}
               >
                 Got it

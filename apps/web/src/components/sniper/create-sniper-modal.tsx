@@ -286,7 +286,7 @@ export function CreateSniperModal({
                     key={s}
                     className={cn(
                       'flex-1 h-1 rounded-full transition-colors',
-                      i <= stepIndex ? 'bg-green-500' : 'bg-zinc-700'
+                      i <= stepIndex ? 'bg-orange-500' : 'bg-zinc-700'
                     )}
                   />
                 ))}
@@ -338,7 +338,7 @@ export function CreateSniperModal({
                         className={cn(
                           'w-full p-3 rounded-lg border text-left transition-colors',
                           selectedWalletId === wallet.id
-                            ? 'bg-green-900/20 border-green-700'
+                            ? 'bg-orange-900/20 border-orange-700'
                             : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'
                         )}
                       >
@@ -412,7 +412,7 @@ export function CreateSniperModal({
                   <div className={cn(
                     'w-5 h-5 rounded border-2 transition-colors flex items-center justify-center',
                     config.coverInitials
-                      ? 'bg-green-600 border-green-600'
+                      ? 'bg-orange-600 border-orange-600'
                       : 'border-zinc-600 group-hover:border-zinc-500'
                   )}>
                     {config.coverInitials && <Check className="w-3 h-3 text-white" />}
@@ -494,7 +494,7 @@ export function CreateSniperModal({
                     <div className={cn(
                       'w-5 h-5 rounded border-2 transition-colors flex items-center justify-center',
                       config.mevProtection ?? true
-                        ? 'bg-green-600 border-green-600'
+                        ? 'bg-orange-600 border-orange-600'
                         : 'border-zinc-600 group-hover:border-zinc-500'
                     )}>
                       {(config.mevProtection ?? true) && <Check className="w-3 h-3 text-white" />}
@@ -502,7 +502,7 @@ export function CreateSniperModal({
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-green-400" />
+                      <Shield className="w-4 h-4 text-orange-400" />
                       <span className="text-sm font-medium text-white">MEV Protection</span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1">
@@ -621,9 +621,9 @@ export function CreateSniperModal({
             <div className="space-y-6">
               {/* Token Type Badges */}
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded-full">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-sm font-medium text-green-400">Newly Migrated Tokens ONLY</span>
+                <div className="flex items-center gap-2 px-3 py-2 bg-orange-900/30 border border-orange-700/50 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-orange-500" />
+                  <span className="text-sm font-medium text-orange-400">Newly Migrated Tokens ONLY</span>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-2 bg-yellow-900/30 border border-yellow-700/50 rounded-full">
                   <div className="w-2 h-2 rounded-full bg-yellow-500" />
@@ -653,13 +653,13 @@ export function CreateSniperModal({
                       className={cn(
                         'flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all',
                         config.maxMigrationTimeMinutes === option.value
-                          ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                          ? 'bg-orange-900/30 border-orange-600 shadow-lg shadow-orange-900/20'
                           : 'bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
                       <span className={cn(
                         'text-lg font-bold',
-                        config.maxMigrationTimeMinutes === option.value ? 'text-green-400' : 'text-white'
+                        config.maxMigrationTimeMinutes === option.value ? 'text-orange-400' : 'text-white'
                       )}>
                         {option.label}
                       </span>
@@ -703,7 +703,7 @@ export function CreateSniperModal({
                       className={cn(
                         'py-2.5 px-2 rounded-xl border-2 text-sm font-semibold transition-all',
                         config.minVolumeUsd === option.value
-                          ? 'bg-green-900/30 border-green-600 text-green-400 shadow-lg shadow-green-900/20'
+                          ? 'bg-orange-900/30 border-orange-600 text-orange-400 shadow-lg shadow-orange-900/20'
                           : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
@@ -747,7 +747,7 @@ export function CreateSniperModal({
                       className={cn(
                         'py-2.5 px-2 rounded-xl border-2 text-sm font-semibold transition-all',
                         config.minHolderCount === option.value
-                          ? 'bg-green-900/30 border-green-600 text-green-400 shadow-lg shadow-green-900/20'
+                          ? 'bg-orange-900/30 border-orange-600 text-orange-400 shadow-lg shadow-orange-900/20'
                           : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
@@ -791,7 +791,7 @@ export function CreateSniperModal({
                       className={cn(
                         'py-2.5 px-2 rounded-xl border-2 text-sm font-semibold transition-all',
                         config.maxDevHoldingsPct === option.value
-                          ? 'bg-green-900/30 border-green-600 text-green-400 shadow-lg shadow-green-900/20'
+                          ? 'bg-orange-900/30 border-orange-600 text-orange-400 shadow-lg shadow-orange-900/20'
                           : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
@@ -835,7 +835,7 @@ export function CreateSniperModal({
                       className={cn(
                         'py-2.5 px-2 rounded-xl border-2 text-sm font-semibold transition-all',
                         config.maxTop10HoldingsPct === option.value
-                          ? 'bg-green-900/30 border-green-600 text-green-400 shadow-lg shadow-green-900/20'
+                          ? 'bg-orange-900/30 border-orange-600 text-orange-400 shadow-lg shadow-orange-900/20'
                           : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
@@ -870,7 +870,7 @@ export function CreateSniperModal({
                     className={cn(
                       'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all',
                       config.requireTwitter
-                        ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                        ? 'bg-orange-900/30 border-orange-600 shadow-lg shadow-orange-900/20'
                         : 'bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600 hover:bg-zinc-800'
                     )}
                   >
@@ -880,10 +880,10 @@ export function CreateSniperModal({
                       onChange={(e) => updateConfig({ requireTwitter: e.target.checked })}
                       className="sr-only"
                     />
-                    <svg className={cn('w-4 h-4', config.requireTwitter ? 'text-green-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="currentColor">
+                    <svg className={cn('w-4 h-4', config.requireTwitter ? 'text-orange-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="currentColor">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                     </svg>
-                    <span className={cn('text-sm font-medium', config.requireTwitter ? 'text-green-400' : 'text-zinc-300')}>
+                    <span className={cn('text-sm font-medium', config.requireTwitter ? 'text-orange-400' : 'text-zinc-300')}>
                       Twitter
                     </span>
                   </label>
@@ -892,7 +892,7 @@ export function CreateSniperModal({
                     className={cn(
                       'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all',
                       config.requireTelegram
-                        ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                        ? 'bg-orange-900/30 border-orange-600 shadow-lg shadow-orange-900/20'
                         : 'bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600 hover:bg-zinc-800'
                     )}
                   >
@@ -902,10 +902,10 @@ export function CreateSniperModal({
                       onChange={(e) => updateConfig({ requireTelegram: e.target.checked })}
                       className="sr-only"
                     />
-                    <svg className={cn('w-4 h-4', config.requireTelegram ? 'text-green-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="currentColor">
+                    <svg className={cn('w-4 h-4', config.requireTelegram ? 'text-orange-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="currentColor">
                       <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
                     </svg>
-                    <span className={cn('text-sm font-medium', config.requireTelegram ? 'text-green-400' : 'text-zinc-300')}>
+                    <span className={cn('text-sm font-medium', config.requireTelegram ? 'text-orange-400' : 'text-zinc-300')}>
                       Telegram
                     </span>
                   </label>
@@ -914,7 +914,7 @@ export function CreateSniperModal({
                     className={cn(
                       'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all',
                       config.requireWebsite
-                        ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                        ? 'bg-orange-900/30 border-orange-600 shadow-lg shadow-orange-900/20'
                         : 'bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600 hover:bg-zinc-800'
                     )}
                   >
@@ -924,11 +924,11 @@ export function CreateSniperModal({
                       onChange={(e) => updateConfig({ requireWebsite: e.target.checked })}
                       className="sr-only"
                     />
-                    <svg className={cn('w-4 h-4', config.requireWebsite ? 'text-green-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className={cn('w-4 h-4', config.requireWebsite ? 'text-orange-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                     </svg>
-                    <span className={cn('text-sm font-medium', config.requireWebsite ? 'text-green-400' : 'text-zinc-300')}>
+                    <span className={cn('text-sm font-medium', config.requireWebsite ? 'text-orange-400' : 'text-zinc-300')}>
                       Website
                     </span>
                   </label>
@@ -957,7 +957,7 @@ export function CreateSniperModal({
                       className={cn(
                         'py-2.5 px-2 rounded-xl border-2 text-sm font-semibold transition-all',
                         config.minTwitterFollowers === option.value
-                          ? 'bg-green-900/30 border-green-600 text-green-400 shadow-lg shadow-green-900/20'
+                          ? 'bg-orange-900/30 border-orange-600 text-orange-400 shadow-lg shadow-orange-900/20'
                           : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
@@ -1000,7 +1000,7 @@ export function CreateSniperModal({
                       className={cn(
                         'py-2.5 px-2 rounded-xl border-2 text-sm font-semibold transition-all',
                         config.minCreatorScore === option.value
-                          ? 'bg-green-900/30 border-green-600 text-green-400 shadow-lg shadow-green-900/20'
+                          ? 'bg-orange-900/30 border-orange-600 text-orange-400 shadow-lg shadow-orange-900/20'
                           : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
                       )}
                     >
@@ -1035,7 +1035,7 @@ export function CreateSniperModal({
                     className={cn(
                       'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all',
                       config.requireLiquidityLock
-                        ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                        ? 'bg-orange-900/30 border-orange-600 shadow-lg shadow-orange-900/20'
                         : 'bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600 hover:bg-zinc-800'
                     )}
                   >
@@ -1045,11 +1045,11 @@ export function CreateSniperModal({
                       onChange={(e) => updateConfig({ requireLiquidityLock: e.target.checked })}
                       className="sr-only"
                     />
-                    <svg className={cn('w-4 h-4', config.requireLiquidityLock ? 'text-green-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className={cn('w-4 h-4', config.requireLiquidityLock ? 'text-orange-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
-                    <span className={cn('text-sm font-medium', config.requireLiquidityLock ? 'text-green-400' : 'text-zinc-300')}>
+                    <span className={cn('text-sm font-medium', config.requireLiquidityLock ? 'text-orange-400' : 'text-zinc-300')}>
                       LP Locked
                     </span>
                   </label>
@@ -1058,7 +1058,7 @@ export function CreateSniperModal({
                     className={cn(
                       'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all',
                       config.requireDexScreenerPaid
-                        ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                        ? 'bg-orange-900/30 border-orange-600 shadow-lg shadow-orange-900/20'
                         : 'bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600 hover:bg-zinc-800'
                     )}
                   >
@@ -1068,10 +1068,10 @@ export function CreateSniperModal({
                       onChange={(e) => updateConfig({ requireDexScreenerPaid: e.target.checked })}
                       className="sr-only"
                     />
-                    <svg className={cn('w-4 h-4', config.requireDexScreenerPaid ? 'text-green-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className={cn('w-4 h-4', config.requireDexScreenerPaid ? 'text-orange-400' : 'text-zinc-400')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                     </svg>
-                    <span className={cn('text-sm font-medium', config.requireDexScreenerPaid ? 'text-green-400' : 'text-zinc-300')}>
+                    <span className={cn('text-sm font-medium', config.requireDexScreenerPaid ? 'text-orange-400' : 'text-zinc-300')}>
                       DexScreener Paid
                     </span>
                   </label>
@@ -1088,10 +1088,10 @@ export function CreateSniperModal({
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400 text-xs">Sniper</span>
                   <div className="flex items-center gap-2">
-                    <Crosshair className="w-4 h-4 text-green-400" />
+                    <Crosshair className="w-4 h-4 text-orange-400" />
                     <span className="font-medium text-white text-sm">{name || 'My Sniper'}</span>
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-green-900/30 rounded text-xs text-green-400">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-900/30 rounded text-xs text-orange-400">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
                       New Migrations
                     </div>
                   </div>
@@ -1128,7 +1128,7 @@ export function CreateSniperModal({
                   <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Exit</p>
                   <div className="flex justify-between text-xs">
                     <span className="text-zinc-400">TP</span>
-                    <span className="font-medium text-green-400">
+                    <span className="font-medium text-orange-400">
                       +{config.takeProfitPct}%
                     </span>
                   </div>
@@ -1159,7 +1159,7 @@ export function CreateSniperModal({
                     </span>
                     <span className={cn(
                       'font-medium',
-                      config.mevProtection ?? true ? 'text-green-400' : 'text-zinc-500'
+                      config.mevProtection ?? true ? 'text-orange-400' : 'text-zinc-500'
                     )}>
                       {config.mevProtection ?? true ? 'On' : 'Off'}
                     </span>
@@ -1235,13 +1235,13 @@ export function CreateSniperModal({
                 {config.requireLiquidityLock && (
                   <div className="flex justify-between text-xs">
                     <span className="text-zinc-400">LP Lock</span>
-                    <span className="font-medium text-green-400">Required</span>
+                    <span className="font-medium text-orange-400">Required</span>
                   </div>
                 )}
                 {config.requireDexScreenerPaid && (
                   <div className="flex justify-between text-xs">
                     <span className="text-zinc-400">DexScreener</span>
-                    <span className="font-medium text-green-400">Paid</span>
+                    <span className="font-medium text-orange-400">Paid</span>
                   </div>
                 )}
               </div>
@@ -1258,14 +1258,14 @@ export function CreateSniperModal({
           {/* Step 6: Success */}
           {step === 'success' && createdSniper && (
             <div className="flex flex-col items-center justify-center py-8 space-y-6">
-              <div className="w-20 h-20 rounded-full bg-green-900/30 border-2 border-green-600 flex items-center justify-center">
-                <CheckCircle className="w-10 h-10 text-green-400" />
+              <div className="w-20 h-20 rounded-full bg-orange-900/30 border-2 border-orange-600 flex items-center justify-center">
+                <CheckCircle className="w-10 h-10 text-orange-400" />
               </div>
 
               <div className="text-center space-y-2">
                 <h3 className="text-2xl font-bold text-white">Sniper Created!</h3>
                 <p className="text-zinc-400">
-                  Your sniper <span className="text-green-400 font-medium">&quot;{createdSniper.name}&quot;</span> is ready to go.
+                  Your sniper <span className="text-orange-400 font-medium">&quot;{createdSniper.name}&quot;</span> is ready to go.
                 </p>
               </div>
 
@@ -1283,7 +1283,7 @@ export function CreateSniperModal({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Take Profit</span>
-                  <span className="text-green-400 text-sm font-medium">+{config.takeProfitPct}%</span>
+                  <span className="text-orange-400 text-sm font-medium">+{config.takeProfitPct}%</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Stop Loss</span>
@@ -1311,7 +1311,7 @@ export function CreateSniperModal({
         <div className="flex gap-3 p-4 border-t border-zinc-800 shrink-0">
           {step === 'success' ? (
             <Button
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
               onClick={handleClose}
             >
               Go to Dashboard
@@ -1329,7 +1329,7 @@ export function CreateSniperModal({
               )}
               {step !== 'review' ? (
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
                   onClick={handleNext}
                   disabled={step === 'basics' && (!name || !selectedWalletId)}
                 >
@@ -1337,7 +1337,7 @@ export function CreateSniperModal({
                 </Button>
               ) : (
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
                   onClick={handleCreate}
                   disabled={isLoading || !name || !selectedWalletId}
                 >

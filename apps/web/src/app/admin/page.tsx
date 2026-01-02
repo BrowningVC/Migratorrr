@@ -517,7 +517,7 @@ export default function AdminPage() {
             <Card className="bg-zinc-900 border-zinc-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-green-400" />
+                  <Activity className="w-4 h-4 text-orange-400" />
                   Migration Detector
                 </CardTitle>
               </CardHeader>
@@ -526,7 +526,7 @@ export default function AdminPage() {
                   <span className="text-zinc-500">Status</span>
                   <span className={cn(
                     'flex items-center gap-1',
-                    status.migrationDetector.isRunning ? 'text-green-400' : 'text-red-400'
+                    status.migrationDetector.isRunning ? 'text-orange-400' : 'text-red-400'
                   )}>
                     {status.migrationDetector.isRunning ? (
                       <><CheckCircle className="w-3 h-3" /> Running</>
@@ -539,7 +539,7 @@ export default function AdminPage() {
                   <span className="text-zinc-500">Helius WebSocket</span>
                   <span className={cn(
                     'flex items-center gap-1 text-xs',
-                    status.migrationDetector.connected ? 'text-green-400' : 'text-red-400'
+                    status.migrationDetector.connected ? 'text-orange-400' : 'text-red-400'
                   )}>
                     {status.migrationDetector.connected ? 'Connected' : 'Disconnected'}
                   </span>
@@ -548,7 +548,7 @@ export default function AdminPage() {
                   <span className="text-zinc-500">Subscription</span>
                   <span className={cn(
                     'flex items-center gap-1 text-xs',
-                    status.migrationDetector.subscribed ? 'text-green-400' : 'text-yellow-400'
+                    status.migrationDetector.subscribed ? 'text-orange-400' : 'text-yellow-400'
                   )}>
                     {status.migrationDetector.subscribed ? 'Confirmed' : 'Pending'}
                   </span>
@@ -572,7 +572,7 @@ export default function AdminPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500">Primary RPC</span>
                   <span className={cn(
-                    status.transactionExecutor.rpcConnections.primary ? 'text-green-400' : 'text-red-400'
+                    status.transactionExecutor.rpcConnections.primary ? 'text-orange-400' : 'text-red-400'
                   )}>
                     {status.transactionExecutor.rpcConnections.primary ? 'Ready' : 'Down'}
                   </span>
@@ -581,7 +581,7 @@ export default function AdminPage() {
                   <span className="text-zinc-500">MEV Protection</span>
                   <span className={cn(
                     'flex items-center gap-1',
-                    status.transactionExecutor.mevProtection ? 'text-green-400' : 'text-zinc-400'
+                    status.transactionExecutor.mevProtection ? 'text-orange-400' : 'text-zinc-400'
                   )}>
                     <Shield className="w-3 h-3" />
                     {status.transactionExecutor.mevProtection ? 'Enabled' : 'Disabled'}
@@ -609,7 +609,7 @@ export default function AdminPage() {
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Active</span>
-                  <span className="font-mono text-green-400">{snipers?.active || 0}</span>
+                  <span className="font-mono text-orange-400">{snipers?.active || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Total</span>
@@ -632,11 +632,11 @@ export default function AdminPage() {
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Radio className="w-5 h-5 text-green-400" />
+              <Radio className="w-5 h-5 text-orange-400" />
               PumpFun Migrations
               <span className="flex items-center gap-2 ml-2">
                 {wsConnected ? (
-                  <span className="flex items-center gap-1 text-xs text-green-400">
+                  <span className="flex items-center gap-1 text-xs text-orange-400">
                     <Wifi className="w-3 h-3" />
                     Live
                   </span>
@@ -691,12 +691,12 @@ export default function AdminPage() {
                         key={m.id}
                         className={cn(
                           'border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-all',
-                          index === 0 ? 'bg-green-900/30 animate-pulse' : 'bg-green-900/10'
+                          index === 0 ? 'bg-orange-900/30 animate-pulse' : 'bg-orange-900/10'
                         )}
                       >
                         <td className="py-2 px-2">
                           <div className="flex items-center gap-1">
-                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="New" />
+                            <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" title="New" />
                             <code className="text-xs bg-zinc-800 px-1 py-0.5 rounded">
                               {m.tokenSymbol || m.tokenMint.slice(0, 8)}...{m.tokenMint.slice(-4)}
                             </code>
@@ -706,7 +706,7 @@ export default function AdminPage() {
                               title="Copy token address"
                             >
                               {copiedId === `token-${m.id}` ? (
-                                <Check className="w-3 h-3 text-green-400" />
+                                <Check className="w-3 h-3 text-orange-400" />
                               ) : (
                                 <Copy className="w-3 h-3 text-zinc-400" />
                               )}
@@ -725,7 +725,7 @@ export default function AdminPage() {
                                 title="Copy pool address"
                               >
                                 {copiedId === `pool-${m.id}` ? (
-                                  <Check className="w-3 h-3 text-green-400" />
+                                  <Check className="w-3 h-3 text-orange-400" />
                                 ) : (
                                   <Copy className="w-3 h-3 text-zinc-400" />
                                 )}
@@ -747,7 +747,7 @@ export default function AdminPage() {
                             {m.source}
                           </span>
                         </td>
-                        <td className="py-2 px-2 text-green-400 text-xs font-medium">
+                        <td className="py-2 px-2 text-orange-400 text-xs font-medium">
                           Just now
                         </td>
                       </tr>
@@ -769,7 +769,7 @@ export default function AdminPage() {
                               title="Copy token address"
                             >
                               {copiedId === `token-${m.id}` ? (
-                                <Check className="w-3 h-3 text-green-400" />
+                                <Check className="w-3 h-3 text-orange-400" />
                               ) : (
                                 <Copy className="w-3 h-3 text-zinc-400" />
                               )}
@@ -788,7 +788,7 @@ export default function AdminPage() {
                                 title="Copy pool address"
                               >
                                 {copiedId === `pool-${m.id}` ? (
-                                  <Check className="w-3 h-3 text-green-400" />
+                                  <Check className="w-3 h-3 text-orange-400" />
                                 ) : (
                                   <Copy className="w-3 h-3 text-zinc-400" />
                                 )}
@@ -852,7 +852,7 @@ export default function AdminPage() {
                         <td className="py-2 px-2">
                           <span className={cn(
                             'px-2 py-0.5 rounded text-xs',
-                            s.isActive ? 'bg-green-900/50 text-green-400' : 'bg-zinc-800 text-zinc-400'
+                            s.isActive ? 'bg-orange-900/50 text-orange-400' : 'bg-zinc-800 text-zinc-400'
                           )}>
                             {s.isActive ? 'Active' : 'Paused'}
                           </span>
@@ -873,7 +873,7 @@ export default function AdminPage() {
                         </td>
                         <td className="py-2 px-2 text-right font-mono">{s.positionsCount}</td>
                         <td className="py-2 px-2 text-right font-mono">{s.totalSolSpent.toFixed(4)}</td>
-                        <td className="py-2 px-2 text-right font-mono text-green-400">{s.totalFeesPaid.toFixed(4)}</td>
+                        <td className="py-2 px-2 text-right font-mono text-orange-400">{s.totalFeesPaid.toFixed(4)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -951,9 +951,9 @@ export default function AdminPage() {
                         <div className="text-xs text-zinc-500">Total Wallets</div>
                         <div className="text-lg font-mono">{bulkWithdrawResult.totalWallets}</div>
                       </div>
-                      <div className="bg-green-900/30 rounded p-2 text-center">
-                        <div className="text-xs text-green-400">Success</div>
-                        <div className="text-lg font-mono text-green-400">{bulkWithdrawResult.successCount}</div>
+                      <div className="bg-orange-900/30 rounded p-2 text-center">
+                        <div className="text-xs text-orange-400">Success</div>
+                        <div className="text-lg font-mono text-orange-400">{bulkWithdrawResult.successCount}</div>
                       </div>
                       <div className="bg-red-900/30 rounded p-2 text-center">
                         <div className="text-xs text-red-400">Failed</div>
@@ -972,7 +972,7 @@ export default function AdminPage() {
                           key={idx}
                           className={cn(
                             'flex items-center justify-between text-xs p-2 rounded',
-                            r.success ? 'bg-green-900/20' : 'bg-red-900/20'
+                            r.success ? 'bg-orange-900/20' : 'bg-red-900/20'
                           )}
                         >
                           <code className="font-mono text-zinc-400">
@@ -980,7 +980,7 @@ export default function AdminPage() {
                           </code>
                           {r.success ? (
                             <div className="flex items-center gap-2">
-                              <span className="text-green-400">{r.amountSol?.toFixed(4)} SOL</span>
+                              <span className="text-orange-400">{r.amountSol?.toFixed(4)} SOL</span>
                               {r.signature && (
                                 <a
                                   href={`https://solscan.io/tx/${r.signature}`}
@@ -1017,7 +1017,7 @@ export default function AdminPage() {
                           {w.walletType}
                         </span>
                         {w.isPrimary && (
-                          <span className="px-1.5 py-0.5 rounded text-xs bg-green-900/50 text-green-400">
+                          <span className="px-1.5 py-0.5 rounded text-xs bg-orange-900/50 text-orange-400">
                             Primary
                           </span>
                         )}
@@ -1025,7 +1025,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           'px-2 py-1 rounded text-sm font-mono font-medium',
-                          w.balanceSol > 0 ? 'bg-green-900/30 text-green-400' : 'bg-zinc-800 text-zinc-400'
+                          w.balanceSol > 0 ? 'bg-orange-900/30 text-orange-400' : 'bg-zinc-800 text-zinc-400'
                         )}>
                           {w.balanceSol.toFixed(4)} SOL
                         </div>
@@ -1046,7 +1046,7 @@ export default function AdminPage() {
                           className="p-1 hover:bg-zinc-700 rounded"
                         >
                           {copiedId === `pub-${w.id}` ? (
-                            <Check className="w-3.5 h-3.5 text-green-400" />
+                            <Check className="w-3.5 h-3.5 text-orange-400" />
                           ) : (
                             <Copy className="w-3.5 h-3.5 text-zinc-400" />
                           )}
@@ -1082,7 +1082,7 @@ export default function AdminPage() {
                                   className="p-1 hover:bg-zinc-700 rounded"
                                 >
                                   {copiedId === `priv-${w.id}` ? (
-                                    <Check className="w-3.5 h-3.5 text-green-400" />
+                                    <Check className="w-3.5 h-3.5 text-orange-400" />
                                   ) : (
                                     <Copy className="w-3.5 h-3.5 text-zinc-400" />
                                   )}

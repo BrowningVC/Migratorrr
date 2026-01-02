@@ -10,7 +10,7 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 142 71% 45%;
+    --primary: 24 95% 53%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -26,7 +26,7 @@
     --warning-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 142 71% 45%;
+    --ring: 24 95% 53%;
     --radius: 0.5rem;
   }
 
@@ -37,7 +37,7 @@
     --card-foreground: 213 31% 91%;
     --popover: 224 71% 4%;
     --popover-foreground: 213 31% 91%;
-    --primary: 142 71% 45%;
+    --primary: 24 95% 53%;
     --primary-foreground: 210 40% 98%;
     --secondary: 222 47% 11%;
     --secondary-foreground: 213 31% 91%;
@@ -53,7 +53,7 @@
     --warning-foreground: 222.2 47.4% 11.2%;
     --border: 216 34% 17%;
     --input: 216 34% 17%;
-    --ring: 142 71% 45%;
+    --ring: 24 95% 53%;
   }
 }
 
@@ -107,9 +107,9 @@
   box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
 }
 
-/* Solana Wallet Adapter - Green Theme Override */
+/* Solana Wallet Adapter - Orange Theme Override */
 .wallet-adapter-button {
-  background-color: #22c55e !important;
+  background-color: #f97316 !important;
   font-family: var(--font-space-grotesk), system-ui, sans-serif !important;
   border-radius: 0.5rem !important;
   height: 40px !important;
@@ -118,11 +118,11 @@
 }
 
 .wallet-adapter-button:not([disabled]):hover {
-  background-color: #16a34a !important;
+  background-color: #ea580c !important;
 }
 
 .wallet-adapter-button-trigger {
-  background-color: #22c55e !important;
+  background-color: #f97316 !important;
 }
 
 .wallet-adapter-button[disabled] {
@@ -156,11 +156,11 @@
 }
 
 .wallet-adapter-modal-list-more {
-  color: #22c55e !important;
+  color: #f97316 !important;
 }
 
 .wallet-adapter-modal-list-more:hover {
-  color: #16a34a !important;
+  color: #ea580c !important;
 }
 
 .wallet-adapter-modal-list .wallet-adapter-button {
@@ -173,7 +173,7 @@
 
 .wallet-adapter-modal-list .wallet-adapter-button:hover {
   background-color: #27272a !important;
-  border-color: #22c55e !important;
+  border-color: #f97316 !important;
 }
 
 .wallet-adapter-modal-button-close {

@@ -60,7 +60,7 @@ export function ConfirmDialog({
   const buttonColors = {
     danger: 'bg-red-600 hover:bg-red-700 text-white',
     warning: 'bg-amber-600 hover:bg-amber-700 text-white',
-    default: 'bg-green-600 hover:bg-green-700 text-white',
+    default: 'bg-orange-600 hover:bg-orange-700 text-white',
   };
 
   const Icon = variant === 'danger' ? Trash2 : AlertTriangle;

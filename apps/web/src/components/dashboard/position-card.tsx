@@ -40,7 +40,7 @@ export const PositionCard = memo(function PositionCard({ position, onSell }: Pos
       className={cn(
         'bg-zinc-900/50 border-zinc-800 transition-[border-color,opacity] duration-200',
         status === 'selling' && 'opacity-60',
-        isProfitable && 'border-green-900/50',
+        isProfitable && 'border-orange-900/50',
         !isProfitable && pnlPct !== undefined && 'border-red-900/50'
       )}
     >
@@ -56,7 +56,7 @@ export const PositionCard = memo(function PositionCard({ position, onSell }: Pos
             <p
               className={cn(
                 'text-xl font-bold',
-                isProfitable ? 'text-green-400' : 'text-red-400',
+                isProfitable ? 'text-orange-400' : 'text-red-400',
                 pnlPct === undefined && 'text-zinc-400'
               )}
             >
@@ -66,7 +66,7 @@ export const PositionCard = memo(function PositionCard({ position, onSell }: Pos
               <p
                 className={cn(
                   'text-sm',
-                  isProfitable ? 'text-green-500/70' : 'text-red-500/70'
+                  isProfitable ? 'text-orange-500/70' : 'text-red-500/70'
                 )}
               >
                 {pnlSol >= 0 ? '+' : ''}{pnlSol.toFixed(4)} SOL
@@ -109,7 +109,7 @@ export const PositionCard = memo(function PositionCard({ position, onSell }: Pos
         {/* Automation indicators */}
         <div className="flex flex-wrap gap-2 mb-4">
           {takeProfitPrice && (
-            <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">
+            <span className="px-2 py-1 bg-orange-900/30 text-orange-400 text-xs rounded">
               TP: {((takeProfitPrice / entryPrice - 1) * 100).toFixed(0)}%
             </span>
           )}

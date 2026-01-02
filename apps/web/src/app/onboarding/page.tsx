@@ -354,7 +354,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent mb-2">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent mb-2">
             Migratorrr
           </h1>
           <p className="text-zinc-400">Get started in a few simple steps</p>
@@ -371,8 +371,8 @@ export default function OnboardingPage() {
           {step === 'connect' && (
             <>
               <CardHeader className="text-center pb-2">
-                <div className="w-14 h-14 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Wallet className="w-7 h-7 text-green-400" />
+                <div className="w-14 h-14 bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Wallet className="w-7 h-7 text-orange-400" />
                 </div>
                 <CardTitle className="text-2xl">Connect Your Wallet</CardTitle>
                 <p className="text-zinc-400 text-sm mt-2">
@@ -423,7 +423,7 @@ export default function OnboardingPage() {
                   </p>
                 </div>
                 <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
+                  className="w-full bg-orange-600 hover:bg-orange-700"
                   onClick={handleAuthenticate}
                   disabled={isLoading}
                 >
@@ -441,8 +441,8 @@ export default function OnboardingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {hasPendingSniper() && pendingSniper && (
-                  <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-3 mb-2">
-                    <p className="text-green-400 text-sm">
+                  <div className="bg-orange-900/20 border border-orange-800/50 rounded-lg p-3 mb-2">
+                    <p className="text-orange-400 text-sm">
                       Creating wallet for sniper <strong>"{pendingSniper.name}"</strong>
                     </p>
                   </div>
@@ -485,7 +485,7 @@ export default function OnboardingPage() {
                     </Button>
                   )}
                   <Button
-                    className={`${hasPendingSniper() ? 'w-full' : 'flex-1'} bg-green-600 hover:bg-green-700`}
+                    className={`${hasPendingSniper() ? 'w-full' : 'flex-1'} bg-orange-600 hover:bg-orange-700`}
                     onClick={handleGenerateWallet}
                     disabled={isLoading}
                   >
@@ -506,9 +506,9 @@ export default function OnboardingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center py-4">
-                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg
-                      className="w-8 h-8 text-green-400"
+                      className="w-8 h-8 text-orange-400"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -532,29 +532,29 @@ export default function OnboardingPage() {
                   <h4 className="font-medium text-sm">Next steps:</h4>
                   <ul className="text-zinc-400 text-sm space-y-1">
                     <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                       Fund your trading wallet with SOL
                     </li>
                     {createdSniperId ? (
                       <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                         Activate your sniper from the dashboard
                       </li>
                     ) : (
                       <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                         Create your first sniper configuration
                       </li>
                     )}
                     <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                       Watch the magic happen
                     </li>
                   </ul>
                 </div>
 
                 <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
+                  className="w-full bg-orange-600 hover:bg-orange-700"
                   onClick={handleComplete}
                 >
                   Go to Dashboard

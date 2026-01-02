@@ -100,7 +100,7 @@ export const SniperCard = memo(function SniperCard({
     <Card
       className={cn(
         'bg-zinc-900/50 border-zinc-800 transition-[border-color,box-shadow] duration-200',
-        isActive && 'border-green-900/50 ring-1 ring-green-500/20'
+        isActive && 'border-orange-900/50 ring-1 ring-orange-500/20'
       )}
     >
       <CardContent className="p-4">
@@ -109,7 +109,7 @@ export const SniperCard = memo(function SniperCard({
             <h3 className="font-semibold text-lg flex items-center gap-2">
               {name}
               {isActive && (
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
               )}
             </h3>
             <p className="text-zinc-500 text-sm">
@@ -121,7 +121,7 @@ export const SniperCard = memo(function SniperCard({
             size="sm"
             onClick={() => onToggle?.(id, !isActive && hasInsufficientFunds)}
             className={cn(
-              isActive && 'bg-green-600 hover:bg-green-700'
+              isActive && 'bg-orange-600 hover:bg-orange-700'
             )}
           >
             {isActive ? 'Active' : 'Paused'}
@@ -141,7 +141,7 @@ export const SniperCard = memo(function SniperCard({
               title="Copy address"
             >
               {copiedAddress ? (
-                <Check className="w-3.5 h-3.5 text-green-400" />
+                <Check className="w-3.5 h-3.5 text-orange-400" />
               ) : (
                 <Copy className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300" />
               )}
@@ -186,7 +186,7 @@ export const SniperCard = memo(function SniperCard({
           {config.takeProfitPct && (
             <div className="flex justify-between">
               <span className="text-zinc-500">Take Profit</span>
-              <span className="text-green-400">+{config.takeProfitPct}%</span>
+              <span className="text-orange-400">+{config.takeProfitPct}%</span>
             </div>
           )}
           {config.stopLossPct && (
@@ -208,7 +208,7 @@ export const SniperCard = memo(function SniperCard({
             </span>
             <span className={cn(
               'font-medium',
-              config.mevProtection ?? true ? 'text-green-400' : 'text-zinc-500'
+              config.mevProtection ?? true ? 'text-orange-400' : 'text-zinc-500'
             )}>
               {config.mevProtection ?? true ? 'On' : 'Off'}
             </span>

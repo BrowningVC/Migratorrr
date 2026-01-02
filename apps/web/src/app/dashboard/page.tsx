@@ -568,7 +568,7 @@ export default function DashboardPage() {
                 Go Home
               </Button>
               <Button
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-orange-600 hover:bg-orange-700"
                 onClick={handleRetryLoad}
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -592,14 +592,14 @@ export default function DashboardPage() {
                 <Logo size="md" />
                 <LogoText size="md" />
               </Link>
-              <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">
+              <span className="px-2 py-1 bg-orange-900/30 text-orange-400 text-xs rounded">
                 Beta
               </span>
             </div>
             {/* Navigation Tabs */}
             <nav className="flex items-center gap-1">
               <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-green-400 bg-green-900/20">
+                <Button variant="ghost" size="sm" className="text-orange-400 bg-orange-900/20">
                   Sniper Dashboard
                 </Button>
               </Link>
@@ -619,7 +619,7 @@ export default function DashboardPage() {
             {/* Auth indicator - shows which wallet you're signed in with */}
             {connected && publicKey && (
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <div className="w-2 h-2 rounded-full bg-orange-500" />
                 <span className="text-xs text-zinc-400">Signed in:</span>
                 <code className="text-xs text-zinc-300 font-mono">
                   {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
@@ -740,7 +740,7 @@ export default function DashboardPage() {
                             className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-3 items-center text-sm border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors"
                           >
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
                                 {position.tokenSymbol?.charAt(0) || '?'}
                               </div>
                               <div className="min-w-0 flex-1">
@@ -941,7 +941,7 @@ export default function DashboardPage() {
               <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700">
                 <p className="text-xs text-zinc-500 mb-2">Deposit Address</p>
                 <div className="flex items-center gap-2">
-                  <code className="text-xs text-green-400 font-mono flex-1 truncate">
+                  <code className="text-xs text-orange-400 font-mono flex-1 truncate">
                     {depositModalData.walletAddress}
                   </code>
                   <Button

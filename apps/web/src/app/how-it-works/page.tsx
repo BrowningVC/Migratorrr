@@ -434,7 +434,7 @@ export default function HowItWorksPage() {
                 <ExitStrategyCard
                   title="Take Profit"
                   icon={ArrowUpRight}
-                  iconColor="text-green-500"
+                  iconColor="text-orange-500"
                   description="Automatically sell when your position reaches a target profit percentage based on market cap increase"
                   example="Set to 100% = sell when market cap doubles from entry (2x)"
                   required
@@ -503,26 +503,26 @@ export default function HowItWorksPage() {
                   </ul>
                 </div>
 
-                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    <h4 className="font-semibold text-green-500">With Jito Protection</h4>
+                    <CheckCircle2 className="h-5 w-5 text-orange-500" />
+                    <h4 className="font-semibold text-orange-500">With Jito Protection</h4>
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex items-start gap-2">
-                      <span className="text-green-500">•</span>
+                      <span className="text-orange-500">•</span>
                       Transaction goes directly to block builders
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-500">•</span>
+                      <span className="text-orange-500">•</span>
                       Not visible in public mempool
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-500">•</span>
+                      <span className="text-orange-500">•</span>
                       Sandwich attacks cannot target you
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-500">•</span>
+                      <span className="text-orange-500">•</span>
                       Pay small tip instead of losing to MEV
                     </li>
                   </ul>
@@ -834,7 +834,7 @@ function InfoBox({
 }) {
   const styles = {
     info: 'bg-blue-500/10 border-blue-500/30 text-blue-500',
-    success: 'bg-green-500/10 border-green-500/30 text-green-500',
+    success: 'bg-orange-500/10 border-orange-500/30 text-orange-500',
     warning: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500',
     error: 'bg-red-500/10 border-red-500/30 text-red-500',
   };
@@ -1021,7 +1021,7 @@ function ExecutionStep({
       <div
         className={cn(
           'w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-semibold',
-          status === 'success' && 'bg-green-500/20 text-green-500',
+          status === 'success' && 'bg-orange-500/20 text-orange-500',
           status === 'pending' && 'bg-muted text-muted-foreground',
           status === 'error' && 'bg-red-500/20 text-red-500'
         )}
@@ -1051,7 +1051,7 @@ function StatPreview({
       <div
         className={cn(
           'text-lg font-bold',
-          positive ? 'text-green-500' : 'text-foreground'
+          positive ? 'text-orange-500' : 'text-foreground'
         )}
       >
         {value}
