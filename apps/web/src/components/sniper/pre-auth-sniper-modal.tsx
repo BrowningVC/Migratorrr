@@ -662,6 +662,77 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                       ))}
                     </div>
                   </div>
+
+                  {/* Min Twitter Followers Filter */}
+                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="text-xs font-medium text-zinc-300">Min X Followers</Label>
+                      {config.minTwitterFollowers && (
+                        <button
+                          type="button"
+                          onClick={() => updateConfig({ minTwitterFollowers: undefined })}
+                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mb-2">Minimum followers on token's X account</p>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[
+                        { value: 100, label: '100' },
+                        { value: 500, label: '500' },
+                        { value: 1000, label: '1K' },
+                        { value: 5000, label: '5K' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => updateConfig({ minTwitterFollowers: opt.value })}
+                          className={cn(
+                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
+                            config.minTwitterFollowers === opt.value
+                              ? 'bg-green-600 text-white'
+                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                          )}
+                        >
+                          {opt.label}+
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* LP Locked Filter */}
+                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
+                    <Label className="text-xs font-medium text-zinc-300 block mb-1">LP Locked</Label>
+                    <p className="text-[10px] text-zinc-500 mb-2">Require liquidity to be locked</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => updateConfig({ requireLiquidityLock: false })}
+                        className={cn(
+                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
+                          !config.requireLiquidityLock
+                            ? 'bg-zinc-600 text-white'
+                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                        )}
+                      >
+                        No
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateConfig({ requireLiquidityLock: true })}
+                        className={cn(
+                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
+                          config.requireLiquidityLock
+                            ? 'bg-green-600 text-white'
+                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                        )}
+                      >
+                        Yes
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Right Column */}
@@ -798,128 +869,73 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                     </div>
                   </div>
 
-                  {/* Row: Twitter Followers + Creator Score */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Min Twitter Followers Filter */}
-                    <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                      <Label className="text-xs font-medium text-zinc-300 block mb-1">Min Twitter Followers</Label>
-                      <p className="text-[10px] text-zinc-500 mb-2">Minimum followers on token's X</p>
-                      <div className="grid grid-cols-2 gap-1">
-                        {[
-                          { value: 100, label: '100+' },
-                          { value: 500, label: '500+' },
-                          { value: 1000, label: '1K+' },
-                          { value: 5000, label: '5K+' },
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => updateConfig({ minTwitterFollowers: config.minTwitterFollowers === option.value ? undefined : option.value })}
-                            className={cn(
-                              'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                              config.minTwitterFollowers === option.value
-                                ? 'bg-green-600 text-white'
-                                : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                            )}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
+                  {/* Creator Score Filter */}
+                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="text-xs font-medium text-zinc-300">Min Creator Score</Label>
+                      {config.minCreatorScore && (
+                        <button
+                          type="button"
+                          onClick={() => updateConfig({ minCreatorScore: undefined })}
+                          className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                        >
+                          Clear
+                        </button>
+                      )}
                     </div>
-
-                    {/* Creator Score Filter */}
-                    <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                      <Label className="text-xs font-medium text-zinc-300 block mb-1">Min Creator Score</Label>
-                      <p className="text-[10px] text-zinc-500 mb-2">Trust score (0-100)</p>
-                      <div className="grid grid-cols-3 gap-1">
-                        {[
-                          { value: 25, label: '25+' },
-                          { value: 50, label: '50+' },
-                          { value: 75, label: '75+' },
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => updateConfig({ minCreatorScore: config.minCreatorScore === option.value ? undefined : option.value })}
-                            className={cn(
-                              'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                              config.minCreatorScore === option.value
-                                ? 'bg-green-600 text-white'
-                                : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                            )}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
+                    <p className="text-[10px] text-zinc-500 mb-2">Trust score based on creator history</p>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { value: 25, label: '25' },
+                        { value: 50, label: '50' },
+                        { value: 75, label: '75' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => updateConfig({ minCreatorScore: opt.value })}
+                          className={cn(
+                            'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
+                            config.minCreatorScore === opt.value
+                              ? 'bg-green-600 text-white'
+                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                          )}
+                        >
+                          {opt.label}+
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Row: LP Locked + DexScreener Paid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* LP Locked Filter */}
-                    <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                      <Label className="text-xs font-medium text-zinc-300 block mb-1">LP Locked</Label>
-                      <p className="text-[10px] text-zinc-500 mb-2">Require liquidity lock</p>
-                      <div className="grid grid-cols-2 gap-1">
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ requireLiquidityLock: false })}
-                          className={cn(
-                            'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                            !config.requireLiquidityLock
-                              ? 'bg-zinc-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          No
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ requireLiquidityLock: true })}
-                          className={cn(
-                            'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                            config.requireLiquidityLock
-                              ? 'bg-green-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          Yes
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* DexScreener Paid Filter */}
-                    <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
-                      <Label className="text-xs font-medium text-zinc-300 block mb-1">DexScreener Paid</Label>
-                      <p className="text-[10px] text-zinc-500 mb-2">Require paid promotion</p>
-                      <div className="grid grid-cols-2 gap-1">
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ requireDexScreenerPaid: false })}
-                          className={cn(
-                            'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                            !config.requireDexScreenerPaid
-                              ? 'bg-zinc-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          No
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateConfig({ requireDexScreenerPaid: true })}
-                          className={cn(
-                            'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                            config.requireDexScreenerPaid
-                              ? 'bg-green-600 text-white'
-                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
-                          )}
-                        >
-                          Yes
-                        </button>
-                      </div>
+                  {/* DexScreener Paid Filter */}
+                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
+                    <Label className="text-xs font-medium text-zinc-300 block mb-1">DexScreener Paid</Label>
+                    <p className="text-[10px] text-zinc-500 mb-2">Require paid DexScreener promotion</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => updateConfig({ requireDexScreenerPaid: false })}
+                        className={cn(
+                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
+                          !config.requireDexScreenerPaid
+                            ? 'bg-zinc-600 text-white'
+                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                        )}
+                      >
+                        No
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateConfig({ requireDexScreenerPaid: true })}
+                        className={cn(
+                          'py-1.5 px-1 rounded-md text-xs font-medium transition-all',
+                          config.requireDexScreenerPaid
+                            ? 'bg-green-600 text-white'
+                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                        )}
+                      >
+                        Yes
+                      </button>
                     </div>
                   </div>
                 </div>
