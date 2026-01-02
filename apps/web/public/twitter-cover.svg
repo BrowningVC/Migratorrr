@@ -1,135 +1,120 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500">
-  <!-- Twitter cover dimensions: 1500x500 -->
   <defs>
-    <!-- Import Space Grotesk font -->
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;display=swap');
-    </style>
-    <!-- Background gradient - dark with subtle blue tint -->
+    <!-- Background gradient -->
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0a0d14"/>
+      <stop offset="0%" stop-color="#080a0d"/>
       <stop offset="50%" stop-color="#0f1318"/>
-      <stop offset="100%" stop-color="#0a0d14"/>
+      <stop offset="100%" stop-color="#080a0d"/>
     </linearGradient>
 
-    <!-- Green glow gradient -->
-    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#22C55E" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+    <!-- Glow effect -->
+    <radialGradient id="glow1" cx="30%" cy="50%" r="40%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Text glow filter -->
-    <filter id="textGlow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
+    <radialGradient id="glow2" cx="70%" cy="50%" r="30%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Subtle grid pattern -->
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="1"/>
+    </pattern>
   </defs>
 
   <!-- Background -->
   <rect width="1500" height="500" fill="url(#bgGrad)"/>
 
-  <!-- Subtle grid pattern -->
-  <g opacity="0.03">
-    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#22C55E" stroke-width="1"/>
-    </pattern>
-    <rect width="1500" height="500" fill="url(#grid)"/>
+  <!-- Grid overlay -->
+  <rect width="1500" height="500" fill="url(#grid)"/>
+
+  <!-- Glow effects -->
+  <rect width="1500" height="500" fill="url(#glow1)"/>
+  <rect width="1500" height="500" fill="url(#glow2)"/>
+
+  <!-- Decorative crosshair elements - left side (faded) -->
+  <g transform="translate(150, 250)" opacity="0.15">
+    <circle cx="0" cy="0" r="60" stroke="#f97316" stroke-width="3" fill="none"/>
+    <circle cx="0" cy="0" r="35" stroke="#f97316" stroke-width="2" fill="none"/>
+    <circle cx="0" cy="0" r="8" fill="#f97316"/>
+    <line x1="0" y1="-75" x2="0" y2="-42" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
+    <line x1="0" y1="42" x2="0" y2="75" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
+    <line x1="-75" y1="0" x2="-42" y2="0" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
+    <line x1="42" y1="0" x2="75" y2="0" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
   </g>
 
-  <!-- Animated-looking decorative elements - trading/chart vibes -->
-  <g opacity="0.15">
-    <!-- Rising line chart pattern on left -->
-    <polyline points="50,400 150,350 250,380 350,280 450,320 550,200"
-              stroke="#22C55E" stroke-width="2" fill="none"/>
-    <!-- Rising line chart pattern on right -->
-    <polyline points="950,380 1050,300 1150,340 1250,240 1350,280 1450,150"
-              stroke="#22C55E" stroke-width="2" fill="none"/>
+  <!-- Decorative crosshair elements - right side (more faded) -->
+  <g transform="translate(1350, 250)" opacity="0.1">
+    <circle cx="0" cy="0" r="50" stroke="#f97316" stroke-width="2.5" fill="none"/>
+    <circle cx="0" cy="0" r="28" stroke="#f97316" stroke-width="2" fill="none"/>
+    <circle cx="0" cy="0" r="6" fill="#f97316"/>
+    <line x1="0" y1="-62" x2="0" y2="-35" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="0" y1="35" x2="0" y2="62" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="-62" y1="0" x2="-35" y2="0" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="35" y1="0" x2="62" y2="0" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
   </g>
 
-  <!-- Central glow effect -->
-  <ellipse cx="750" cy="250" rx="450" ry="220" fill="url(#glowGrad)"/>
-
-  <!-- Logo arrow icon + Brand name -->
-  <g filter="url(#textGlow)">
-    <!-- Arrow logo to the left of text -->
-    <g transform="translate(430, 120)">
-      <path d="M30 70 L50 20 L70 70 L50 55 Z" fill="#22C55E"/>
+  <!-- Main Logo Group - centered -->
+  <g transform="translate(550, 250)">
+    <!-- Crosshair Logo -->
+    <g transform="translate(0, 0)">
+      <!-- Outer ring -->
+      <circle
+        cx="0"
+        cy="0"
+        r="70"
+        stroke="#f97316"
+        stroke-width="5"
+        fill="none"
+      />
+      <!-- Inner ring -->
+      <circle
+        cx="0"
+        cy="0"
+        r="40"
+        stroke="#f97316"
+        stroke-width="3.5"
+        fill="none"
+      />
+      <!-- Center dot - the target -->
+      <circle
+        cx="0"
+        cy="0"
+        r="12"
+        fill="#f97316"
+      />
+      <!-- Crosshair lines -->
+      <line x1="0" y1="-88" x2="0" y2="-48" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+      <line x1="0" y1="48" x2="0" y2="88" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+      <line x1="-88" y1="0" x2="-48" y2="0" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+      <line x1="48" y1="0" x2="88" y2="0" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
     </g>
-    <text x="780" y="200"
-          font-family="'Space Grotesk', system-ui, sans-serif"
-          font-size="90"
-          font-weight="700"
-          fill="white"
-          text-anchor="middle"
-          letter-spacing="-2">
-      Migratorrr
-    </text>
+
+    <!-- Brand text -->
+    <text
+      x="130"
+      y="18"
+      font-family="Inter, system-ui, -apple-system, sans-serif"
+      font-size="72"
+      font-weight="700"
+      fill="white"
+      letter-spacing="-2"
+    >BondShot</text>
+
+    <!-- Tagline -->
+    <text
+      x="132"
+      y="60"
+      font-family="Inter, system-ui, -apple-system, sans-serif"
+      font-size="20"
+      font-weight="400"
+      fill="rgba(255,255,255,0.5)"
+      letter-spacing="0.5"
+    >Profit Off Every Bonding Token On PumpFun</text>
   </g>
 
-  <!-- Main tagline - emphasizing migration sniping -->
-  <text x="750" y="270"
-        font-family="'Space Grotesk', system-ui, sans-serif"
-        font-size="28"
-        font-weight="600"
-        fill="#22C55E"
-        text-anchor="middle">
-    Fully Automated Newly Migrated Token Sniping
-  </text>
-
-  <!-- Feature highlights -->
-  <g font-family="'Space Grotesk', system-ui, sans-serif"
-     font-size="18"
-     font-weight="500"
-     fill="#9ca3af">
-    <!-- Feature 1 -->
-    <g transform="translate(380, 340)">
-      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
-      <text x="15" y="0">Custom Filters</text>
-    </g>
-    <!-- Feature 2 -->
-    <g transform="translate(580, 340)">
-      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
-      <text x="15" y="0">Auto TP/SL</text>
-    </g>
-    <!-- Feature 3 -->
-    <g transform="translate(760, 340)">
-      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
-      <text x="15" y="0">Trailing Stop</text>
-    </g>
-    <!-- Feature 4 -->
-    <g transform="translate(940, 340)">
-      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
-      <text x="15" y="0">Multi-Sniper</text>
-    </g>
-  </g>
-
-  <!-- Beta badge - top right area -->
-  <g transform="translate(1380, 30)">
-    <rect x="0" y="0" width="70" height="28" rx="4" fill="#22C55E" opacity="0.2"/>
-    <rect x="0" y="0" width="70" height="28" rx="4" fill="none" stroke="#22C55E" stroke-width="1"/>
-    <text x="35" y="19"
-          font-family="'Space Grotesk', system-ui, sans-serif"
-          font-size="14"
-          font-weight="600"
-          fill="#22C55E"
-          text-anchor="middle">
-      Beta
-    </text>
-  </g>
-
-  <!-- Bottom accent bar -->
-  <rect x="0" y="495" width="1500" height="5" fill="#22C55E" opacity="0.6"/>
-
-  <!-- Decorative dots pattern -->
-  <g opacity="0.1">
-    <circle cx="100" cy="100" r="3" fill="#22C55E"/>
-    <circle cx="150" cy="80" r="2" fill="#22C55E"/>
-    <circle cx="200" cy="120" r="2.5" fill="#22C55E"/>
-    <circle cx="1300" cy="100" r="3" fill="#22C55E"/>
-    <circle cx="1350" cy="130" r="2" fill="#22C55E"/>
-    <circle cx="1400" cy="90" r="2.5" fill="#22C55E"/>
-  </g>
+  <!-- Subtle accent line -->
+  <line x1="550" y1="320" x2="950" y2="320" stroke="#f97316" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
 </svg>

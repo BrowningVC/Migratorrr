@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500">
+  <!-- Twitter cover dimensions: 1500x500 for Bondshot -->
+  <defs>
+    <!-- Import Space Grotesk font -->
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;display=swap');
+    </style>
+
+    <!-- Background gradient - dark with subtle blue tint -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0d14"/>
+      <stop offset="50%" stop-color="#0f1318"/>
+      <stop offset="100%" stop-color="#0a0d14"/>
+    </linearGradient>
+
+    <!-- Green gradient for accents -->
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+
+    <!-- Green glow gradient -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22C55E" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Text glow filter -->
+    <filter id="textGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Logo glow filter -->
+    <filter id="logoGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="500" fill="url(#bgGrad)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03">
+    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#22C55E" stroke-width="1"/>
+    </pattern>
+    <rect width="1500" height="500" fill="url(#grid)"/>
+  </g>
+
+  <!-- Trading chart patterns - left side -->
+  <g opacity="0.12">
+    <polyline points="50,400 120,340 180,370 260,280 340,310 420,180"
+              stroke="#22C55E" stroke-width="2" fill="none"/>
+    <!-- Candlestick hints -->
+    <rect x="120" y="340" width="8" height="30" fill="#22C55E" opacity="0.5"/>
+    <rect x="180" y="350" width="8" height="20" fill="#22C55E" opacity="0.5"/>
+    <rect x="260" y="280" width="8" height="30" fill="#22C55E" opacity="0.5"/>
+  </g>
+
+  <!-- Trading chart patterns - right side -->
+  <g opacity="0.12">
+    <polyline points="1080,380 1150,300 1220,340 1300,220 1380,260 1450,120"
+              stroke="#22C55E" stroke-width="2" fill="none"/>
+    <!-- Candlestick hints -->
+    <rect x="1150" y="300" width="8" height="40" fill="#22C55E" opacity="0.5"/>
+    <rect x="1220" y="320" width="8" height="20" fill="#22C55E" opacity="0.5"/>
+    <rect x="1300" y="220" width="8" height="40" fill="#22C55E" opacity="0.5"/>
+  </g>
+
+  <!-- Central glow effect -->
+  <ellipse cx="750" cy="250" rx="500" ry="250" fill="url(#glowGrad)"/>
+
+  <!-- Crosshair/Target design - left of text -->
+  <g transform="translate(480, 165)" filter="url(#logoGlow)" opacity="0.9">
+    <!-- Outer ring -->
+    <circle cx="35" cy="35" r="45" stroke="#22C55E" stroke-width="2" fill="none" opacity="0.3"/>
+    <!-- Inner ring -->
+    <circle cx="35" cy="35" r="30" stroke="#22C55E" stroke-width="1.5" fill="none" opacity="0.5"/>
+    <!-- Crosshair lines -->
+    <line x1="35" y1="-5" x2="35" y2="15" stroke="#22C55E" stroke-width="2" stroke-linecap="round"/>
+    <line x1="35" y1="55" x2="35" y2="75" stroke="#22C55E" stroke-width="2" stroke-linecap="round"/>
+    <line x1="-5" y1="35" x2="15" y2="35" stroke="#22C55E" stroke-width="2" stroke-linecap="round"/>
+    <line x1="55" y1="35" x2="75" y2="35" stroke="#22C55E" stroke-width="2" stroke-linecap="round"/>
+    <!-- Arrow in center -->
+    <path d="M25 55 L35 20 L45 55 L35 45 Z" fill="#22C55E"/>
+  </g>
+
+  <!-- Brand name -->
+  <g filter="url(#textGlow)">
+    <text x="780" y="215"
+          font-family="'Space Grotesk', system-ui, sans-serif"
+          font-size="95"
+          font-weight="700"
+          fill="white"
+          text-anchor="middle"
+          letter-spacing="-3">
+      Bondshot
+    </text>
+  </g>
+
+  <!-- Main tagline -->
+  <text x="750" y="280"
+        font-family="'Space Grotesk', system-ui, sans-serif"
+        font-size="28"
+        font-weight="600"
+        fill="#22C55E"
+        text-anchor="middle">
+    Fully Automated Newly Migrated Token Sniping
+  </text>
+
+  <!-- Feature highlights -->
+  <g font-family="'Space Grotesk', system-ui, sans-serif"
+     font-size="17"
+     font-weight="500"
+     fill="#9ca3af">
+    <!-- Feature 1 -->
+    <g transform="translate(370, 350)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Custom Filters</text>
+    </g>
+    <!-- Feature 2 -->
+    <g transform="translate(560, 350)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Auto TP/SL</text>
+    </g>
+    <!-- Feature 3 -->
+    <g transform="translate(730, 350)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Trailing Stop</text>
+    </g>
+    <!-- Feature 4 -->
+    <g transform="translate(900, 350)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Multi-Sniper</text>
+    </g>
+    <!-- Feature 5 -->
+    <g transform="translate(1070, 350)">
+      <circle cx="0" cy="-5" r="4" fill="#22C55E"/>
+      <text x="15" y="0">Real-time</text>
+    </g>
+  </g>
+
+  <!-- Website URL - bottom center -->
+  <text x="750" y="420"
+        font-family="'Space Grotesk', system-ui, sans-serif"
+        font-size="20"
+        font-weight="500"
+        fill="#6b7280"
+        text-anchor="middle">
+    bondshot.xyz
+  </text>
+
+  <!-- Bottom accent bar -->
+  <rect x="0" y="492" width="1500" height="8" fill="url(#greenGrad)" opacity="0.7"/>
+
+  <!-- Decorative corner elements -->
+  <g opacity="0.15">
+    <!-- Top left corner -->
+    <path d="M0 50 L0 0 L50 0" fill="none" stroke="#22C55E" stroke-width="2"/>
+    <circle cx="25" cy="25" r="3" fill="#22C55E"/>
+
+    <!-- Top right corner -->
+    <path d="M1450 0 L1500 0 L1500 50" fill="none" stroke="#22C55E" stroke-width="2"/>
+    <circle cx="1475" cy="25" r="3" fill="#22C55E"/>
+
+    <!-- Decorative dots -->
+    <circle cx="100" cy="80" r="2" fill="#22C55E"/>
+    <circle cx="140" cy="100" r="1.5" fill="#22C55E"/>
+    <circle cx="1400" cy="80" r="2" fill="#22C55E"/>
+    <circle cx="1360" cy="100" r="1.5" fill="#22C55E"/>
+  </g>
+</svg>

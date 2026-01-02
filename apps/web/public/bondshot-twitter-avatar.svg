@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <!-- Twitter Avatar for Bondshot - 400x400 -->
+  <defs>
+    <!-- Background gradient - dark with subtle gradient -->
+    <radialGradient id="bgGradient" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1a1f2e"/>
+      <stop offset="100%" stop-color="#0a0d14"/>
+    </radialGradient>
+
+    <!-- Green gradient for logo -->
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+
+    <!-- Glow effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Outer glow for crosshair -->
+    <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Full background -->
+  <rect x="0" y="0" width="400" height="400" fill="url(#bgGradient)"/>
+
+  <!-- Subtle grid pattern for tech feel -->
+  <g opacity="0.04">
+    <line x1="100" y1="0" x2="100" y2="400" stroke="#22C55E" stroke-width="1"/>
+    <line x1="200" y1="0" x2="200" y2="400" stroke="#22C55E" stroke-width="1"/>
+    <line x1="300" y1="0" x2="300" y2="400" stroke="#22C55E" stroke-width="1"/>
+    <line x1="0" y1="100" x2="400" y2="100" stroke="#22C55E" stroke-width="1"/>
+    <line x1="0" y1="200" x2="400" y2="200" stroke="#22C55E" stroke-width="1"/>
+    <line x1="0" y1="300" x2="400" y2="300" stroke="#22C55E" stroke-width="1"/>
+  </g>
+
+  <!-- Crosshair/Target design centered -->
+  <g transform="translate(200, 200)" filter="url(#softGlow)">
+    <!-- Outer ring -->
+    <circle cx="0" cy="0" r="120" stroke="url(#logoGradient)" stroke-width="3" fill="none" opacity="0.3"/>
+
+    <!-- Middle ring -->
+    <circle cx="0" cy="0" r="85" stroke="url(#logoGradient)" stroke-width="2.5" fill="none" opacity="0.5"/>
+
+    <!-- Inner ring -->
+    <circle cx="0" cy="0" r="50" stroke="url(#logoGradient)" stroke-width="2" fill="none" opacity="0.7"/>
+
+    <!-- Crosshair lines -->
+    <line x1="0" y1="-140" x2="0" y2="-95" stroke="url(#logoGradient)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="0" y1="95" x2="0" y2="140" stroke="url(#logoGradient)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="-140" y1="0" x2="-95" y2="0" stroke="url(#logoGradient)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="95" y1="0" x2="140" y2="0" stroke="url(#logoGradient)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Main arrow logo with glow - centered -->
+  <g filter="url(#glow)">
+    <path
+      d="M160 280 L200 120 L240 280 L200 240 Z"
+      fill="url(#logoGradient)"
+    />
+  </g>
+
+  <!-- Center targeting dot -->
+  <circle cx="200" cy="200" r="8" fill="url(#logoGradient)" filter="url(#glow)"/>
+</svg>

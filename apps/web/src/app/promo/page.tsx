@@ -1,709 +1,396 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Logo, LogoText } from '@/components/logo';
-import { cn } from '@/lib/utils';
-import {
-  Crosshair,
-  Shield,
-  Check,
-  X,
+import { 
+  TrendingUp, 
+  Crosshair, 
+  Activity, 
+  Target, 
+  Zap, 
+  BarChart3,
   Radio,
   Copy,
   ExternalLink,
-  Bot,
-  Info,
-  RefreshCw,
-  ImageIcon,
+  ArrowUpRight,
+  Flame,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
+import { Logo, LogoText } from '@/components/logo';
+import { cn } from '@/lib/utils';
 
-// Mock data for promotional screenshots - Real tokens that hit $1M+ ATH
+// Mock impressive positions for marketing
 const MOCK_POSITIONS = [
-  {
-    id: '1',
-    tokenSymbol: 'FARTCOIN',
-    tokenMint: '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump',
-    entrySol: 0.25,
-    entryMarketCap: 68000,
-    currentMarketCap: 2400000,
-    pnlPct: 3429.4,
-    pnlSol: 8.57,
-    createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-  },
-  {
-    id: '2',
-    tokenSymbol: 'GOAT',
-    tokenMint: 'CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump',
-    entrySol: 0.2,
-    entryMarketCap: 72000,
-    currentMarketCap: 1850000,
-    pnlPct: 2469.4,
-    pnlSol: 4.94,
-    createdAt: new Date(Date.now() - 1000 * 60 * 23).toISOString(),
-  },
-  {
-    id: '3',
-    tokenSymbol: 'PNUT',
-    tokenMint: '2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump',
-    entrySol: 0.15,
-    entryMarketCap: 58000,
-    currentMarketCap: 1120000,
-    pnlPct: 1831.0,
-    pnlSol: 2.75,
-    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-  },
+  { id: 1, symbol: '$GROK', pnlPct: 847.2, pnlSol: 4.236, entrySol: 0.5, mcap: '$2.4M', time: '2m ago', status: 'profit' },
+  { id: 2, symbol: '$PEPE2', pnlPct: 312.5, pnlSol: 1.562, entrySol: 0.5, mcap: '$890K', time: '8m ago', status: 'profit' },
+  { id: 3, symbol: '$BONK2', pnlPct: 189.3, pnlSol: 0.946, entrySol: 0.5, mcap: '$1.2M', time: '15m ago', status: 'profit' },
+  { id: 4, symbol: '$DOGE3', pnlPct: 156.8, pnlSol: 0.784, entrySol: 0.5, mcap: '$650K', time: '23m ago', status: 'profit' },
+  { id: 5, symbol: '$WIF2', pnlPct: 94.2, pnlSol: 0.471, entrySol: 0.5, mcap: '$420K', time: '31m ago', status: 'profit' },
 ];
 
+// Mock snipers
 const MOCK_SNIPERS = [
-  {
-    id: '1',
-    name: 'Alpha Hunter',
-    isActive: true,
-    config: {
-      snipeAmountSol: 0.15,
-      slippageBps: 1000,
-      priorityFeeSol: 0.005,
-      takeProfitPct: 150,
-      stopLossPct: 40,
-      mevProtection: true,
-    },
-    stats: {
-      totalSnipes: 47,
-      successfulSnipes: 41,
-      tokensFiltered: 1284,
-      totalSolSpent: 7.05,
-    },
-  },
-  {
-    id: '2',
-    name: 'Degen Mode',
-    isActive: true,
-    config: {
-      snipeAmountSol: 0.25,
-      slippageBps: 1500,
-      priorityFeeSol: 0.008,
-      takeProfitPct: 200,
-      stopLossPct: 50,
-      mevProtection: true,
-    },
-    stats: {
-      totalSnipes: 23,
-      successfulSnipes: 19,
-      tokensFiltered: 847,
-      totalSolSpent: 4.75,
-    },
-  },
+  { id: 1, name: 'Alpha Hunter', isActive: true, snipes: 47, winRate: 89, profit: 12.4 },
+  { id: 2, name: 'Degen Mode', isActive: true, snipes: 32, winRate: 78, profit: 8.7 },
+  { id: 3, name: 'Safe Plays', isActive: false, snipes: 18, winRate: 94, profit: 5.2 },
 ];
 
-const MOCK_MIGRATIONS = [
-  { id: '1', symbol: 'AIXBT', time: '2s ago', sniped: true, success: true, tokenMint: 'AIXBT1234...' },
-  { id: '2', symbol: 'AI16Z', time: '18s ago', sniped: true, success: true, tokenMint: 'AI16Z5678...' },
-  { id: '3', symbol: 'ZEREBRO', time: '34s ago', sniped: false, success: null, tokenMint: 'ZERB9012...' },
-  { id: '4', symbol: 'SWARMS', time: '1m ago', sniped: true, success: false, tokenMint: 'SWRM3456...' },
-  { id: '5', symbol: 'GRIFFAIN', time: '2m ago', sniped: false, success: null, tokenMint: 'GRIF7890...' },
-  { id: '6', symbol: 'MOODENG', time: '3m ago', sniped: true, success: true, tokenMint: 'MOOD1234...' },
-  { id: '7', symbol: 'BONK2', time: '4m ago', sniped: false, success: null, tokenMint: 'BONK5678...' },
-  { id: '8', symbol: 'POPCAT', time: '5m ago', sniped: true, success: true, tokenMint: 'POPC9012...' },
+// Mock activity feed
+const MOCK_ACTIVITY = [
+  { type: 'snipe', symbol: '$GROK', amount: '0.5 SOL', time: '2m ago', status: 'success' },
+  { type: 'tp_hit', symbol: '$MOON', amount: '+2.4 SOL', time: '5m ago', status: 'profit' },
+  { type: 'snipe', symbol: '$PEPE2', amount: '0.5 SOL', time: '8m ago', status: 'success' },
+  { type: 'tp_hit', symbol: '$CAT', amount: '+1.8 SOL', time: '12m ago', status: 'profit' },
+  { type: 'snipe', symbol: '$BONK2', amount: '0.5 SOL', time: '15m ago', status: 'success' },
+  { type: 'migration', symbol: '$DOGE3', mcap: '$420K', time: '18m ago', status: 'detected' },
+  { type: 'tp_hit', symbol: '$SHIB2', amount: '+3.1 SOL', time: '22m ago', status: 'profit' },
+  { type: 'snipe', symbol: '$WIF2', amount: '0.5 SOL', time: '31m ago', status: 'success' },
 ];
-
-const MOCK_TRADES = [
-  { id: '1', sniperName: 'Alpha Hunter', action: 'Bought', token: 'FARTCOIN', time: '14:32:18' },
-  { id: '2', sniperName: 'Degen Mode', action: 'Bought', token: 'GOAT', time: '14:09:42' },
-  { id: '3', sniperName: 'Alpha Hunter', action: 'TP Hit', token: 'POPCAT', time: '13:47:51' },
-  { id: '4', sniperName: 'Degen Mode', action: 'Bought', token: 'PNUT', time: '13:22:08' },
-  { id: '5', sniperName: 'Alpha Hunter', action: 'Sold', token: 'MOODENG', time: '12:55:33' },
-];
-
-// Mock stats matching the real dashboard structure
-const MOCK_STATS = {
-  totalPnlSol: 16.26,
-  totalPnlPct: 270.4,
-  openPositions: 3,
-  activeSnipers: 2,
-  snipesToday: 70,
-  successRate: 86,
-  bestTradeSol: 4.12,
-  bestTradePct: 1847,
-  worstTradeSol: -0.08,
-  worstTradePct: -32,
-  tokensCaught: 60,
-  tokensAvoided: 2131,
-  biggestMiss: { ticker: 'TRUMP', athMcap: 14200000000 },
-};
 
 export default function PromoPage() {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<'migrations' | 'trades'>('migrations');
-  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     setMounted(true);
+    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   if (!mounted) return null;
 
-  const formatMcap = (mcap: number) => {
-    if (mcap >= 1_000_000_000) return `$${(mcap / 1_000_000_000).toFixed(1)}B`;
-    if (mcap >= 1_000_000) return `$${(mcap / 1_000_000).toFixed(1)}M`;
-    if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(1)}K`;
-    return `$${mcap.toFixed(0)}`;
+  const stats = {
+    totalPnlSol: 26.347,
+    totalPnlPct: 438.2,
+    openPositions: 5,
+    activeSnipers: 2,
+    snipesToday: 23,
+    successRate: 87,
   };
 
-  const isProfitable = MOCK_STATS.totalPnlSol >= 0;
-
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Header - matches real dashboard */}
-      <header className="border-b border-zinc-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <Logo size="md" />
-                <LogoText size="md" />
-              </Link>
-              <span className="px-2 py-1 bg-orange-900/30 text-orange-400 text-xs rounded">
-                Beta
-              </span>
-            </div>
-            {/* Navigation Tabs */}
-            <nav className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="text-orange-400 bg-orange-900/20">
-                Sniper Dashboard
-              </Button>
-              <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
-                $BOND Buybacks
-              </Button>
-              <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
-                How it Works
-              </Button>
-            </nav>
+    <div className="min-h-screen bg-[#050608] text-white">
+      {/* Promo Badge */}
+      <div className="fixed top-4 right-4 z-50 bg-orange-500/20 border border-orange-500/30 rounded-full px-4 py-2 backdrop-blur-xl">
+        <span className="text-orange-400 text-sm font-medium">Marketing Preview</span>
+      </div>
+
+      {/* Nav */}
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-black/50 backdrop-blur-xl border-b border-white/5">
+        <div className="max-w-[1600px] mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Logo size="sm" />
+            <LogoText size="sm" />
           </div>
           <div className="flex items-center gap-4">
-            {/* Auth indicator */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-              <div className="w-2 h-2 rounded-full bg-orange-500" />
-              <span className="text-xs text-zinc-400">Signed in:</span>
-              <code className="text-xs text-zinc-300 font-mono">7xKX...AsU</code>
+            <div className="flex items-center gap-2 text-xs text-white/50">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span>Connected</span>
             </div>
-            <Button variant="outline" size="sm">+ New Sniper</Button>
-            <Button className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4">
-              Select Wallet
-            </Button>
+            <div className="bg-zinc-800 rounded-lg px-3 py-1.5 text-sm">
+              <span className="text-white/50">Balance:</span>
+              <span className="text-white font-semibold ml-2">42.5 SOL</span>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* Stats - Row 1: Core Stats (matches StatsCards exactly) */}
-        <div className="space-y-2">
-          <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Total P&L</p>
-                <p className={cn('text-lg font-bold', isProfitable ? 'text-orange-400' : 'text-red-400')}>
-                  +{MOCK_STATS.totalPnlSol.toFixed(4)}
-                </p>
-                <p className="text-zinc-500 text-[10px]">
-                  (+{MOCK_STATS.totalPnlPct.toFixed(2)}%)
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Open Positions</p>
-                <p className="text-lg font-bold text-white">{MOCK_STATS.openPositions}</p>
-                <p className="text-zinc-500 text-[10px]">Active trades</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Active Snipers</p>
-                <p className="text-lg font-bold text-orange-400">{MOCK_STATS.activeSnipers}</p>
-                <p className="text-zinc-500 text-[10px]">Watching</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Snipes Today</p>
-                <p className="text-lg font-bold text-white">{MOCK_STATS.snipesToday}</p>
-                <p className="text-zinc-500 text-[10px]">Last 24h</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Success Rate</p>
-                <p className="text-lg font-bold text-white">{MOCK_STATS.successRate}%</p>
-                <p className="text-zinc-500 text-[10px]">Tx success</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Status</p>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
-                  <p className="text-sm font-medium text-orange-400">Connected</p>
-                </div>
-                <p className="text-zinc-500 text-[10px]">Real-time</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Stats - Row 2: Extended Stats */}
-          <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Best Trade</p>
-                <p className="text-lg font-bold text-orange-400">+{MOCK_STATS.bestTradeSol.toFixed(2)}</p>
-                <p className="text-zinc-500 text-[10px]">+{MOCK_STATS.bestTradePct}%</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Worst Trade</p>
-                <p className="text-lg font-bold text-red-400">{MOCK_STATS.worstTradeSol.toFixed(2)}</p>
-                <p className="text-zinc-500 text-[10px]">{MOCK_STATS.worstTradePct}%</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Tokens Caught</p>
-                <p className="text-lg font-bold text-orange-400">{MOCK_STATS.tokensCaught}</p>
-                <p className="text-zinc-500 text-[10px]">Sniped</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Tokens Avoided</p>
-                <p className="text-lg font-bold text-yellow-400">{MOCK_STATS.tokensAvoided}</p>
-                <p className="text-zinc-500 text-[10px]">Filtered</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800 col-span-2">
-              <CardContent className="p-3">
-                <p className="text-zinc-500 text-xs mb-0.5">Biggest Miss</p>
-                <p className="text-lg font-bold text-orange-400">${MOCK_STATS.biggestMiss.ticker}</p>
-                <p className="text-zinc-500 text-[10px]">{formatMcap(MOCK_STATS.biggestMiss.athMcap)}</p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="bg-zinc-900/50 border-zinc-800 hover:border-orange-800/50 transition-colors cursor-pointer group col-span-2"
-              onClick={() => setShowComingSoon(true)}
-            >
-              <CardContent className="p-3 flex flex-col items-center justify-center h-full">
-                <div className="w-8 h-8 rounded-full bg-orange-900/30 flex items-center justify-center mb-1 group-hover:bg-orange-900/50 transition-colors">
-                  <ImageIcon className="w-4 h-4 text-orange-400" />
-                </div>
-                <p className="text-xs font-medium text-orange-400">Share Results</p>
-                <p className="text-zinc-500 text-[10px]">Show off gains</p>
-              </CardContent>
-            </Card>
-          </div>
+      <main className="pt-14 pb-8 relative">
+        {/* Animated background glow */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-orange-600/5 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Positions + Snipers */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Open Positions - matches real dashboard table */}
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold">
-                  Open Positions ({MOCK_POSITIONS.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="border border-zinc-800 rounded-lg overflow-hidden">
-                  {/* Table Header - 7 columns like real dashboard */}
-                  <div className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-3 text-xs font-medium text-zinc-400 bg-zinc-800/50 border-b border-zinc-800">
-                    <div>Token</div>
-                    <div className="text-right">Amount (SOL)</div>
-                    <div className="text-right">Entry MCAP</div>
-                    <div className="text-right">Current MCAP</div>
-                    <div className="text-right">P&L (%)</div>
-                    <div className="text-right">Entry Time</div>
-                    <div className="text-right">Action</div>
+        <div className="max-w-[1600px] mx-auto px-4 py-4 relative z-10">
+          {/* Hero Stats Section */}
+          <div className="mb-6">
+            <div className="flex flex-col lg:flex-row gap-3 items-start">
+              {/* Main P&L Card */}
+              <div className="relative rounded-2xl px-6 py-4 border overflow-hidden bg-gradient-to-br from-orange-950/40 via-orange-900/20 to-transparent border-orange-500/30 shadow-lg shadow-orange-500/10">
+                <div className="absolute top-3 right-3">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 border border-orange-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                    <span className="text-[10px] text-orange-400 font-medium">Live</span>
                   </div>
-                  {/* Rows */}
-                  {MOCK_POSITIONS.map((position) => (
-                    <div
-                      key={position.id}
-                      className="grid grid-cols-[2fr_1fr_1.2fr_1.2fr_1fr_1.2fr_80px] gap-3 px-4 py-3 items-center text-sm border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
-                          {position.tokenSymbol.charAt(0)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-medium text-white truncate">${position.tokenSymbol}</p>
-                            <button className="p-1 hover:bg-zinc-700 rounded transition-colors">
-                              <Copy className="w-3 h-3 text-zinc-500 hover:text-zinc-300" />
-                            </button>
-                            <button className="p-1 hover:bg-zinc-700 rounded transition-colors">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-500 hover:text-zinc-300">
-                                <path d="M3 3v18h18"/>
-                                <path d="m19 9-5 5-4-4-3 3"/>
-                              </svg>
-                            </button>
-                          </div>
-                          <p className="text-[10px] text-zinc-500 font-mono">
-                            {position.tokenMint.slice(0, 4)}...{position.tokenMint.slice(-4)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-white">{position.entrySol.toFixed(3)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-zinc-300">{formatMcap(position.entryMarketCap)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-zinc-300">{formatMcap(position.currentMarketCap)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-orange-400">+{position.pnlPct.toFixed(1)}%</p>
-                        <p className="text-[10px] text-orange-400/70">+{position.pnlSol.toFixed(4)} SOL</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-zinc-400 text-xs">
-                          {new Date(position.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-3 text-xs border-red-800 text-red-400 hover:bg-red-900/30"
-                        >
-                          Sell All
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Snipers - matches real dashboard grid layout */}
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold flex items-center justify-between">
-                  <span>
-                    Snipers ({MOCK_SNIPERS.filter(s => s.isActive).length}/{MOCK_SNIPERS.length} active)
+                <p className="text-xs text-white/50 mb-1">Total P&L (24h)</p>
+                <div className="flex items-end gap-2">
+                  <h1 className="text-4xl font-bold tracking-tight text-orange-400">
+                    +{stats.totalPnlSol.toFixed(3)}
+                  </h1>
+                  <span className="text-lg text-white/30 mb-1">SOL</span>
+                  <span className="text-sm text-orange-400/80 mb-1 ml-2">
+                    (+{stats.totalPnlPct.toFixed(1)}%)
                   </span>
-                  <Button variant="ghost" size="sm">+ New</Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {MOCK_SNIPERS.map((sniper) => (
-                    <div
-                      key={sniper.id}
-                      className={cn(
-                        'bg-zinc-800/30 rounded-xl border p-4',
-                        sniper.isActive ? 'border-orange-500/30' : 'border-zinc-700/50'
-                      )}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            'w-10 h-10 rounded-lg flex items-center justify-center',
-                            sniper.isActive ? 'bg-orange-500/20' : 'bg-zinc-700/30'
-                          )}>
-                            <Crosshair className={cn('w-5 h-5', sniper.isActive ? 'text-orange-400' : 'text-zinc-500')} />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-white">{sniper.name}</h3>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className={cn(
-                                'px-2 py-0.5 text-xs rounded-full flex items-center gap-1',
-                                sniper.isActive
-                                  ? 'bg-orange-500/20 text-orange-400'
-                                  : 'bg-zinc-700/50 text-zinc-400'
-                              )}>
-                                {sniper.isActive && <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse" />}
-                                {sniper.isActive ? 'Active' : 'Paused'}
-                              </span>
-                              <span className="text-xs text-zinc-500">
-                                {Math.round((sniper.stats.successfulSnipes / sniper.stats.totalSnipes) * 100)}% success
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={sniper.isActive ? 'border-red-800 text-red-400' : 'border-orange-800 text-orange-400'}
-                        >
-                          {sniper.isActive ? 'Pause' : 'Start'}
-                        </Button>
-                      </div>
-
-                      {/* Stats Grid */}
-                      <div className="grid grid-cols-3 gap-2 mb-3">
-                        <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                          <p className="text-zinc-500 text-[10px] mb-0.5">Snipes</p>
-                          <p className="font-medium text-white text-sm">{sniper.stats.totalSnipes}</p>
-                        </div>
-                        <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                          <p className="text-zinc-500 text-[10px] mb-0.5">Win Rate</p>
-                          <p className="font-medium text-orange-400 text-sm">
-                            {Math.round((sniper.stats.successfulSnipes / sniper.stats.totalSnipes) * 100)}%
-                          </p>
-                        </div>
-                        <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                          <p className="text-zinc-500 text-[10px] mb-0.5">SOL Spent</p>
-                          <p className="font-medium text-white text-sm">{sniper.stats.totalSolSpent.toFixed(2)}</p>
-                        </div>
-                      </div>
-
-                      {/* Config Display */}
-                      <div className="flex flex-wrap gap-1.5 text-[10px]">
-                        <span className="px-2 py-1 bg-zinc-800 rounded text-zinc-400">
-                          {sniper.config.snipeAmountSol} SOL
-                        </span>
-                        <span className="px-2 py-1 bg-zinc-800 rounded text-zinc-400">
-                          {(sniper.config.slippageBps / 100)}% slip
-                        </span>
-                        <span className="px-2 py-1 bg-zinc-800 rounded text-orange-400">
-                          TP: +{sniper.config.takeProfitPct}%
-                        </span>
-                        <span className="px-2 py-1 bg-zinc-800 rounded text-red-400">
-                          SL: -{sniper.config.stopLossPct}%
-                        </span>
-                        {sniper.config.mevProtection && (
-                          <span className="px-2 py-1 bg-orange-900/30 rounded text-orange-400 flex items-center gap-1">
-                            <Shield className="w-2.5 h-2.5" /> Jito
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
                 </div>
-              </CardContent>
-            </Card>
+                <p className="text-xs text-white/40 mt-2">
+                  <span className="text-orange-400">$4,952</span> USD at current prices
+                </p>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="flex flex-wrap gap-2">
+                <div className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/5 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Activity className="w-4 h-4 text-orange-400" />
+                    <span className="text-xs text-white/40">Positions</span>
+                  </div>
+                  <span className="text-2xl font-bold text-white">{stats.openPositions}</span>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/5 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Target className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs text-white/40">Active</span>
+                  </div>
+                  <span className="text-2xl font-bold text-white">{stats.activeSnipers}</span>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/5 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className="w-4 h-4 text-yellow-400" />
+                    <span className="text-xs text-white/40">Snipes</span>
+                  </div>
+                  <span className="text-2xl font-bold text-white">{stats.snipesToday}</span>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/5 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <BarChart3 className="w-4 h-4 text-green-400" />
+                    <span className="text-xs text-white/40">Win Rate</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-400">{stats.successRate}%</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Trading Wallets - matches WalletBalanceCard */}
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                    <Bot className="h-5 w-5 text-orange-400" />
-                    Trading Wallets
-                    <Info className="h-3.5 w-3.5 text-zinc-500 cursor-help" />
-                  </CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-zinc-300">Trading Wallet</span>
-                    <span className="text-lg font-bold text-orange-400">1.847 SOL</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-xs font-mono text-zinc-500 truncate">
-                      7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
-                    </code>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-700">
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-zinc-700">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Three Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Positions Column */}
+            <div className="lg:col-span-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-orange-400" />
+                  Open Positions
+                  <span className="text-xs text-white/40 font-normal">({MOCK_POSITIONS.length})</span>
+                </h2>
+              </div>
 
-            {/* Activity Log - matches ActivityLog component */}
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <Radio className="w-5 h-5 text-orange-400" />
-                  Activity Log
-                </CardTitle>
-                {/* Tabs */}
-                <div className="flex gap-1 mt-2">
-                  <button
-                    onClick={() => setActiveTab('migrations')}
+              <div className="space-y-2">
+                {MOCK_POSITIONS.map((position) => (
+                  <div
+                    key={position.id}
                     className={cn(
-                      'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                      activeTab === 'migrations'
-                        ? 'bg-orange-900/30 text-orange-400 border border-orange-700/50'
-                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                      "group relative rounded-xl border bg-white/[0.02] backdrop-blur-sm px-4 py-3 transition-all hover:bg-white/[0.04]",
+                      "border-orange-500/20 hover:border-orange-500/40 hover:shadow-lg hover:shadow-orange-500/5"
                     )}
                   >
-                    PumpFun Migrations
-                    <span className="ml-1.5 px-1.5 py-0.5 bg-zinc-700 rounded-full text-[10px]">
-                      {MOCK_MIGRATIONS.length}
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('trades')}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                      activeTab === 'trades'
-                        ? 'bg-orange-900/30 text-orange-400 border border-orange-700/50'
-                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-                    )}
-                  >
-                    Trades
-                    <span className="ml-1.5 px-1.5 py-0.5 bg-zinc-700 rounded-full text-[10px]">
-                      {MOCK_TRADES.length}
-                    </span>
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[400px] overflow-y-auto space-y-2">
-                  {activeTab === 'migrations' ? (
-                    // Migrations Tab
-                    MOCK_MIGRATIONS.map((m, i) => (
-                      <div
-                        key={m.id}
-                        className={cn(
-                          'flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg transition-all',
-                          i === 0 ? 'bg-orange-900/20' : 'bg-zinc-800/50 hover:bg-zinc-800'
-                        )}
-                      >
-                        {/* Ticker with copy + Solscan */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          {i === 0 && (
-                            <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse flex-shrink-0" />
-                          )}
-                          <code className="text-sm font-medium text-zinc-200 truncate">
-                            ${m.symbol}
-                          </code>
-                          <div className="flex items-center gap-0.5 flex-shrink-0">
-                            <button className="p-1 hover:bg-zinc-700 rounded transition-colors">
-                              <Copy className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300" />
-                            </button>
-                            <button className="p-1 hover:bg-zinc-700 rounded transition-colors">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="stroke-zinc-500 hover:stroke-zinc-300">
-                                <path d="M3 3v18h18"/>
-                                <path d="m19 9-5 5-4-4-3 3"/>
-                              </svg>
-                            </button>
-                            <button className="p-1 hover:bg-zinc-700 rounded transition-colors">
-                              <ExternalLink className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300" />
-                            </button>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-sm font-bold text-black shadow-lg shadow-orange-500/30">
+                          {position.symbol.charAt(1)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-white">{position.symbol}</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-orange-400" />
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-white/40">
+                            <span>{position.entrySol} SOL</span>
+                            <span>•</span>
+                            <span>{position.mcap}</span>
+                            <span>•</span>
+                            <span>{position.time}</span>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Time + Sniped status */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="text-xs text-zinc-500">{m.time}</span>
-                          {m.sniped ? (
-                            m.success ? (
-                              <div className="w-5 h-5 rounded-full bg-orange-900/50 flex items-center justify-center">
-                                <Check className="w-3 h-3 text-orange-400" />
-                              </div>
-                            ) : m.success === false ? (
-                              <div className="w-5 h-5 rounded-full bg-red-900/50 flex items-center justify-center">
-                                <X className="w-3 h-3 text-red-400" />
-                              </div>
-                            ) : (
-                              <div className="w-5 h-5 rounded-full bg-yellow-900/50 flex items-center justify-center animate-pulse">
-                                <div className="w-2 h-2 rounded-full bg-yellow-400" />
-                              </div>
-                            )
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center">
-                              <span className="text-zinc-600 text-xs">—</span>
-                            </div>
-                          )}
-                        </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold font-mono text-orange-400">
+                          +{position.pnlPct.toFixed(1)}%
+                        </p>
+                        <p className="text-xs font-mono text-orange-400/70">
+                          +{position.pnlSol.toFixed(3)} SOL
+                        </p>
                       </div>
-                    ))
-                  ) : (
-                    // Trades Tab
-                    MOCK_TRADES.map((trade) => (
-                      <div
-                        key={trade.id}
-                        className="flex items-center gap-3 text-sm py-2.5 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
-                      >
-                        <Crosshair className={cn(
-                          'w-4 h-4 flex-shrink-0',
-                          trade.action === 'Bought' ? 'text-orange-400' :
-                          trade.action === 'TP Hit' ? 'text-orange-400' :
-                          trade.action === 'SL Hit' ? 'text-red-400' : 'text-red-400'
-                        )} />
-                        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                          <span className="text-zinc-200 font-medium truncate">{trade.sniperName}</span>
-                          <span className={cn(
-                            'font-medium',
-                            trade.action === 'Bought' ? 'text-orange-400' :
-                            trade.action === 'TP Hit' ? 'text-orange-400' :
-                            trade.action === 'SL Hit' ? 'text-red-400' : 'text-red-400'
-                          )}>{trade.action}</span>
-                          <span className="text-zinc-300">${trade.token}</span>
-                        </div>
-                        <span className="text-zinc-500 text-xs flex-shrink-0">{trade.time}</span>
-                      </div>
-                    ))
-                  )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total unrealized */}
+              <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-white/60">Unrealized P&L</span>
+                  <div className="text-right">
+                    <span className="text-lg font-bold text-orange-400">+7.999 SOL</span>
+                    <span className="text-sm text-white/40 ml-2">($1,504)</span>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+
+            {/* Snipers Column */}
+            <div className="lg:col-span-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Crosshair className="w-4 h-4 text-orange-400" />
+                  Snipers
+                </h2>
+                <button className="bg-orange-500 hover:bg-orange-600 text-black font-semibold h-7 text-xs px-3 rounded-lg transition-colors">
+                  + New
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {MOCK_SNIPERS.map((sniper) => (
+                  <div
+                    key={sniper.id}
+                    className={cn(
+                      "rounded-xl border bg-white/[0.02] backdrop-blur-sm p-4 transition-all",
+                      sniper.isActive ? "border-orange-500/30" : "border-white/5"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          sniper.isActive ? "bg-orange-500 animate-pulse" : "bg-white/20"
+                        )} />
+                        <span className="font-medium text-white">{sniper.name}</span>
+                      </div>
+                      <div className={cn(
+                        "px-2 py-0.5 rounded text-xs font-medium",
+                        sniper.isActive ? "bg-orange-500/20 text-orange-400" : "bg-white/5 text-white/40"
+                      )}>
+                        {sniper.isActive ? 'Active' : 'Paused'}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-lg font-bold text-white">{sniper.snipes}</p>
+                        <p className="text-[10px] text-white/40">Snipes</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-green-400">{sniper.winRate}%</p>
+                        <p className="text-[10px] text-white/40">Win Rate</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-orange-400">+{sniper.profit}</p>
+                        <p className="text-[10px] text-white/40">SOL Profit</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Trading Wallet */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-white">Trading Wallet</span>
+                  <span className="text-xs text-white/40">Auto-generated</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <code className="text-xs text-white/60 font-mono">7xKX...AsU</code>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-white">42.5 SOL</p>
+                    <p className="text-xs text-white/40">$7,990 USD</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Activity Column */}
+            <div className="lg:col-span-3 space-y-3">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Radio className="w-4 h-4 text-orange-400" />
+                Live Feed
+              </h2>
+              
+              <div className="rounded-xl border border-white/5 bg-white/[0.02] backdrop-blur-sm overflow-hidden">
+                <div className="divide-y divide-white/5">
+                  {MOCK_ACTIVITY.map((item, i) => (
+                    <div key={i} className="px-3 py-2.5 hover:bg-white/[0.02] transition-colors">
+                      <div className="flex items-center gap-2">
+                        {item.type === 'snipe' && (
+                          <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <Zap className="w-3 h-3 text-blue-400" />
+                          </div>
+                        )}
+                        {item.type === 'tp_hit' && (
+                          <div className="w-6 h-6 rounded-lg bg-green-500/20 flex items-center justify-center">
+                            <CheckCircle2 className="w-3 h-3 text-green-400" />
+                          </div>
+                        )}
+                        {item.type === 'migration' && (
+                          <div className="w-6 h-6 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                            <Flame className="w-3 h-3 text-orange-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-medium text-white truncate">{item.symbol}</span>
+                            {item.type === 'tp_hit' && (
+                              <span className="text-xs font-bold text-green-400">{item.amount}</span>
+                            )}
+                            {item.type === 'snipe' && (
+                              <span className="text-xs text-white/40">{item.amount}</span>
+                            )}
+                            {item.type === 'migration' && (
+                              <span className="text-xs text-orange-400">{item.mcap}</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-white/30">
+                            {item.type === 'snipe' && 'Sniped'}
+                            {item.type === 'tp_hit' && 'Take Profit Hit'}
+                            {item.type === 'migration' && 'Migration Detected'}
+                            {' • '}{item.time}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Performance Summary */}
+              <div className="rounded-xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-transparent p-4">
+                <h3 className="text-xs font-medium text-white/60 mb-3">Today's Performance</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/40">Total Snipes</span>
+                    <span className="text-sm font-bold text-white">23</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/40">Successful</span>
+                    <span className="text-sm font-bold text-green-400">20</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/40">Take Profits Hit</span>
+                    <span className="text-sm font-bold text-orange-400">18</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                    <span className="text-xs text-white/60">Net Profit</span>
+                    <span className="text-lg font-bold text-orange-400">+26.3 SOL</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>
 
-      {/* Floating badge for screenshots */}
-      <div className="fixed bottom-4 right-4 px-4 py-2 bg-zinc-900/90 border border-zinc-700 rounded-full text-sm flex items-center gap-2 backdrop-blur">
-        <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
-        <span className="text-zinc-400">bondshot.io</span>
-      </div>
-
-      {/* Coming Soon Modal */}
-      {showComingSoon && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowComingSoon(false)}>
-          <Card className="bg-zinc-900 border-zinc-700 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <CardContent className="p-6 text-center">
-              <button
-                onClick={() => setShowComingSoon(false)}
-                className="absolute top-3 right-3 text-zinc-500 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <div className="w-16 h-16 rounded-full bg-orange-900/30 flex items-center justify-center mx-auto mb-4">
-                <ImageIcon className="w-8 h-8 text-orange-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Coming Soon</h3>
-              <p className="text-zinc-400 text-sm">
-                Share your trading results with a beautiful card image. This feature is under development.
-              </p>
-              <Button
-                className="mt-4 bg-orange-600 hover:bg-orange-700"
-                onClick={() => setShowComingSoon(false)}
-              >
-                Got it
-              </Button>
-            </CardContent>
-          </Card>
+      {/* Bottom CTA Banner */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/95 to-transparent pt-8 pb-4 px-4 z-30">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-3 bg-orange-500/10 border border-orange-500/30 rounded-full px-6 py-3 backdrop-blur-xl">
+            <Logo size="sm" />
+            <span className="text-white font-semibold">Start sniping migrations in under 60 seconds</span>
+            <span className="text-orange-400 font-bold">bondshot.xyz</span>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
