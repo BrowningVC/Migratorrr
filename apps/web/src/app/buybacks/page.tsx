@@ -175,7 +175,7 @@ export default function BuybacksPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-4">
               {steps.map((step, i) => {
                 const isActive = activeStep === i;
-                const colorClasses = {
+                const colorMap: Record<string, { bg: string; border: string; text: string; glow: string }> = {
                   orange: {
                     bg: 'bg-orange-500/10',
                     border: 'border-orange-500/30',
@@ -200,7 +200,8 @@ export default function BuybacksPage() {
                     text: 'text-red-400',
                     glow: 'shadow-red-500/20',
                   },
-                }[step.color];
+                };
+                const colorClasses = colorMap[step.color];
 
                 return (
                   <div
