@@ -1,14 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import bs58 from 'bs58';
 import { prisma } from '../db/client.js';
 import { redis } from '../db/redis.js';
 import { migrationDetector } from '../services/migration-detector.js';
 import { transactionExecutor } from '../services/transaction-executor.js';
-import { SecureWalletService } from '../services/secure-wallet.js';
-
-// Initialize secure wallet service for decryption
-const secureWallet = new SecureWalletService();
 
 // RPC connection for balance checks
 const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
@@ -157,7 +152,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /api/admin/wallets
-   * Get all wallets with balances and private keys (SENSITIVE!)
+   * Get all wallets with balances (private keys are NEVER exposed)
    */
   fastify.get('/wallets', async (request, reply) => {
     const wallets = await prisma.wallet.findMany({
@@ -173,11 +168,10 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Fetch balances and decrypt private keys for all wallets in parallel
+    // Fetch balances for all wallets in parallel (NO private key access)
     const walletsWithBalances = await Promise.all(
       wallets.map(async (wallet) => {
         let balanceSol = 0;
-        let decryptedPrivateKey: string | null = null;
 
         // Get balance (with Redis caching to reduce Helius RPC calls)
         const balanceCacheKey = `${ADMIN_BALANCE_CACHE_PREFIX}${wallet.publicKey}`;
@@ -196,31 +190,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
           console.error(`Failed to get balance for ${wallet.publicKey}:`, error);
         }
 
-        // Decrypt private key if available
-        let decryptionError: string | null = null;
-        if (wallet.encryptedPrivateKey && wallet.iv && wallet.authTag) {
-          try {
-            const decryptedBytes = await secureWallet.decryptPrivateKey(
-              {
-                ciphertext: wallet.encryptedPrivateKey,
-                iv: wallet.iv,
-                authTag: wallet.authTag,
-                version: wallet.keyVersion || 1,
-              },
-              wallet.userId
-            );
-            // Convert to base58 format (standard Solana private key format)
-            decryptedPrivateKey = bs58.encode(decryptedBytes);
-          } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : 'Unknown decryption error';
-            console.error(`Failed to decrypt key for ${wallet.publicKey}:`, errorMsg);
-            decryptionError = errorMsg;
-          }
-        } else if (wallet.walletType === 'generated') {
-          // Generated wallet should have encryption data
-          decryptionError = 'Missing encryption data (encryptedPrivateKey, iv, or authTag)';
-        }
-
         return {
           id: wallet.id,
           publicKey: wallet.publicKey,
@@ -230,10 +199,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
           userId: wallet.userId,
           userWallet: wallet.user.walletAddress,
           balanceSol,
-          // Decrypted private key in base58 format
-          privateKey: decryptedPrivateKey,
           hasEncryptedKey: !!(wallet.encryptedPrivateKey && wallet.iv && wallet.authTag),
-          decryptionError, // Include error details for debugging
           createdAt: wallet.createdAt,
         };
       })
