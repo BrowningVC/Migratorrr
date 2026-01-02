@@ -367,4 +367,198 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       },
     };
   });
+
+  /**
+   * POST /api/admin/bulk-withdraw
+   * Withdraw all funds from all generated wallets to a single destination
+   */
+  fastify.post('/bulk-withdraw', async (request, reply) => {
+    const { destinationAddress } = request.body as { destinationAddress: string };
+
+    if (!destinationAddress) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Destination address is required',
+      });
+    }
+
+    // Validate destination address
+    let destinationPubkey: PublicKey;
+    try {
+      destinationPubkey = new PublicKey(destinationAddress);
+    } catch {
+      return reply.status(400).send({
+        success: false,
+        error: 'Invalid Solana address',
+      });
+    }
+
+    // Get all generated wallets with balances
+    const wallets = await prisma.wallet.findMany({
+      where: {
+        walletType: 'generated',
+        isActive: true,
+        encryptedPrivateKey: { not: null },
+        iv: { not: null },
+        authTag: { not: null },
+      },
+    });
+
+    const results: Array<{
+      walletId: string;
+      publicKey: string;
+      success: boolean;
+      amountSol?: number;
+      signature?: string;
+      error?: string;
+    }> = [];
+
+    let totalWithdrawn = 0;
+    let successCount = 0;
+    let failCount = 0;
+
+    // Process each wallet
+    for (const wallet of wallets) {
+      try {
+        // Get current balance
+        const walletPubkey = new PublicKey(wallet.publicKey);
+        const balance = await connection.getBalance(walletPubkey);
+        const balanceSol = balance / LAMPORTS_PER_SOL;
+
+        // Skip wallets with less than 0.001 SOL (not worth the fee)
+        if (balanceSol < 0.001) {
+          results.push({
+            walletId: wallet.id,
+            publicKey: wallet.publicKey,
+            success: false,
+            error: `Insufficient balance: ${balanceSol.toFixed(6)} SOL`,
+          });
+          continue;
+        }
+
+        // Decrypt private key
+        let privateKey: Uint8Array;
+        try {
+          privateKey = await walletService.decryptPrivateKey(
+            {
+              ciphertext: wallet.encryptedPrivateKey!,
+              iv: wallet.iv!,
+              authTag: wallet.authTag!,
+              version: wallet.keyVersion || 1,
+            },
+            wallet.userId
+          );
+        } catch (decryptError) {
+          results.push({
+            walletId: wallet.id,
+            publicKey: wallet.publicKey,
+            success: false,
+            error: `Decryption failed: ${decryptError instanceof Error ? decryptError.message : 'Unknown error'}`,
+          });
+          failCount++;
+          continue;
+        }
+
+        // Verify the decrypted key
+        const keypair = Keypair.fromSecretKey(privateKey);
+        if (keypair.publicKey.toBase58() !== wallet.publicKey) {
+          privateKey.fill(0);
+          results.push({
+            walletId: wallet.id,
+            publicKey: wallet.publicKey,
+            success: false,
+            error: 'Key verification failed - MASTER_ENCRYPTION_KEY mismatch',
+          });
+          failCount++;
+          continue;
+        }
+
+        // Calculate amount to send (leave 0.000005 for fee)
+        const fee = 5000; // 5000 lamports for basic transfer
+        const sendAmount = balance - fee;
+
+        if (sendAmount <= 0) {
+          privateKey.fill(0);
+          results.push({
+            walletId: wallet.id,
+            publicKey: wallet.publicKey,
+            success: false,
+            error: 'Balance too low to cover fee',
+          });
+          continue;
+        }
+
+        // Create and send transaction
+        const { SystemProgram, Transaction } = await import('@solana/web3.js');
+        const transaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: walletPubkey,
+            toPubkey: destinationPubkey,
+            lamports: sendAmount,
+          })
+        );
+
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = walletPubkey;
+        transaction.sign(keypair);
+
+        // Zero out private key
+        privateKey.fill(0);
+
+        const rawTransaction = transaction.serialize();
+        const signature = await connection.sendRawTransaction(rawTransaction, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+
+        // Wait for confirmation (with timeout)
+        try {
+          await connection.confirmTransaction(
+            { signature, blockhash, lastValidBlockHeight },
+            'confirmed'
+          );
+        } catch (confirmError) {
+          // Even if confirmation times out, tx might succeed
+          console.warn(`Confirmation timeout for ${wallet.publicKey}, tx: ${signature}`);
+        }
+
+        const amountSol = sendAmount / LAMPORTS_PER_SOL;
+        totalWithdrawn += amountSol;
+        successCount++;
+
+        results.push({
+          walletId: wallet.id,
+          publicKey: wallet.publicKey,
+          success: true,
+          amountSol,
+          signature,
+        });
+
+        // Small delay between transactions to avoid rate limits
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      } catch (error) {
+        failCount++;
+        results.push({
+          walletId: wallet.id,
+          publicKey: wallet.publicKey,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        destination: destinationAddress,
+        totalWallets: wallets.length,
+        successCount,
+        failCount,
+        totalWithdrawnSol: totalWithdrawn,
+        results,
+      },
+    };
+  });
 };

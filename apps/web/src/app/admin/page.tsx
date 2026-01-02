@@ -26,6 +26,9 @@ import {
   Radio,
   Wifi,
   WifiOff,
+  Send,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { io, Socket } from 'socket.io-client';
@@ -189,6 +192,25 @@ export default function AdminPage() {
   const [showPrivateKeys, setShowPrivateKeys] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Bulk withdraw states
+  const [bulkWithdrawAddress, setBulkWithdrawAddress] = useState('');
+  const [isBulkWithdrawing, setIsBulkWithdrawing] = useState(false);
+  const [bulkWithdrawResult, setBulkWithdrawResult] = useState<{
+    destination: string;
+    totalWallets: number;
+    successCount: number;
+    failCount: number;
+    totalWithdrawnSol: number;
+    results: Array<{
+      walletId: string;
+      publicKey: string;
+      success: boolean;
+      amountSol?: number;
+      signature?: string;
+      error?: string;
+    }>;
+  } | null>(null);
+
   const fetchAllData = useCallback(async () => {
     if (!adminKey) return;
 
@@ -316,6 +338,55 @@ export default function AdminPage() {
 
   const formatBytes = (bytes: number) => {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  const handleBulkWithdraw = async () => {
+    if (!bulkWithdrawAddress.trim()) {
+      toast.error('Please enter a destination address');
+      return;
+    }
+
+    // Basic Solana address validation
+    if (bulkWithdrawAddress.length < 32 || bulkWithdrawAddress.length > 44) {
+      toast.error('Invalid Solana address');
+      return;
+    }
+
+    setIsBulkWithdrawing(true);
+    setBulkWithdrawResult(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/bulk-withdraw`, {
+        method: 'POST',
+        headers: {
+          'x-admin-key': adminKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ destinationAddress: bulkWithdrawAddress }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        setBulkWithdrawResult(data.data);
+        if (data.data.successCount > 0) {
+          toast.success(`Withdrew ${data.data.totalWithdrawnSol.toFixed(4)} SOL from ${data.data.successCount} wallets`);
+        } else if (data.data.failCount > 0) {
+          toast.error(`All ${data.data.failCount} withdrawals failed`);
+        } else {
+          toast.success('No wallets with sufficient balance to withdraw');
+        }
+        // Refresh wallet data
+        fetchAllData();
+      } else {
+        toast.error(data.error || 'Bulk withdraw failed');
+      }
+    } catch (error) {
+      toast.error('Network error during bulk withdraw');
+      console.error('Bulk withdraw error:', error);
+    } finally {
+      setIsBulkWithdrawing(false);
+    }
   };
 
   // Show loading while checking localStorage or auto-authenticating with saved key
@@ -834,6 +905,105 @@ export default function AdminPage() {
                   These are decrypted private keys. Never share them. They can be imported into Phantom or any Solana wallet.
                 </p>
               </div>
+
+              {/* Bulk Withdraw Section */}
+              <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2 text-yellow-400 text-sm mb-3">
+                  <Send className="w-4 h-4" />
+                  <span className="font-medium">Bulk Withdraw All Funds</span>
+                </div>
+                <p className="text-yellow-400/70 text-xs mb-3">
+                  Withdraw all SOL from all generated trading wallets to a single destination address.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Destination Solana address"
+                    value={bulkWithdrawAddress}
+                    onChange={(e) => setBulkWithdrawAddress(e.target.value)}
+                    className="flex-1 bg-zinc-900 border-zinc-700 text-sm font-mono"
+                    disabled={isBulkWithdrawing}
+                  />
+                  <Button
+                    onClick={handleBulkWithdraw}
+                    disabled={isBulkWithdrawing || !bulkWithdrawAddress.trim()}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-black font-medium"
+                  >
+                    {isBulkWithdrawing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Withdrawing...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Withdraw All
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Bulk Withdraw Results */}
+                {bulkWithdrawResult && (
+                  <div className="mt-4 pt-4 border-t border-yellow-700/30">
+                    <div className="grid grid-cols-4 gap-3 mb-3">
+                      <div className="bg-zinc-900/50 rounded p-2 text-center">
+                        <div className="text-xs text-zinc-500">Total Wallets</div>
+                        <div className="text-lg font-mono">{bulkWithdrawResult.totalWallets}</div>
+                      </div>
+                      <div className="bg-green-900/30 rounded p-2 text-center">
+                        <div className="text-xs text-green-400">Success</div>
+                        <div className="text-lg font-mono text-green-400">{bulkWithdrawResult.successCount}</div>
+                      </div>
+                      <div className="bg-red-900/30 rounded p-2 text-center">
+                        <div className="text-xs text-red-400">Failed</div>
+                        <div className="text-lg font-mono text-red-400">{bulkWithdrawResult.failCount}</div>
+                      </div>
+                      <div className="bg-yellow-900/30 rounded p-2 text-center">
+                        <div className="text-xs text-yellow-400">Total Withdrawn</div>
+                        <div className="text-lg font-mono text-yellow-400">{bulkWithdrawResult.totalWithdrawnSol.toFixed(4)} SOL</div>
+                      </div>
+                    </div>
+
+                    {/* Individual Results */}
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {bulkWithdrawResult.results.map((r, idx) => (
+                        <div
+                          key={idx}
+                          className={cn(
+                            'flex items-center justify-between text-xs p-2 rounded',
+                            r.success ? 'bg-green-900/20' : 'bg-red-900/20'
+                          )}
+                        >
+                          <code className="font-mono text-zinc-400">
+                            {r.publicKey.slice(0, 8)}...{r.publicKey.slice(-4)}
+                          </code>
+                          {r.success ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-green-400">{r.amountSol?.toFixed(4)} SOL</span>
+                              {r.signature && (
+                                <a
+                                  href={`https://solscan.io/tx/${r.signature}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-400 hover:text-blue-300"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-red-400 text-[10px] max-w-[200px] truncate" title={r.error}>
+                              {r.error}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-3">
                 {wallets.wallets.map((w) => (
                   <div key={w.id} className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/50">
