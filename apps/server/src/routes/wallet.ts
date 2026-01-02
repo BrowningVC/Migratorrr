@@ -469,9 +469,11 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
     // Verify the keypair matches the wallet's public key
     if (keypair.publicKey.toBase58() !== wallet.publicKey) {
       fastify.log.error(`Keypair mismatch! Expected: ${wallet.publicKey}, Got: ${keypair.publicKey.toBase58()}`);
+      fastify.log.error(`This usually means MASTER_ENCRYPTION_KEY changed after wallet was generated.`);
+      fastify.log.error(`Wallet keyVersion: ${wallet.keyVersion}, userId: ${userId}`);
       return reply.status(500).send({
         success: false,
-        error: 'Wallet key verification failed. Please contact support.',
+        error: 'Wallet key verification failed. The encryption key may have changed since this wallet was created. Please generate a new trading wallet.',
       });
     }
 
