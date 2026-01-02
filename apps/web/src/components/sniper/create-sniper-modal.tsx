@@ -1,4 +1,5 @@
 'use client';
+// v2 - Added 4 new filters: Twitter followers, liquidity lock, DexScreener paid, creator score
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
