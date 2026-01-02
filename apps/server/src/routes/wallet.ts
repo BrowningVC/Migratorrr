@@ -556,10 +556,14 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
         userMessage = 'Insufficient funds for transaction (including fee)';
       } else if (errorMessage.includes('blockhash') || errorMessage.includes('expired')) {
         userMessage = 'Transaction expired. Please try again.';
-      } else if (errorMessage.includes('signature')) {
-        userMessage = 'Transaction signature failed. Please contact support.';
+      } else if (errorMessage.includes('simulation failed') || errorMessage.includes('SimulationFailed')) {
+        userMessage = 'Transaction simulation failed. Check your balance and try again.';
+      } else if (errorMessage.includes('AccountNotFound')) {
+        userMessage = 'Destination account not found. Please verify the address.';
       } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
         userMessage = 'Transaction timed out. Check Solscan for status.';
+      } else if (errorMessage.includes('TransactionExpiredBlockheightExceeded')) {
+        userMessage = 'Transaction expired. Network may be congested - please try again.';
       }
 
       return reply.status(500).send({
