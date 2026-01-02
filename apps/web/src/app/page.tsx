@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Zap, Shield, Target, BarChart3, Copy, Check, ChevronRight, TrendingUp, RefreshCw, Flame, Users, DollarSign, Coins } from 'lucide-react';
+import { ArrowRight, Zap, Shield, Target, BarChart3, Copy, Check, ChevronRight, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo, LogoText } from '@/components/logo';
@@ -142,147 +142,6 @@ function LiveMigrationFeed() {
             <span className="text-[10px] text-zinc-700">•</span>
             <span className="text-[10px] text-zinc-500">83% win</span>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BondFlywheel() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [totalBurned, setTotalBurned] = useState(142847);
-
-  // Cycle through steps and increment burned amount
-  useEffect(() => {
-    const stepInterval = setInterval(() => {
-      setActiveStep(prev => (prev + 1) % 4);
-    }, 2000);
-
-    const burnInterval = setInterval(() => {
-      setTotalBurned(prev => prev + Math.floor(Math.random() * 50) + 10);
-    }, 3000);
-
-    return () => {
-      clearInterval(stepInterval);
-      clearInterval(burnInterval);
-    };
-  }, []);
-
-  const steps = [
-    { icon: DollarSign, label: 'Tx Fees', sublabel: '0.5% per trade', color: 'text-orange-400', bg: 'bg-orange-500/20', ring: 'ring-orange-500/30' },
-    { icon: Coins, label: 'Buy $BOND', sublabel: '100% of fees', color: 'text-yellow-400', bg: 'bg-yellow-500/20', ring: 'ring-yellow-500/30' },
-    { icon: Flame, label: 'Burn', sublabel: 'Deflationary', color: 'text-red-400', bg: 'bg-red-500/20', ring: 'ring-red-500/30' },
-    { icon: Users, label: 'Holders Win', sublabel: 'Price goes up', color: 'text-emerald-400', bg: 'bg-emerald-500/20', ring: 'ring-emerald-500/30' },
-  ];
-
-  return (
-    <div className="relative w-full max-w-xs">
-      {/* Glowing background */}
-      <div className="absolute -inset-4 bg-gradient-to-br from-orange-500/10 via-yellow-500/5 to-transparent blur-2xl rounded-3xl" />
-
-      {/* Main container */}
-      <div className="relative bg-zinc-950/80 border border-zinc-800/50 rounded-2xl backdrop-blur-xl overflow-hidden">
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <RefreshCw className={cn("w-3.5 h-3.5 text-orange-400", activeStep >= 0 && "animate-spin")} style={{ animationDuration: '3s' }} />
-            <span className="text-xs font-medium text-zinc-400">$BOND Flywheel</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Flame className="w-3 h-3 text-red-400" />
-            <span className="text-[10px] text-red-400 font-mono">{totalBurned.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* Flywheel visualization */}
-        <div className="p-4">
-          {/* Circular flywheel */}
-          <div className="relative w-full aspect-square max-w-[200px] mx-auto">
-            {/* Center circle */}
-            <div className="absolute inset-[30%] rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30 flex items-center justify-center">
-              <span className="text-xl font-bold text-orange-400">$BOND</span>
-            </div>
-
-            {/* Rotating ring */}
-            <div
-              className="absolute inset-0 rounded-full border-2 border-dashed border-orange-500/20 transition-transform duration-1000"
-              style={{ transform: `rotate(${activeStep * 90}deg)` }}
-            />
-
-            {/* Step nodes */}
-            {steps.map((step, i) => {
-              const angle = (i * 90 - 90) * (Math.PI / 180);
-              const radius = 42;
-              const x = 50 + radius * Math.cos(angle);
-              const y = 50 + radius * Math.sin(angle);
-              const isActive = activeStep === i;
-
-              return (
-                <div
-                  key={i}
-                  className={cn(
-                    "absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2 rounded-xl flex items-center justify-center transition-all duration-500",
-                    step.bg,
-                    isActive && `ring-2 ${step.ring} scale-110`
-                  )}
-                  style={{ left: `${x}%`, top: `${y}%` }}
-                >
-                  <step.icon className={cn("w-5 h-5 transition-all", step.color, isActive && "animate-pulse")} />
-                </div>
-              );
-            })}
-
-            {/* Connecting arrows */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100">
-              {[0, 1, 2, 3].map((i) => {
-                const startAngle = (i * 90 - 90 + 25) * (Math.PI / 180);
-                const endAngle = (i * 90 - 90 + 65) * (Math.PI / 180);
-                const radius = 42;
-                const x1 = 50 + radius * Math.cos(startAngle);
-                const y1 = 50 + radius * Math.sin(startAngle);
-                const x2 = 50 + radius * Math.cos(endAngle);
-                const y2 = 50 + radius * Math.sin(endAngle);
-
-                return (
-                  <path
-                    key={i}
-                    d={`M ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2}`}
-                    fill="none"
-                    stroke={activeStep === i ? 'rgba(249, 115, 22, 0.5)' : 'rgba(255,255,255,0.1)'}
-                    strokeWidth="1.5"
-                    strokeDasharray="4 2"
-                    className="transition-all duration-500"
-                  />
-                );
-              })}
-            </svg>
-          </div>
-        </div>
-
-        {/* Active step info */}
-        <div className="px-4 pb-4">
-          <div className={cn(
-            "rounded-xl p-3 transition-all duration-500",
-            steps[activeStep].bg,
-            "border border-white/5"
-          )}>
-            <div className="flex items-center gap-2 mb-1">
-              {(() => {
-                const StepIcon = steps[activeStep].icon;
-                return <StepIcon className={cn("w-4 h-4", steps[activeStep].color)} />;
-              })()}
-              <span className={cn("text-sm font-semibold", steps[activeStep].color)}>
-                {steps[activeStep].label}
-              </span>
-            </div>
-            <p className="text-xs text-zinc-500">{steps[activeStep].sublabel}</p>
-          </div>
-        </div>
-
-        {/* Bottom stats */}
-        <div className="px-4 py-2.5 border-t border-zinc-800/50 flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500">100% Revenue → $BOND</span>
-          <span className="text-[10px] text-orange-400 font-medium">Deflationary</span>
         </div>
       </div>
     </div>
@@ -505,10 +364,9 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Right side - Live animations */}
-            <div className="flex-shrink-0 hidden lg:flex gap-4 items-start">
+            {/* Right side - Live animation */}
+            <div className="flex-shrink-0 hidden lg:block">
               <LiveMigrationFeed />
-              <BondFlywheel />
             </div>
           </div>
         </div>
