@@ -19,6 +19,7 @@ const WORKFLOW_STEPS = [
 ];
 
 const TAGLINE = 'Exploiting PumpFun Profitability';
+const MIGRATOR_TOKEN_ADDRESS = 'BnbvSDF8zUjWAvkD6eyxbrTNtkRwG4i3oDNRumFRpump';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function LandingPage() {
   const [isSniperModalOpen, setIsSniperModalOpen] = useState(false);
   const [activeStep, setActiveStep] = useState(1); // Start at 1 so first box is green on load
   const [taglineIndex, setTaglineIndex] = useState(0);
+  const [copied, setCopied] = useState(false);
   const { isAuthenticated, hasCompletedOnboarding, _hasHydrated: authHydrated } = useAuthStore();
 
   useEffect(() => {
@@ -290,21 +292,28 @@ export default function LandingPage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-zinc-100">$MIGRATOR</span>
-                      <span className="px-2 py-0.5 text-xs font-medium bg-yellow-500/20 text-yellow-400 rounded">
-                        Coming Soon
+                      <span className="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-400 rounded">
+                        Live
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 text-xs bg-zinc-800 px-3 py-2 rounded font-mono text-zinc-400 truncate">
-                      Contract address coming soon...
+                      {MIGRATOR_TOKEN_ADDRESS}
                     </code>
                     <button
-                      className="p-2 hover:bg-zinc-700 rounded transition-colors text-zinc-500 hover:text-zinc-300"
-                      disabled
+                      className={cn(
+                        "p-2 rounded transition-colors",
+                        copied ? "bg-green-500/20 text-green-400" : "hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300"
+                      )}
+                      onClick={() => {
+                        navigator.clipboard.writeText(MIGRATOR_TOKEN_ADDRESS);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
                       title="Copy contract address"
                     >
-                      <Copy className="w-4 h-4" />
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
