@@ -32,7 +32,7 @@ interface PreAuthSniperModalProps {
 type Step = 'basics' | 'buying' | 'selling' | 'filters' | 'review';
 
 const DEFAULT_CONFIG: SniperConfig = {
-  snipeAmountSol: 0.1,
+  snipeAmountSol: 0.2,
   slippageBps: 1000,
   priorityFeeSol: 0.003,
   takeProfitPct: 100,
@@ -51,7 +51,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
   const [step, setStep] = useState<Step>('basics');
   const [isCreatingSniper, setIsCreatingSniper] = useState(false);
 
-  const [name, setName] = useState('My First Sniper');
+  const [name, setName] = useState('My BondShot Sniper');
   const [config, setConfig] = useState<SniperConfig>(DEFAULT_CONFIG);
 
   const [snipeAmountInput, setSnipeAmountInput] = useState(String(DEFAULT_CONFIG.snipeAmountSol));
@@ -126,7 +126,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
         toast.success(`Sniper "${name}" created successfully!`, { id: toastId });
 
         setStep('basics');
-        setName('My First Sniper');
+        setName('My BondShot Sniper');
         setConfig(DEFAULT_CONFIG);
         onClose();
         router.refresh();
@@ -207,7 +207,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
 
   const handleClose = () => {
     setStep('basics');
-    setName('My First Sniper');
+    setName('My BondShot Sniper');
     setConfig(DEFAULT_CONFIG);
     setValidationErrors({});
     setSnipeAmountInput(String(DEFAULT_CONFIG.snipeAmountSol));

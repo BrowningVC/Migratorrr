@@ -81,7 +81,7 @@ function LiveMigrationFeed() {
             <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
             <span className="text-xs font-medium text-zinc-400">Live Migrations</span>
           </div>
-          <span className="text-[10px] text-zinc-600 font-mono">bondshot.io</span>
+          <span className="text-[10px] text-zinc-600 font-mono">bondshot.xyz</span>
         </div>
 
         {/* Migration list */}
@@ -260,7 +260,7 @@ export default function LandingPage() {
                 </Button>
               </Link>
               <a
-                href="https://x.com/Bondshot_io"
+                href="https://x.com/bondshotxyz"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3 py-1.5 text-zinc-400 hover:text-white text-sm transition-colors"
@@ -529,7 +529,7 @@ export default function LandingPage() {
               Buybacks
             </Link>
             <a
-              href="https://x.com/Bondshot_io"
+              href="https://x.com/bondshotxyz"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-white transition-colors"
