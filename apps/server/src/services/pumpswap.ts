@@ -466,32 +466,28 @@ export class PumpSwapService {
     // 2. If that SOL amount <= maxSolSpend, it executes and spends EXACTLY that SOL amount
     // 3. If that SOL amount > maxSolSpend, it fails
     //
-    // This means: minTokensOut directly determines how much SOL is spent!
-    // If minTokensOut = 85% of expected, only ~85% of maxSolSpend is used.
+    // To ensure user spends their FULL SOL amount:
+    // - Set minTokensOut to expected tokens (what we want to get)
+    // - Set maxSolSpend higher than needed to allow for price movement
+    // - The AMM will spend exactly what's needed to get minTokensOut tokens
     //
-    // For "fixed input" buys where user wants to spend their FULL SOL amount:
-    // - We need minTokensOut close to expectedTokens (100%)
-    // - But allow small tolerance for block-to-block price movement
+    // User's slippage controls maxSolSpend (how much MORE they're willing to pay if price moves)
+    // The retry logic in transaction-executor.ts will escalate this on retries.
     //
-    // We use 5% execution tolerance (not user's slippage which may be 15-20%):
-    // - Ensures ~95% of intended SOL is spent
-    // - Allows for some price volatility during transaction confirmation
-    // - If price moved >5% against us, transaction fails (better than overpaying)
-    //
-    // User's configured slippage is effectively ignored for buy amount, but maxSolSpend
-    // still acts as a ceiling to protect against extreme price spikes.
-    const EXECUTION_TOLERANCE_BPS = 500; // 5% tolerance for price movement during execution
-    const minTokensOut = tokenOut * BigInt(10000 - EXECUTION_TOLERANCE_BPS) / 10000n;
+    // With 2% execution buffer on minTokensOut to handle minor price fluctuations:
+    const EXECUTION_BUFFER_BPS = 200; // 2% buffer for block-to-block price movement
+    const minTokensOut = tokenOut * BigInt(10000 - EXECUTION_BUFFER_BPS) / 10000n;
 
-    // maxSolSpend is the EXACT amount user wants to spend - no inflation
-    const maxSolSpend = solLamports;
+    // maxSolSpend includes user's slippage tolerance - allows paying more if price moved
+    // This ensures the transaction lands even if price increased, while still getting ~same tokens
+    const maxSolSpend = solLamports * BigInt(10000 + slippageBps) / 10000n;
 
     // Calculate price impact
     const priceImpactPct = Number((solLamports * 10000n) / solReserve) / 100;
 
     console.log(`   [PumpSwap] Buy quote: ${solAmount} SOL → ${Number(tokenOut) / 1e6} tokens (expected)`);
-    console.log(`   [PumpSwap] minTokensOut: ${Number(minTokensOut) / 1e6} tokens (${EXECUTION_TOLERANCE_BPS/100}% tolerance)`);
-    console.log(`   [PumpSwap] maxSolSpend: ${Number(maxSolSpend) / 1e9} SOL (exact)`);
+    console.log(`   [PumpSwap] minTokensOut: ${Number(minTokensOut) / 1e6} tokens (2% execution buffer)`);
+    console.log(`   [PumpSwap] maxSolSpend: ${Number(maxSolSpend) / 1e9} SOL (${slippageBps / 100}% slippage ceiling)`);
     console.log(`   [PumpSwap] Reserves: ${Number(solReserve) / 1e9} SOL / ${Number(tokenReserve) / 1e6} tokens`);
     console.log(`   [PumpSwap] Price impact: ${priceImpactPct.toFixed(2)}%`);
 

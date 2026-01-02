@@ -290,59 +290,88 @@ export class SnipeWorker {
       }
       console.log(`   ✓ No duplicate positions (wallet: ${walletId.slice(0, 8)}, token: ${migration.tokenMint.slice(0, 12)})`);
 
-      // CRITICAL: TWO-LAYER atomic lock system to prevent duplicate snipes
-      // Layer 1: Wallet-level lock - prevents ANY snipe to this token from this wallet
-      //          This catches cases where user has multiple snipers with same wallet
-      // Layer 2: Sniper-level lock - prevents same sniper from double-executing
+      // CRITICAL: Verify dispatch locks still exist before execution
+      // The orchestrator sets these locks during dispatch - we MUST verify they're still held
+      // by checking if OUR sniper is the one that set them. If another job already executed,
+      // these locks will have been extended or the value won't match.
       //
-      // Lock keys use consistent format: prefix:identifier:tokenMint
-      // TTL is 5 minutes - long enough for tx to complete + confirmation
-      const EXECUTION_LOCK_TTL = 300;
+      // LOCK KEY FORMAT (must match snipe-orchestrator.ts exactly):
+      // - Wallet lock: snipe-wallet-dispatch:${walletId}:${tokenMint}
+      // - Sniper lock: snipe-lock:${sniperId}:${tokenMint}
+      //
+      // We also set execution-stage locks to prevent race conditions if dispatch locks expire
+      const EXECUTION_LOCK_TTL = 300; // 5 minutes
 
-      // Layer 1: WALLET-LEVEL LOCK (most important - prevents wallet from double-buying)
-      const walletLockKey = `snipe-wallet-exec:${walletId}:${migration.tokenMint}`;
+      // Layer 1: Check if wallet dispatch lock exists and matches our sniper
+      // The dispatch lock was set by orchestrator with value = sniperId
+      const walletDispatchKey = `snipe-wallet-dispatch:${walletId}:${migration.tokenMint}`;
+      const dispatchLockOwner = await redis.get(walletDispatchKey);
+
+      if (!dispatchLockOwner) {
+        console.log(`   ⚠️ Dispatch lock expired or missing - proceeding with execution lock`);
+      } else if (dispatchLockOwner !== sniperId) {
+        // Another sniper already claimed this wallet+token combo
+        console.log(`   ❌ ABORT: Another sniper owns the dispatch lock`);
+        console.log(`      Lock key: ${walletDispatchKey}`);
+        console.log(`      Lock owner: ${dispatchLockOwner}`);
+        console.log(`      Our sniper: ${sniperId}`);
+        await emitToUser(userId, 'snipe:skipped', {
+          sniperId,
+          sniperName,
+          reason: 'Another sniper already claimed this token for this wallet',
+          tokenMint: migration.tokenMint,
+          tokenSymbol: migration.tokenSymbol,
+        });
+        return;
+      } else {
+        console.log(`   ✓ Dispatch lock verified (owner: ${sniperId.slice(0, 8)}...)`);
+      }
+
+      // Layer 2: Set execution lock (additional safety layer)
+      // This prevents race conditions if dispatch locks have expired
+      const walletExecKey = `snipe-wallet-exec:${walletId}:${migration.tokenMint}`;
       const walletLockValue = `${sniperId}:${job.id || Date.now()}`;
 
-      console.log(`   🔒 Attempting wallet lock: ${walletLockKey}`);
-      const acquiredWalletLock = await redis.set(walletLockKey, walletLockValue, 'EX', EXECUTION_LOCK_TTL, 'NX');
+      console.log(`   🔒 Attempting execution lock: ${walletExecKey}`);
+      const acquiredWalletLock = await redis.set(walletExecKey, walletLockValue, 'EX', EXECUTION_LOCK_TTL, 'NX');
 
       if (!acquiredWalletLock) {
         // Check who owns the lock for debugging
-        const lockOwner = await redis.get(walletLockKey);
-        console.log(`   ❌ ABORT: Wallet already has pending snipe for this token`);
-        console.log(`      Lock key: ${walletLockKey}`);
+        const lockOwner = await redis.get(walletExecKey);
+        console.log(`   ❌ ABORT: Wallet already has pending snipe execution for this token`);
+        console.log(`      Lock key: ${walletExecKey}`);
         console.log(`      Lock owner: ${lockOwner}`);
         console.log(`      Our attempt: ${walletLockValue}`);
         await emitToUser(userId, 'snipe:skipped', {
           sniperId,
           sniperName,
-          reason: 'Wallet already sniping this token',
+          reason: 'Wallet already executing snipe for this token',
           tokenMint: migration.tokenMint,
           tokenSymbol: migration.tokenSymbol,
         });
         return;
       }
-      console.log(`   ✓ Wallet lock acquired`);
+      console.log(`   ✓ Wallet execution lock acquired`);
 
-      // Layer 2: SNIPER-LEVEL LOCK (additional safety)
-      const sniperLockKey = `snipe-exec:${sniperId}:${migration.tokenMint}`;
-      const acquiredSniperLock = await redis.set(sniperLockKey, job.id || '1', 'EX', EXECUTION_LOCK_TTL, 'NX');
+      // Layer 3: Sniper-level execution lock (additional safety)
+      const sniperExecKey = `snipe-exec:${sniperId}:${migration.tokenMint}`;
+      const acquiredSniperLock = await redis.set(sniperExecKey, job.id || '1', 'EX', EXECUTION_LOCK_TTL, 'NX');
 
       if (!acquiredSniperLock) {
         // Release wallet lock since we couldn't get sniper lock
-        await redis.del(walletLockKey);
+        await redis.del(walletExecKey);
         console.log(`   ❌ ABORT: Sniper execution already in progress for this token`);
-        console.log(`      Lock key: ${sniperLockKey}`);
+        console.log(`      Lock key: ${sniperExecKey}`);
         await emitToUser(userId, 'snipe:skipped', {
           sniperId,
           sniperName,
-          reason: 'Another snipe already executing for this token',
+          reason: 'Another execution already in progress for this token',
           tokenMint: migration.tokenMint,
           tokenSymbol: migration.tokenSymbol,
         });
         return;
       }
-      console.log(`   ✓ Sniper lock acquired`);
+      console.log(`   ✓ Sniper execution lock acquired`);
 
       await job.updateProgress(40);
 
@@ -515,7 +544,10 @@ export class SnipeWorker {
 
     // Retry up to 3 times with 500ms delay to handle race condition
     // The transaction/position might not be committed yet when we first check
-    let transactionWithPosition: { position: NonNullable<Awaited<ReturnType<typeof prisma.transaction.findFirst>>['position']> } | null = null;
+    type TransactionWithPosition = NonNullable<Awaited<ReturnType<typeof prisma.transaction.findFirst<{ include: { position: true } }>>>>;
+    type Position = NonNullable<TransactionWithPosition['position']>;
+
+    let position: Position | null = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       const tx = await prisma.transaction.findFirst({
         where: { signature },
@@ -523,7 +555,7 @@ export class SnipeWorker {
       });
 
       if (tx?.position) {
-        transactionWithPosition = { position: tx.position };
+        position = tx.position;
         break;
       }
 
@@ -532,12 +564,10 @@ export class SnipeWorker {
       }
     }
 
-    if (!transactionWithPosition) {
+    if (!position) {
       console.error(`[Automation] Position not found for transaction ${signature.slice(0, 20)}... after 3 retries`);
       return;
     }
-
-    const position = transactionWithPosition.position;
 
     // Calculate TP/SL prices from entry price
     const entryPrice = position.entryPrice || 0;

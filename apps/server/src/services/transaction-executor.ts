@@ -1430,17 +1430,29 @@ export class TransactionExecutor {
 
   /**
    * Build a PumpSwap buy transaction with all necessary instructions
+   * @param slippageMultiplier - Factor to multiply slippage by on retries (1.0 = no change, 1.075 = +7.5%)
    */
   private async buildPumpSwapBuyTransaction(
     wallet: Keypair,
     quote: PumpSwapQuote,
     jitoTip: number,
-    platformFee: number
+    platformFee: number,
+    slippageMultiplier: number = 1.0
   ): Promise<VersionedTransaction> {
     const { blockhash } = await this.getBlockhash();
 
+    // Apply slippage multiplier if set (for retries with increased tolerance)
+    // Higher multiplier = allow spending more SOL to get the same tokens
+    // E.g., 1.075 = willing to pay 7.5% more SOL if price moved against us
+    let adjustedQuote = quote;
+    if (slippageMultiplier > 1.0) {
+      const adjustedMaxSolSpend = BigInt(Math.floor(Number(quote.maxSolSpend) * slippageMultiplier));
+      adjustedQuote = { ...quote, maxSolSpend: adjustedMaxSolSpend };
+      console.log(`   🔧 Slippage escalation: maxSolSpend ${Number(quote.maxSolSpend) / 1e9} → ${Number(adjustedMaxSolSpend) / 1e9} SOL (${((slippageMultiplier - 1) * 100).toFixed(1)}% more tolerance)`);
+    }
+
     // Get swap instructions from PumpSwap service
-    const { instructions: swapInstructions, cleanupInstructions } = await this.pumpSwapService.buildBuyInstruction(wallet, quote);
+    const { instructions: swapInstructions, cleanupInstructions } = await this.pumpSwapService.buildBuyInstruction(wallet, adjustedQuote);
 
     const instructions: TransactionInstruction[] = [];
 
@@ -1526,24 +1538,23 @@ export class TransactionExecutor {
     // Migration snipes are highly competitive - use aggressive tips
     // Strategy: Jito first (MEV protected), then Helius staked, then direct
     //
-    // NOTE: We NO LONGER escalate slippage on retries.
-    // PumpSwap AMM calculates "minimum SOL needed for minTokensOut tokens" and only spends that.
-    // Escalating slippage (lowering minTokensOut) caused users to spend LESS SOL, not more!
-    // Now we use fixed 2% execution tolerance on minTokensOut (set in getBuyQuote).
+    // Slippage escalation: Each retry increases maxSolSpend by 7.5%
+    // This helps land transactions when prices move quickly during migrations
+    // slippageMultiplier of 1.075 = willing to pay 7.5% more SOL to get same tokens
     const attempts = mevProtection
       ? [
-          { path: 'jito-parallel', tipMultiplier: 1.5 },
-          { path: 'jito-parallel', tipMultiplier: 2.5 },
-          { path: 'helius', tipMultiplier: 3.5 },
-          { path: 'direct', tipMultiplier: 5 },
+          { path: 'jito-parallel', tipMultiplier: 1.5, slippageMultiplier: 1.0 },    // No extra slippage on first attempt
+          { path: 'jito-parallel', tipMultiplier: 2.5, slippageMultiplier: 1.075 },  // +7.5% slippage tolerance
+          { path: 'helius', tipMultiplier: 3.5, slippageMultiplier: 1.15 },          // +15% slippage tolerance
+          { path: 'direct', tipMultiplier: 5, slippageMultiplier: 1.225 },           // +22.5% slippage tolerance
         ]
       : [
-          { path: 'helius', tipMultiplier: 1.5 },
-          { path: 'helius', tipMultiplier: 2.5 },
-          { path: 'direct', tipMultiplier: 4 },
+          { path: 'helius', tipMultiplier: 1.5, slippageMultiplier: 1.0 },           // No extra slippage on first attempt
+          { path: 'helius', tipMultiplier: 2.5, slippageMultiplier: 1.075 },         // +7.5% slippage tolerance
+          { path: 'direct', tipMultiplier: 4, slippageMultiplier: 1.15 },            // +15% slippage tolerance
         ];
 
-    console.log(`   🔄 PumpSwap submission strategy: ${attempts.map(a => `${a.path}(tip:${a.tipMultiplier}x)`).join(' → ')}`);
+    console.log(`   🔄 PumpSwap submission strategy: ${attempts.map(a => `${a.path}(tip:${a.tipMultiplier}x,slip:+${((a.slippageMultiplier - 1) * 100).toFixed(1)}%)`).join(' → ')}`);
 
     // Log transaction details for debugging
     console.log(`   📋 Transaction details:`);
@@ -1591,12 +1602,13 @@ export class TransactionExecutor {
       const attempt = attempts[i];
       const attemptTip = initialTip * attempt.tipMultiplier;
 
-      console.log(`   📤 Attempt ${i + 1}/${attempts.length}: ${attempt.path} (tip: ${attemptTip.toFixed(4)} SOL)`);
+      const slippageExtra = (attempt.slippageMultiplier - 1) * 100;
+      console.log(`   📤 Attempt ${i + 1}/${attempts.length}: ${attempt.path} (tip: ${attemptTip.toFixed(4)} SOL, slippage: +${slippageExtra.toFixed(1)}%)`);
 
       // ALWAYS rebuild transaction for each attempt to ensure fresh blockhash
       // This is critical - stale blockhashes cause "transaction is invalid" errors
       if (i > 0) {
-        console.log(`      Rebuilding PumpSwap transaction with fresh blockhash and higher tip...`);
+        console.log(`      Rebuilding PumpSwap transaction with fresh blockhash, higher tip, and increased slippage...`);
         await emitToUser(userId, 'snipe:retrying', {
           sniperId,
           tokenSymbol,
@@ -1604,14 +1616,14 @@ export class TransactionExecutor {
           maxAttempts: attempts.length,
           path: attempt.path,
           newTip: attemptTip,
+          slippageIncrease: slippageExtra,
         });
       }
 
-      // Use the original quote's minTokensOut (with 2% execution tolerance)
-      // We no longer adjust slippage on retries - that was causing less SOL to be spent!
       // Force fresh blockhash for every attempt by clearing cache
+      // Apply slippage multiplier for retries to improve landing rate on volatile migrations
       this.cachedBlockhash = null;
-      transaction = await this.buildPumpSwapBuyTransaction(wallet, pumpSwapQuote, attemptTip, platformFee);
+      transaction = await this.buildPumpSwapBuyTransaction(wallet, pumpSwapQuote, attemptTip, platformFee, attempt.slippageMultiplier);
 
       try {
         await emitToUser(userId, 'snipe:submitting', {

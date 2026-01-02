@@ -6,11 +6,15 @@ import { useActivityStore } from '../stores/activity';
 import { usePositionsStore } from '../stores/positions';
 import { useMigrationsStore } from '../stores/migrations';
 import toast from 'react-hot-toast';
+import { Bell, Target, Pause, OctagonX, TrendingDown } from 'lucide-react';
 
 const toastConfig = {
   duration: 4000,
   position: 'top-right' as const,
 };
+
+// Icon style for toast icons
+const iconProps = { size: 18, strokeWidth: 2 };
 
 export function useSocket(token: string | null) {
   const addActivity = useActivityStore((state) => state.addEntry);
@@ -55,7 +59,7 @@ export function useSocket(token: string | null) {
           toast(`Sniper "${data.sniperName}" paused`, {
             ...toastConfig,
             id: toastId,
-            icon: '⏸️',
+            icon: <Pause {...iconProps} />,
           });
           break;
 
@@ -75,7 +79,7 @@ export function useSocket(token: string | null) {
           toast(`New migration: $${data.tokenSymbol || data.tokenMint?.slice(0, 8)}`, {
             ...toastConfig,
             id: `migration-${data.tokenMint}`,
-            icon: '🔔',
+            icon: <Bell {...iconProps} />,
           });
           break;
 
@@ -91,7 +95,7 @@ export function useSocket(token: string | null) {
           toast(`Migration matches sniper "${data.sniperName}"`, {
             ...toastConfig,
             id: `match-${data.tokenMint}`,
-            icon: '🎯',
+            icon: <Target {...iconProps} />,
           });
           break;
 
@@ -174,7 +178,7 @@ export function useSocket(token: string | null) {
           toast(`Stop loss triggered for $${data.tokenSymbol}`, {
             ...toastConfig,
             id: `sl-${data.tokenMint}`,
-            icon: '🛑',
+            icon: <OctagonX {...iconProps} />,
           });
           break;
 
@@ -182,7 +186,7 @@ export function useSocket(token: string | null) {
           toast(`Trailing stop triggered for $${data.tokenSymbol}`, {
             ...toastConfig,
             id: `ts-${data.tokenMint}`,
-            icon: '📉',
+            icon: <TrendingDown {...iconProps} />,
           });
           break;
 
