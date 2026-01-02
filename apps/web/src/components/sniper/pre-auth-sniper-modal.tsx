@@ -129,7 +129,7 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
         setName('My BondShot Sniper');
         setConfig(DEFAULT_CONFIG);
         onClose();
-        router.refresh();
+        router.push('/dashboard');
       } else {
         throw new Error(res.error || 'Failed to create sniper');
       }
