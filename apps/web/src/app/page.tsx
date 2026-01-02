@@ -1,14 +1,152 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Zap, Shield, Target, BarChart3, Copy, Check, ChevronRight } from 'lucide-react';
+import { ArrowRight, Zap, Shield, Target, BarChart3, Copy, Check, ChevronRight, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo, LogoText } from '@/components/logo';
 import { PreAuthSniperModal } from '@/components/sniper/pre-auth-sniper-modal';
 import { useAuthStore } from '@/lib/stores/auth';
 import { cn } from '@/lib/utils';
+
+// Mock migration data for the animation
+const MOCK_TOKENS = [
+  { symbol: '$PEPE', pnl: '+142%', amount: '0.5 SOL' },
+  { symbol: '$DOGE', pnl: '+89%', amount: '0.3 SOL' },
+  { symbol: '$BONK', pnl: '+256%', amount: '0.8 SOL' },
+  { symbol: '$WIF', pnl: '+67%', amount: '0.2 SOL' },
+  { symbol: '$POPCAT', pnl: '+198%', amount: '0.4 SOL' },
+  { symbol: '$BOME', pnl: '+312%', amount: '1.0 SOL' },
+  { symbol: '$MYRO', pnl: '+45%', amount: '0.6 SOL' },
+  { symbol: '$SAMO', pnl: '+178%', amount: '0.35 SOL' },
+];
+
+function LiveMigrationFeed() {
+  const [migrations, setMigrations] = useState<Array<{
+    id: number;
+    symbol: string;
+    pnl: string;
+    amount: string;
+    timestamp: string;
+    status: 'detected' | 'sniped' | 'profit';
+  }>>([]);
+  const idCounter = useRef(0);
+
+  useEffect(() => {
+    // Add initial migrations
+    const initial = MOCK_TOKENS.slice(0, 4).map((token, i) => ({
+      id: idCounter.current++,
+      ...token,
+      timestamp: `${i + 1}s ago`,
+      status: 'profit' as const,
+    }));
+    setMigrations(initial);
+
+    // Add new migrations periodically
+    const interval = setInterval(() => {
+      const randomToken = MOCK_TOKENS[Math.floor(Math.random() * MOCK_TOKENS.length)];
+      const newMigration = {
+        id: idCounter.current++,
+        ...randomToken,
+        pnl: `+${Math.floor(Math.random() * 300) + 50}%`,
+        timestamp: 'now',
+        status: 'detected' as const,
+      };
+
+      setMigrations(prev => {
+        const updated = [newMigration, ...prev.slice(0, 5)];
+        // Update statuses
+        return updated.map((m, i) => ({
+          ...m,
+          status: i === 0 ? 'detected' : i === 1 ? 'sniped' : 'profit',
+          timestamp: i === 0 ? 'now' : `${i * 2}s ago`,
+        }));
+      });
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="relative w-full max-w-sm">
+      {/* Glowing background */}
+      <div className="absolute -inset-4 bg-gradient-to-r from-orange-500/20 via-orange-600/10 to-transparent blur-2xl rounded-3xl" />
+
+      {/* Main container */}
+      <div className="relative bg-zinc-950/80 border border-zinc-800/50 rounded-2xl backdrop-blur-xl overflow-hidden">
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            <span className="text-xs font-medium text-zinc-400">Live Migrations</span>
+          </div>
+          <span className="text-[10px] text-zinc-600 font-mono">bondshot.io</span>
+        </div>
+
+        {/* Migration list */}
+        <div className="p-2 space-y-1.5">
+          {migrations.map((migration, i) => (
+            <div
+              key={migration.id}
+              className={cn(
+                "flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-500",
+                i === 0 && "bg-orange-500/10 border border-orange-500/20 animate-pulse",
+                i === 1 && "bg-zinc-800/50 border border-zinc-700/50",
+                i > 1 && "bg-zinc-900/30"
+              )}
+              style={{
+                opacity: 1 - (i * 0.15),
+                transform: `translateY(${i === 0 ? 0 : 0}px)`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
+                  i === 0 ? "bg-orange-500/20 text-orange-400" : "bg-zinc-800 text-zinc-400"
+                )}>
+                  {migration.symbol.charAt(1)}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{migration.symbol}</p>
+                  <p className="text-[10px] text-zinc-500">{migration.amount} • {migration.timestamp}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={cn(
+                  "text-sm font-bold font-mono",
+                  i === 0 ? "text-orange-400" : "text-orange-400/70"
+                )}>
+                  {migration.pnl}
+                </p>
+                <p className={cn(
+                  "text-[10px]",
+                  i === 0 ? "text-orange-400/70" : "text-zinc-600"
+                )}>
+                  {i === 0 ? '⚡ Sniped' : i === 1 ? '✓ Filled' : '$ Profit'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom stats bar */}
+        <div className="px-4 py-2.5 border-t border-zinc-800/50 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp className="w-3 h-3 text-orange-400" />
+            <span className="text-xs text-orange-400 font-medium">+2.4 SOL</span>
+            <span className="text-[10px] text-zinc-600">today</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-zinc-500">12 snipes</span>
+            <span className="text-[10px] text-zinc-700">•</span>
+            <span className="text-[10px] text-zinc-500">83% win</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const BOND_TOKEN_ADDRESS = 'BnbvSDF8zUjWAvkD6eyxbrTNtkRwG4i3oDNRumFRpump';
 
@@ -172,60 +310,70 @@ export default function LandingPage() {
         {/* Subtle grid */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
 
-        <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm mb-8">
-            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-            <span className="text-sm text-zinc-400">Migration Sniper for Solana</span>
-          </div>
-
-          {/* Main headline */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6">
-            <span className="block text-white">Catch Every</span>
-            <span className="block bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 bg-clip-text text-transparent">
-              Migration
-            </span>
-          </h1>
-
-          {/* Subheadline */}
-          <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Automated sniping for PumpFun to Raydium migrations.
-            Sub-50ms detection, MEV protection, and intelligent position management.
-          </p>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Button
-              size="lg"
-              className="h-14 px-8 bg-orange-500 hover:bg-orange-600 text-black font-semibold text-lg gap-2 rounded-xl"
-              onClick={() => setIsSniperModalOpen(true)}
-            >
-              Start Sniping
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-            <Link href="/how-it-works">
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 px-8 border-zinc-700 hover:bg-zinc-900 text-white font-medium text-lg rounded-xl"
-              >
-                Learn More
-              </Button>
-            </Link>
-          </div>
-
-          {/* Stats Bar */}
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
-            {STATS.map((stat, i) => (
-              <div key={i} className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-white font-mono">
-                  {stat.value}
-                </div>
-                <div className="text-xs md:text-sm text-zinc-500 uppercase tracking-wider mt-1">
-                  {stat.label}
-                </div>
+        <div className="relative z-10 max-w-7xl mx-auto px-6">
+          <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+            {/* Left side - Text content */}
+            <div className="flex-1 text-center lg:text-left">
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm mb-8">
+                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                <span className="text-sm text-zinc-400">Migration Sniper for Solana</span>
               </div>
-            ))}
+
+              {/* Main headline */}
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
+                <span className="block text-white">Catch Every</span>
+                <span className="block bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 bg-clip-text text-transparent">
+                  Migration
+                </span>
+              </h1>
+
+              {/* Subheadline */}
+              <p className="text-lg md:text-xl text-zinc-400 max-w-xl mb-10 leading-relaxed">
+                Automated sniping for PumpFun to Raydium migrations.
+                Sub-50ms detection, MEV protection, and intelligent position management.
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4 mb-12">
+                <Button
+                  size="lg"
+                  className="h-14 px-8 bg-orange-500 hover:bg-orange-600 text-black font-semibold text-lg gap-2 rounded-xl"
+                  onClick={() => setIsSniperModalOpen(true)}
+                >
+                  Start Sniping
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+                <Link href="/how-it-works">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-14 px-8 border-zinc-700 hover:bg-zinc-900 text-white font-medium text-lg rounded-xl"
+                  >
+                    Learn More
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Stats Bar */}
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-8">
+                {STATS.map((stat, i) => (
+                  <div key={i} className="text-center lg:text-left">
+                    <div className="text-2xl font-bold text-white font-mono">
+                      {stat.value}
+                    </div>
+                    <div className="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                      {stat.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right side - Live animation */}
+            <div className="flex-shrink-0 hidden lg:block">
+              <LiveMigrationFeed />
+            </div>
           </div>
         </div>
 

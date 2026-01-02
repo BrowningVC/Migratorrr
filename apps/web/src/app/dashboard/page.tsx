@@ -366,12 +366,12 @@ export default function DashboardPage() {
               <div className={cn(
                 "relative rounded-2xl px-6 py-5 border overflow-hidden",
                 isProfitable
-                  ? "bg-gradient-to-br from-green-950/40 via-green-900/20 to-transparent border-green-500/20"
+                  ? "bg-gradient-to-br from-orange-950/40 via-orange-900/20 to-transparent border-orange-500/20"
                   : "bg-gradient-to-br from-red-950/40 via-red-900/20 to-transparent border-red-500/20"
               )}>
                 <div className="absolute top-3 right-3">
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/40 border border-white/10">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
                     <span className="text-[10px] text-white/70">Live</span>
                   </div>
                 </div>
@@ -380,7 +380,7 @@ export default function DashboardPage() {
                 <div className="flex items-end gap-2">
                   <h1 className={cn(
                     "text-4xl font-bold tracking-tight",
-                    isProfitable ? "text-green-400" : "text-red-400"
+                    isProfitable ? "text-orange-400" : "text-red-400"
                   )}>
                     {isProfitable ? '+' : ''}{stats.totalPnlSol.toFixed(3)}
                   </h1>
@@ -388,7 +388,7 @@ export default function DashboardPage() {
                 </div>
                 <p className={cn(
                   "text-sm mt-1",
-                  isProfitable ? "text-green-400/70" : "text-red-400/70"
+                  isProfitable ? "text-orange-400/70" : "text-red-400/70"
                 )}>
                   {isProfitable ? '+' : ''}{stats.totalPnlPct.toFixed(1)}%
                 </p>
@@ -434,7 +434,7 @@ export default function DashboardPage() {
             <div className="lg:col-span-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-green-400" />
+                  <TrendingUp className="w-5 h-5 text-orange-400" />
                   Positions
                 </h2>
               </div>
@@ -457,7 +457,7 @@ export default function DashboardPage() {
                         key={position.id}
                         className={cn(
                           "group relative rounded-2xl border bg-white/[0.02] backdrop-blur-sm p-4 transition-all hover:bg-white/[0.04]",
-                          isProfit && "border-green-500/20 hover:border-green-500/30",
+                          isProfit && "border-orange-500/20 hover:border-orange-500/30",
                           isLoss && "border-red-500/20 hover:border-red-500/30",
                           !isProfit && !isLoss && "border-white/5"
                         )}
@@ -489,14 +489,14 @@ export default function DashboardPage() {
                             <div className="text-right">
                               <p className={cn(
                                 "text-xl font-bold font-mono",
-                                isProfit && "text-green-400",
+                                isProfit && "text-orange-400",
                                 isLoss && "text-red-400",
                                 !isProfit && !isLoss && "text-white/40"
                               )}>
                                 {isProfit ? '+' : ''}{pnlPct.toFixed(1)}%
                               </p>
                               {position.pnlSol !== undefined && (
-                                <p className={cn("text-xs font-mono", isProfit ? "text-green-400/60" : isLoss ? "text-red-400/60" : "text-white/30")}>
+                                <p className={cn("text-xs font-mono", isProfit ? "text-orange-400/60" : isLoss ? "text-red-400/60" : "text-white/30")}>
                                   {isProfit ? '+' : ''}{position.pnlSol.toFixed(4)}
                                 </p>
                               )}
