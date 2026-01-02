@@ -59,7 +59,7 @@ export default function BuybacksPage() {
             mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
-          <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">$MIGRATOR</span>
+          <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">$BOND</span>
           <span className="text-zinc-100"> Buybacks</span>
         </h1>
 
@@ -69,7 +69,7 @@ export default function BuybacksPage() {
             mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
-          Fees from Sniper trades & Token Volume are used to buy back and burn $MIGRATOR tokens
+          Fees from Sniper trades & Token Volume are used to buy back and burn $BOND tokens
         </p>
 
         {/* Factory Conveyor Belt Animation */}
@@ -258,7 +258,7 @@ export default function BuybacksPage() {
               </div>
               {/* Labels */}
               <div className="mt-4 flex flex-col items-center gap-1">
-                <span className="text-sm font-semibold bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">$MIGRATOR</span>
+                <span className="text-sm font-semibold bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">$BOND</span>
                 <span className="text-xs text-zinc-500 uppercase tracking-wider">Buy Backs</span>
               </div>
             </div>

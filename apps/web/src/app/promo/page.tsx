@@ -175,7 +175,7 @@ export default function PromoPage() {
                 Sniper Dashboard
               </Button>
               <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
-                $MIGRATOR Buybacks
+                $BOND Buybacks
               </Button>
               <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
                 How it Works
@@ -673,7 +673,7 @@ export default function PromoPage() {
       {/* Floating badge for screenshots */}
       <div className="fixed bottom-4 right-4 px-4 py-2 bg-zinc-900/90 border border-zinc-700 rounded-full text-sm flex items-center gap-2 backdrop-blur">
         <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
-        <span className="text-zinc-400">migratorrr.xyz</span>
+        <span className="text-zinc-400">bondshot.io</span>
       </div>
 
       {/* Coming Soon Modal */}

@@ -66,7 +66,7 @@ export default function HowItWorksPage() {
     { id: 'exit', label: 'Exit Strategies', icon: TrendingUp },
     { id: 'protection', label: 'MEV Protection', icon: Shield },
     { id: 'monitoring', label: 'Monitoring & Alerts', icon: Activity },
-    { id: 'buybacks', label: '$MIGRATOR Buybacks', icon: Flame },
+    { id: 'buybacks', label: '$BOND Buybacks', icon: Flame },
     { id: 'fees', label: 'Fees & Costs', icon: DollarSign },
   ];
 
@@ -84,7 +84,7 @@ export default function HowItWorksPage() {
               <Button variant="ghost">Sniper Dashboard</Button>
             </Link>
             <Link href="/buybacks">
-              <Button variant="ghost">$MIGRATOR Buybacks</Button>
+              <Button variant="ghost">$BOND Buybacks</Button>
             </Link>
             <Link href="/how-it-works">
               <Button variant="ghost" className="text-primary">How it Works</Button>
@@ -130,7 +130,7 @@ export default function HowItWorksPage() {
           <main className="flex-1 max-w-4xl">
             {/* Page Header */}
             <div className="mb-12">
-              <h1 className="text-4xl font-bold mb-4">How Migratorrr Works</h1>
+              <h1 className="text-4xl font-bold mb-4">How Bondshot Works</h1>
               <p className="text-lg text-muted-foreground">
                 A comprehensive guide to automated token sniping on Solana. Learn how to configure
                 snipers, set filters, and maximize your trading efficiency.
@@ -140,7 +140,7 @@ export default function HowItWorksPage() {
             {/* Overview Section */}
             <Section id="overview" title="Overview" icon={Eye}>
               <p className="text-muted-foreground mb-6">
-                Migratorrr is an automated trading platform that monitors PumpFun token migrations
+                Bondshot is an automated trading platform that monitors PumpFun token migrations
                 to Raydium and PumpSwap, executing trades based on your configured strategies. Here&apos;s the
                 high-level flow:
               </p>
@@ -183,7 +183,7 @@ export default function HowItWorksPage() {
             {/* Migration Detection Section */}
             <Section id="detection" title="Migration Detection" icon={Zap}>
               <p className="text-muted-foreground mb-6">
-                Speed is everything in token sniping. Migratorrr uses real-time WebSocket streaming
+                Speed is everything in token sniping. Bondshot uses real-time WebSocket streaming
                 to catch migrations as fast as possible.
               </p>
 
@@ -376,7 +376,7 @@ export default function HowItWorksPage() {
             {/* Trade Execution Section */}
             <Section id="execution" title="Trade Execution" icon={Target}>
               <p className="text-muted-foreground mb-6">
-                When a migration matches your sniper&apos;s criteria, Migratorrr automatically
+                When a migration matches your sniper&apos;s criteria, Bondshot automatically
                 executes a buy transaction. For Raydium migrations, Jupiter is used for optimal routing.
                 For PumpSwap, direct swap instructions are used.
               </p>
@@ -474,7 +474,7 @@ export default function HowItWorksPage() {
             <Section id="protection" title="MEV Protection" icon={Shield}>
               <p className="text-muted-foreground mb-6">
                 MEV (Maximal Extractable Value) attacks like sandwich attacks can significantly
-                impact your trade prices. Migratorrr uses Jito bundles to protect your transactions.
+                impact your trade prices. Bondshot uses Jito bundles to protect your transactions.
               </p>
 
               <div className="grid md:grid-cols-2 gap-6 mb-6">
@@ -577,9 +577,9 @@ export default function HowItWorksPage() {
             </Section>
 
             {/* Buybacks Section */}
-            <Section id="buybacks" title="$MIGRATOR Buybacks" icon={Flame}>
+            <Section id="buybacks" title="$BOND Buybacks" icon={Flame}>
               <p className="text-muted-foreground mb-6">
-                Platform fees are used to buy back and burn $MIGRATOR tokens, creating deflationary
+                Platform fees are used to buy back and burn $BOND tokens, creating deflationary
                 pressure and rewarding holders.
               </p>
 
@@ -617,16 +617,16 @@ export default function HowItWorksPage() {
                   />
                   <TimelineItem
                     time="4"
-                    event="$MIGRATOR tokens burned, reducing supply"
+                    event="$BOND tokens burned, reducing supply"
                     highlight
                   />
                 </div>
               </div>
 
               <InfoBox type="success" title="Deflationary Tokenomics">
-                Every successful trade on Migratorrr contributes to $MIGRATOR buybacks.
+                Every successful trade on Bondshot contributes to $BOND buybacks.
                 Tokens are permanently burned, reducing total supply over time.
-                Track buyback stats on the <Link href="/buybacks" className="underline text-primary">$MIGRATOR Buybacks</Link> page.
+                Track buyback stats on the <Link href="/buybacks" className="underline text-primary">$BOND Buybacks</Link> page.
               </InfoBox>
             </Section>
 
@@ -650,7 +650,7 @@ export default function HowItWorksPage() {
                       <td className="px-4 py-3 font-medium">Platform Fee</td>
                       <td className="px-4 py-3 text-primary font-semibold">1%</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
-                        On successful buy transactions only (funds $MIGRATOR buybacks)
+                        On successful buy transactions only (funds $BOND buybacks)
                       </td>
                     </tr>
                     <tr>
@@ -680,7 +680,7 @@ export default function HowItWorksPage() {
 
               <InfoBox type="info" title="No Hidden Fees">
                 Failed transactions only cost gas (network fee). The 1% platform fee is only
-                charged on successful buys and goes directly to $MIGRATOR buybacks. Sells have no platform fee—just network and swap fees.
+                charged on successful buys and goes directly to $BOND buybacks. Sells have no platform fee—just network and swap fees.
               </InfoBox>
             </Section>
 
@@ -721,13 +721,13 @@ export default function HowItWorksPage() {
                 Sniper Dashboard
               </Link>
               <Link href="/buybacks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                $MIGRATOR Buybacks
+                $BOND Buybacks
               </Link>
               <Link href="/how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 How it Works
               </Link>
               <a
-                href="https://x.com/Migratorrr"
+                href="https://x.com/Bondshot_io"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
@@ -735,7 +735,7 @@ export default function HowItWorksPage() {
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
-                @Migratorrr
+                @Bondshot_io
               </a>
             </div>
             <p className="text-sm text-muted-foreground">

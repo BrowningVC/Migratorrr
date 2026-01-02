@@ -10,7 +10,7 @@ import { PreAuthSniperModal } from '@/components/sniper/pre-auth-sniper-modal';
 import { useAuthStore } from '@/lib/stores/auth';
 import { cn } from '@/lib/utils';
 
-const MIGRATOR_TOKEN_ADDRESS = 'BnbvSDF8zUjWAvkD6eyxbrTNtkRwG4i3oDNRumFRpump';
+const BOND_TOKEN_ADDRESS = 'BnbvSDF8zUjWAvkD6eyxbrTNtkRwG4i3oDNRumFRpump';
 
 const STATS = [
   { value: '<50ms', label: 'Detection' },
@@ -94,7 +94,7 @@ export default function LandingPage() {
   };
 
   const handleCopyCA = () => {
-    navigator.clipboard.writeText(MIGRATOR_TOKEN_ADDRESS);
+    navigator.clipboard.writeText(BOND_TOKEN_ADDRESS);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -118,11 +118,11 @@ export default function LandingPage() {
               </Link>
               <Link href="/buybacks">
                 <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white text-sm">
-                  $MIGRATOR
+                  $BOND
                 </Button>
               </Link>
               <a
-                href="https://x.com/Migratorrr"
+                href="https://x.com/Bondshot_io"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3 py-1.5 text-zinc-400 hover:text-white text-sm transition-colors"
@@ -319,11 +319,11 @@ export default function LandingPage() {
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 mb-4">
                   <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                  <span className="text-sm text-orange-400 font-medium">$MIGRATOR</span>
+                  <span className="text-sm text-orange-400 font-medium">$BOND</span>
                 </div>
                 <h3 className="text-2xl md:text-3xl font-bold mb-2">Platform Token</h3>
                 <p className="text-zinc-400 max-w-md">
-                  50% of platform fees buy back and burn $MIGRATOR.
+                  50% of platform fees buy back and burn $BOND.
                   Hold for reduced fees and exclusive features.
                 </p>
               </div>
@@ -334,7 +334,7 @@ export default function LandingPage() {
                   className="flex items-center gap-3 px-5 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors group"
                 >
                   <code className="text-sm text-zinc-300 font-mono">
-                    {MIGRATOR_TOKEN_ADDRESS.slice(0, 6)}...{MIGRATOR_TOKEN_ADDRESS.slice(-6)}
+                    {BOND_TOKEN_ADDRESS.slice(0, 6)}...{BOND_TOKEN_ADDRESS.slice(-6)}
                   </code>
                   {copied ? (
                     <Check className="w-4 h-4 text-orange-400" />
@@ -387,7 +387,7 @@ export default function LandingPage() {
               Buybacks
             </Link>
             <a
-              href="https://x.com/Migratorrr"
+              href="https://x.com/Bondshot_io"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-white transition-colors"

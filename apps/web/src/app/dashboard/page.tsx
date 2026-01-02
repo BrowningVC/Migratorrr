@@ -70,7 +70,6 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [walletBalances, setWalletBalances] = useState<WalletBalance[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'positions' | 'snipers' | 'activity'>('positions');
   const [depositModalData, setDepositModalData] = useState<{
     isOpen: boolean;
     walletAddress: string;
@@ -615,60 +614,21 @@ export default function DashboardPage() {
             </button>
           </Link>
 
-          <button
-            onClick={() => setActiveTab('positions')}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm",
-              activeTab === 'positions'
-                ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-            )}
-          >
-            <TrendingUp className="w-4 h-4" />
-            Positions
-            {openPositions.length > 0 && (
-              <span className="ml-auto text-xs bg-zinc-800 px-1.5 py-0.5 rounded">
-                {openPositions.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('snipers')}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm",
-              activeTab === 'snipers'
-                ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-            )}
-          >
+          <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 text-sm">
             <Crosshair className="w-4 h-4" />
-            Snipers
+            Dashboard
             {activeSnipers.length > 0 && (
               <span className="ml-auto text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
                 {activeSnipers.length} live
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('activity')}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm",
-              activeTab === 'activity'
-                ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-            )}
-          >
-            <History className="w-4 h-4" />
-            Activity
-          </button>
+          </div>
 
           <div className="pt-4 border-t border-zinc-800 mt-4">
             <Link href="/buybacks">
               <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors text-sm">
                 <Wallet className="w-4 h-4" />
-                $MIGRATOR
+                $BOND
               </button>
             </Link>
             <Link href="/how-it-works">
@@ -745,186 +705,184 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Tab Content */}
-          {activeTab === 'positions' && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-                <h2 className="font-semibold">Open Positions</h2>
-                <span className="text-sm text-zinc-500">{openPositions.length} position{openPositions.length !== 1 ? 's' : ''}</span>
-              </div>
-
-              {openPositions.length === 0 ? (
-                <div className="p-12 text-center">
-                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-4">
-                    <TrendingUp className="w-6 h-6 text-zinc-600" />
-                  </div>
-                  <p className="text-zinc-400 mb-2">No open positions</p>
-                  <p className="text-sm text-zinc-600">Positions appear here when snipers catch migrations</p>
+          {/* Main Grid - All sections visible */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Left Column - Positions & Snipers */}
+            <div className="xl:col-span-2 space-y-6">
+              {/* Open Positions */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-orange-400" />
+                    Open Positions
+                  </h2>
+                  <span className="text-sm text-zinc-500">{openPositions.length} position{openPositions.length !== 1 ? 's' : ''}</span>
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-zinc-800/50">
-                      <tr className="text-left text-xs text-zinc-500 uppercase">
-                        <th className="px-4 py-3 font-medium">Token</th>
-                        <th className="px-4 py-3 font-medium text-right">Entry</th>
-                        <th className="px-4 py-3 font-medium text-right">Entry MCAP</th>
-                        <th className="px-4 py-3 font-medium text-right">Current MCAP</th>
-                        <th className="px-4 py-3 font-medium text-right">P&L</th>
-                        <th className="px-4 py-3 font-medium text-right">Time</th>
-                        <th className="px-4 py-3 font-medium text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800/50">
-                      {openPositions.map((position) => {
-                        const pnlPct = position.pnlPct ?? 0;
-                        const isProfit = pnlPct > 0;
-                        const isLoss = pnlPct < 0;
 
-                        return (
-                          <tr key={position.id} className="hover:bg-zinc-800/20 transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-xs font-bold text-black">
-                                  {position.tokenSymbol?.charAt(0) || '?'}
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">{position.tokenSymbol || position.tokenMint?.slice(0, 6)}</span>
-                                    <button
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(position.tokenMint || '');
-                                        toast.success('Copied!');
-                                      }}
-                                      className="p-1 hover:bg-zinc-700 rounded transition-colors"
-                                    >
-                                      <Copy className="w-3 h-3 text-zinc-500" />
-                                    </button>
-                                    <a
-                                      href={`https://dexscreener.com/solana/${position.tokenMint}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-1 hover:bg-zinc-700 rounded transition-colors"
-                                    >
-                                      <ExternalLink className="w-3 h-3 text-zinc-500" />
-                                    </a>
+                {openPositions.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3">
+                      <TrendingUp className="w-5 h-5 text-zinc-600" />
+                    </div>
+                    <p className="text-zinc-400 text-sm mb-1">No open positions</p>
+                    <p className="text-xs text-zinc-600">Positions appear when snipers catch migrations</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-zinc-800/50">
+                        <tr className="text-left text-xs text-zinc-500 uppercase">
+                          <th className="px-4 py-2 font-medium">Token</th>
+                          <th className="px-4 py-2 font-medium text-right">Entry</th>
+                          <th className="px-4 py-2 font-medium text-right">MCAP</th>
+                          <th className="px-4 py-2 font-medium text-right">P&L</th>
+                          <th className="px-4 py-2 font-medium text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/50">
+                        {openPositions.map((position) => {
+                          const pnlPct = position.pnlPct ?? 0;
+                          const isProfit = pnlPct > 0;
+                          const isLoss = pnlPct < 0;
+
+                          return (
+                            <tr key={position.id} className="hover:bg-zinc-800/20 transition-colors">
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-xs font-bold text-black">
+                                    {position.tokenSymbol?.charAt(0) || '?'}
                                   </div>
-                                  <p className="text-[10px] text-zinc-600 font-mono">
-                                    {position.tokenMint?.slice(0, 4)}...{position.tokenMint?.slice(-4)}
-                                  </p>
+                                  <div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="font-medium text-sm">{position.tokenSymbol || position.tokenMint?.slice(0, 6)}</span>
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(position.tokenMint || '');
+                                          toast.success('Copied!');
+                                        }}
+                                        className="p-0.5 hover:bg-zinc-700 rounded transition-colors"
+                                      >
+                                        <Copy className="w-3 h-3 text-zinc-500" />
+                                      </button>
+                                      <a
+                                        href={`https://dexscreener.com/solana/${position.tokenMint}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-0.5 hover:bg-zinc-700 rounded transition-colors"
+                                      >
+                                        <ExternalLink className="w-3 h-3 text-zinc-500" />
+                                      </a>
+                                    </div>
+                                    <p className="text-[10px] text-zinc-600 font-mono">
+                                      {position.tokenMint?.slice(0, 4)}...{position.tokenMint?.slice(-4)}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono">
-                              {position.entrySol?.toFixed(3)} SOL
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono text-zinc-400">
-                              {formatMcap(position.entryMarketCap)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono text-zinc-400">
-                              {formatMcap(position.currentMarketCap)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className={cn(
-                                "font-bold font-mono",
-                                isProfit && "text-green-400",
-                                isLoss && "text-red-400",
-                                !isProfit && !isLoss && "text-zinc-400"
-                              )}>
-                                {isProfit ? '+' : ''}{pnlPct.toFixed(1)}%
-                              </span>
-                              {position.pnlSol !== undefined && (
-                                <p className={cn(
-                                  "text-[10px] font-mono",
-                                  isProfit ? "text-green-400/70" : isLoss ? "text-red-400/70" : "text-zinc-500"
+                              </td>
+                              <td className="px-4 py-2 text-right font-mono text-sm">
+                                {position.entrySol?.toFixed(3)}
+                              </td>
+                              <td className="px-4 py-2 text-right font-mono text-sm text-zinc-400">
+                                {formatMcap(position.currentMarketCap)}
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <span className={cn(
+                                  "font-bold font-mono text-sm",
+                                  isProfit && "text-green-400",
+                                  isLoss && "text-red-400",
+                                  !isProfit && !isLoss && "text-zinc-400"
                                 )}>
-                                  {isProfit ? '+' : ''}{position.pnlSol.toFixed(4)}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right text-zinc-500 text-xs">
-                              {position.createdAt
-                                ? new Date(position.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                : '—'}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-3 text-xs border-red-800/50 text-red-400 hover:bg-red-900/30 hover:text-red-300"
-                                onClick={() => handleSellPosition(position.id)}
-                                disabled={sellingPositions.has(position.id) || position.status === 'selling'}
-                              >
-                                {sellingPositions.has(position.id) || position.status === 'selling' ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    Selling
-                                  </>
-                                ) : (
-                                  'Sell'
-                                )}
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'snipers' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Your Snipers</h2>
-                <Button
-                  size="sm"
-                  className="bg-orange-500 hover:bg-orange-600 text-black"
-                  onClick={() => setIsCreateModalOpen(true)}
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Create Sniper
-                </Button>
+                                  {isProfit ? '+' : ''}{pnlPct.toFixed(1)}%
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-xs border-red-800/50 text-red-400 hover:bg-red-900/30 hover:text-red-300"
+                                  onClick={() => handleSellPosition(position.id)}
+                                  disabled={sellingPositions.has(position.id) || position.status === 'selling'}
+                                >
+                                  {sellingPositions.has(position.id) || position.status === 'selling' ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    'Sell'
+                                  )}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
-              {snipers.length === 0 ? (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-12 text-center">
-                  <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-4">
-                    <Crosshair className="w-6 h-6 text-orange-400" />
-                  </div>
-                  <p className="text-zinc-400 mb-2">No snipers yet</p>
-                  <p className="text-sm text-zinc-600 mb-4">Create your first sniper to start catching migrations</p>
+              {/* Snipers */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <Crosshair className="w-4 h-4 text-orange-400" />
+                    Your Snipers
+                  </h2>
                   <Button
-                    className="bg-orange-500 hover:bg-orange-600 text-black"
+                    size="sm"
+                    className="h-7 bg-orange-500 hover:bg-orange-600 text-black"
                     onClick={() => setIsCreateModalOpen(true)}
                   >
-                    Create Sniper
+                    <Plus className="w-3 h-3 mr-1" />
+                    New
                   </Button>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {snipers.map((sniper) => (
-                    <SniperCard
-                      key={sniper.id}
-                      sniper={sniper}
-                      walletBalance={tradingWallet?.balanceSol}
-                      walletAddress={tradingWallet?.publicKey}
-                      onToggle={handleToggleSniper}
-                      onDelete={handleDeleteSniper}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
-          {activeTab === 'activity' && (
-            <div className="max-w-2xl">
-              <ActivityLog />
+                {snipers.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-3">
+                      <Crosshair className="w-5 h-5 text-orange-400" />
+                    </div>
+                    <p className="text-zinc-400 text-sm mb-1">No snipers yet</p>
+                    <p className="text-xs text-zinc-600 mb-3">Create your first sniper to start catching migrations</p>
+                    <Button
+                      size="sm"
+                      className="bg-orange-500 hover:bg-orange-600 text-black"
+                      onClick={() => setIsCreateModalOpen(true)}
+                    >
+                      Create Sniper
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {snipers.map((sniper) => (
+                      <SniperCard
+                        key={sniper.id}
+                        sniper={sniper}
+                        walletBalance={tradingWallet?.balanceSol}
+                        walletAddress={tradingWallet?.publicKey}
+                        onToggle={handleToggleSniper}
+                        onDelete={handleDeleteSniper}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+
+            {/* Right Column - Activity */}
+            <div className="xl:col-span-1">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden sticky top-20">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <History className="w-4 h-4 text-orange-400" />
+                    Activity
+                  </h2>
+                </div>
+                <div className="p-4">
+                  <ActivityLog />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 

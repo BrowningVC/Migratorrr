@@ -22,11 +22,37 @@ export function Logo({ className, size = 'md' }: LogoProps) {
       fill="none"
       className={cn(sizes[size], className)}
     >
-      {/* Single abstract arrow mark - minimal, bold */}
-      <path
-        d="M8 38 L24 10 L40 38 L24 28 Z"
-        fill="#22C55E"
+      {/* Bondshot logo - targeting crosshair with bond/connection element */}
+      {/* Outer ring */}
+      <circle
+        cx="24"
+        cy="24"
+        r="18"
+        stroke="#f97316"
+        strokeWidth="2.5"
+        fill="none"
       />
+      {/* Inner ring */}
+      <circle
+        cx="24"
+        cy="24"
+        r="10"
+        stroke="#f97316"
+        strokeWidth="2"
+        fill="none"
+      />
+      {/* Center dot - the target */}
+      <circle
+        cx="24"
+        cy="24"
+        r="3"
+        fill="#f97316"
+      />
+      {/* Crosshair lines */}
+      <line x1="24" y1="2" x2="24" y2="12" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="24" y1="36" x2="24" y2="46" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="2" y1="24" x2="12" y2="24" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="36" y1="24" x2="46" y2="24" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -52,7 +78,7 @@ export function LogoText({ className, size = 'md' }: LogoTextProps) {
         className
       )}
     >
-      Migratorrr
+      Bondshot
     </span>
   );
 }
