@@ -797,13 +797,109 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                       </button>
                     </div>
                   </div>
+
+                  {/* Min Twitter Followers Filter */}
+                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
+                    <Label className="text-xs font-medium text-zinc-300 block mb-1">Min Twitter Followers</Label>
+                    <p className="text-[10px] text-zinc-500 mb-2">Minimum followers on token's Twitter</p>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[
+                        { value: 100, label: '100+' },
+                        { value: 500, label: '500+' },
+                        { value: 1000, label: '1K+' },
+                        { value: 5000, label: '5K+' },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => updateConfig({ minTwitterFollowers: config.minTwitterFollowers === option.value ? undefined : option.value })}
+                          className={cn(
+                            'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
+                            config.minTwitterFollowers === option.value
+                              ? 'bg-green-600 text-white'
+                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Creator Score Filter */}
+                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
+                    <Label className="text-xs font-medium text-zinc-300 block mb-1">Min Creator Score</Label>
+                    <p className="text-[10px] text-zinc-500 mb-2">Trust score based on creator history (0-100)</p>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { value: 25, label: '25+' },
+                        { value: 50, label: '50+' },
+                        { value: 75, label: '75+' },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => updateConfig({ minCreatorScore: config.minCreatorScore === option.value ? undefined : option.value })}
+                          className={cn(
+                            'py-1.5 px-2 rounded-md text-xs font-medium transition-all',
+                            config.minCreatorScore === option.value
+                              ? 'bg-green-600 text-white'
+                              : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Token Security Filters */}
+                  <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-700/50">
+                    <Label className="text-xs font-medium text-zinc-300 block mb-1">Token Security</Label>
+                    <p className="text-[10px] text-zinc-500 mb-2">Additional security checks</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => updateConfig({ requireLiquidityLock: !config.requireLiquidityLock })}
+                        className={cn(
+                          'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
+                          config.requireLiquidityLock
+                            ? 'bg-green-600 text-white'
+                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                        )}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        LP Locked
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateConfig({ requireDexScreenerPaid: !config.requireDexScreenerPaid })}
+                        className={cn(
+                          'flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
+                          config.requireDexScreenerPaid
+                            ? 'bg-green-600 text-white'
+                            : 'bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                        )}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        DexScreener Paid
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Active Filters Summary */}
               {(config.maxMigrationTimeMinutes || config.minVolumeUsd || config.minHolderCount ||
                 config.maxDevHoldingsPct || config.maxTop10HoldingsPct ||
-                config.requireTwitter || config.requireTelegram || config.requireWebsite) && (
+                config.requireTwitter || config.requireTelegram || config.requireWebsite ||
+                config.minTwitterFollowers || config.minCreatorScore ||
+                config.requireLiquidityLock || config.requireDexScreenerPaid) && (
                 <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-zinc-700/50">
                   <span className="text-[10px] text-zinc-500 mr-1">Active:</span>
                   {config.maxMigrationTimeMinutes && (
@@ -839,6 +935,22 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                   )}
                   {config.requireWebsite && (
                     <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">Web</span>
+                  )}
+                  {config.minTwitterFollowers && (
+                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                      {config.minTwitterFollowers >= 1000 ? `${config.minTwitterFollowers / 1000}K` : config.minTwitterFollowers}+ followers
+                    </span>
+                  )}
+                  {config.minCreatorScore && (
+                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">
+                      Creator {config.minCreatorScore}+
+                    </span>
+                  )}
+                  {config.requireLiquidityLock && (
+                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">LP Lock</span>
+                  )}
+                  {config.requireDexScreenerPaid && (
+                    <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded text-[10px]">DexPaid</span>
                   )}
                 </div>
               )}
@@ -974,6 +1086,40 @@ export function PreAuthSniperModal({ isOpen, onClose }: PreAuthSniperModalProps)
                             config.requireWebsite && 'Web'
                           ].filter(Boolean).join(', ')
                         : 'Any'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-400">X Followers</span>
+                    <span className="font-medium text-white">
+                      {config.minTwitterFollowers
+                        ? config.minTwitterFollowers >= 1000
+                          ? `${config.minTwitterFollowers / 1000}K+`
+                          : `${config.minTwitterFollowers}+`
+                        : 'Any'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-400">Creator Score</span>
+                    <span className="font-medium text-white">
+                      {config.minCreatorScore ? `${config.minCreatorScore}+` : 'Any'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-400">LP Lock</span>
+                    <span className={cn(
+                      'font-medium',
+                      config.requireLiquidityLock ? 'text-green-400' : 'text-white'
+                    )}>
+                      {config.requireLiquidityLock ? 'Required' : 'Any'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-400">DexScreener</span>
+                    <span className={cn(
+                      'font-medium',
+                      config.requireDexScreenerPaid ? 'text-green-400' : 'text-white'
+                    )}>
+                      {config.requireDexScreenerPaid ? 'Paid' : 'Any'}
                     </span>
                   </div>
                 </div>
